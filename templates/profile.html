@@ -1,0 +1,351 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>InsightDocs AI · Profile</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+        
+        .glass-panel {
+            background: rgba(24, 24, 27, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Sidebar Transition */
+        #sidebar {
+            transition-property: width, transform;
+            transition-duration: 300ms;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        /* Desktop Collapse State */
+        .sidebar-collapsed {
+            width: 0 !important;
+            overflow: hidden;
+            border-right: 0 !important;
+        }
+
+        /* Form Inputs */
+        .input-glass {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            transition: all 0.2s;
+        }
+        .input-glass:focus {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-color: rgba(99, 102, 241, 0.5); /* Indigo-500 */
+            outline: none;
+            box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.5);
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gray: { 950: '#09090b' },
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="h-screen w-full overflow-hidden bg-gray-950 text-zinc-100 selection:bg-blue-500/30">
+
+    <div id="mobile-backdrop" onclick="toggleMobileSidebar()" class="fixed inset-0 z-40 hidden bg-black/80 backdrop-blur-sm transition-opacity lg:hidden"></div>
+
+    <div class="flex h-full w-full">
+
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 flex w-72 -translate-x-full flex-col border-r border-white/5 bg-gray-950 whitespace-nowrap lg:relative lg:translate-x-0">
+            
+            <div class="flex h-16 shrink-0 items-center justify-between border-b border-white/5 px-6">
+                <a href="{% url 'upload' %}" class="flex items-center gap-2">
+                    <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 shadow-lg shadow-blue-500/20">
+                        <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                    </div>
+                    <span class="text-lg font-bold tracking-tight text-white">InsightDocs</span>
+                </a>
+                <button onclick="toggleMobileSidebar()" class="rounded-lg p-1 text-zinc-400 hover:bg-white/5 hover:text-white lg:hidden">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+
+            <div class="flex flex-1 flex-col overflow-y-auto px-4 py-6 scrollbar-thin">
+                
+                <a href="{% url 'upload' %}" class="group mb-8 flex w-full items-center justify-center gap-2 rounded-xl bg-white py-3 text-sm font-semibold text-black transition-all hover:bg-zinc-200 hover:shadow-lg hover:shadow-white/5">
+                    <span>Start new chat</span>
+                    <svg class="h-4 w-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                </a>
+
+                <div class="space-y-1 mb-8">
+                    <div class="mb-2 px-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">Menu</div>
+                    <a href="{% url 'upload' %}" class="block rounded-xl px-3 py-2 text-sm font-medium text-zinc-400 hover:bg-white/5 hover:text-white">Documents</a>
+                    <a href="{% url 'subscription' %}" class="block rounded-xl px-3 py-2 text-sm font-medium text-zinc-400 hover:bg-white/5 hover:text-white">Subscription & Billing</a>
+                    <a href="#" class="block rounded-xl bg-white/5 px-3 py-2 text-sm font-medium text-white">Settings</a>
+                </div>
+
+                <div class="space-y-1">
+                    <div class="mb-2 flex items-center justify-between px-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                        <span>Recent History</span>
+                    </div>
+                    {% if recent_documents %}
+                        {% for doc in recent_documents %}
+                        <a href="{% url 'chat' doc.id %}" class="group block rounded-xl border border-transparent p-3 text-left transition-colors hover:bg-white/5">
+                            <div class="flex items-center justify-between">
+                                <span class="truncate text-sm text-zinc-300 group-hover:text-white">{{ doc.title }}</span>
+                                <span class="text-[10px] text-zinc-500">{{ doc.extension|upper }}</span>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    {% else %}
+                        <p class="rounded-xl border border-dashed border-white/5 p-3 text-xs text-zinc-500">No recent chats.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="border-t border-white/5 p-4">
+                <div class="flex items-center gap-3 rounded-xl border border-white/5 bg-white/5 p-3">
+                    <div class="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 text-xs font-bold text-white">
+                        {{ request.user.get_full_name|default:request.user.username|slice:":2"|upper }}
+                    </div>
+                    <div class="flex-1 overflow-hidden">
+                        <p class="truncate text-sm font-medium text-white">{{ request.user.get_full_name|default:request.user.username }}</p>
+                        <p class="truncate text-xs text-zinc-400">{{ request.user.email }}</p>
+                    </div>
+                    <form action="{% url 'logout' %}" method="post">
+                        {% csrf_token %}
+                        <button type="submit" class="rounded-lg p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white" title="Log out">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </aside>
+
+        <main class="relative flex flex-1 flex-col overflow-hidden bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-purple-900/20 via-gray-950 to-gray-950">
+            
+            <header class="glass-panel z-20 flex h-16 shrink-0 items-center justify-between px-4 sm:px-6">
+                <div class="flex items-center gap-3">
+                    <button onclick="toggleMobileSidebar()" class="mr-1 rounded-lg p-2 text-zinc-400 hover:bg-white/10 lg:hidden">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                    </button>
+                    
+                    <button onclick="toggleDesktopSidebar()" class="hidden rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white lg:block" title="Toggle Sidebar">
+                        <svg id="toggle-icon-open" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" /></svg>
+                    </button>
+
+                    <div class="flex flex-col border-l border-white/10 pl-4">
+                        <h1 class="text-sm font-semibold text-white sm:text-base">Profile Settings</h1>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <button class="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-white/10 hover:text-white">
+                        View Audit Log
+                    </button>
+                </div>
+            </header>
+
+            <div class="flex-1 overflow-y-auto px-4 py-6 scrollbar-thin sm:px-8">
+                <div class="mx-auto max-w-5xl space-y-8 pb-10">
+                    
+                    {% if messages %}
+                    <div class="space-y-2">
+                        {% for message in messages %}
+                        <div class="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                            {{ message }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    
+                    <div class="glass-card rounded-3xl p-6 sm:p-8">
+                        <div class="flex flex-col items-center gap-6 md:flex-row md:items-start md:gap-8">
+                            
+                            <div class="relative group">
+                                <div class="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-3xl font-bold text-white shadow-xl shadow-purple-900/20 ring-4 ring-gray-950">
+                                    {{ user.get_full_name|default:user.username|slice:":2"|upper }}
+                                </div>
+                                <div class="absolute inset-0 flex cursor-pointer items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                                    <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                </div>
+                            </div>
+
+                            <div class="flex-1 text-center md:text-left">
+                                <h2 class="text-2xl font-bold text-white">{{ user.get_full_name|default:user.username }}</h2>
+                                <p class="text-sm text-zinc-400">{{ user.email }}</p>
+                                <div class="mt-3 flex flex-wrap justify-center gap-2 md:justify-start">
+                                    <span class="inline-flex items-center rounded-md bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-400 ring-1 ring-inset ring-blue-400/20">Administrator</span>
+                                    <span class="inline-flex items-center rounded-md bg-purple-400/10 px-2 py-1 text-xs font-medium text-purple-400 ring-1 ring-inset ring-purple-400/20">Pro Plan</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <form method="post" class="mt-10 grid gap-x-6 gap-y-6 md:grid-cols-2">
+                            {% csrf_token %}
+                            {% if form.non_field_errors %}
+                                <div class="md:col-span-2 rounded-xl bg-red-500/10 p-3 text-xs text-red-400 border border-red-500/20">
+                                    {{ form.non_field_errors }}
+                                </div>
+                            {% endif %}
+
+                            <div class="space-y-1.5">
+                                <label class="block text-xs font-medium text-zinc-400 ml-1">First name</label>
+                                <input type="text" name="{{ form.first_name.name }}" value="{{ form.first_name.value|default:'' }}" class="input-glass block w-full rounded-xl px-4 py-2.5 text-sm placeholder:text-zinc-600" placeholder="First name" />
+                                {% for error in form.first_name.errors %}<p class="text-xs text-red-400 mt-1">{{ error }}</p>{% endfor %}
+                            </div>
+
+                            <div class="space-y-1.5">
+                                <label class="block text-xs font-medium text-zinc-400 ml-1">Last name</label>
+                                <input type="text" name="{{ form.last_name.name }}" value="{{ form.last_name.value|default:'' }}" class="input-glass block w-full rounded-xl px-4 py-2.5 text-sm placeholder:text-zinc-600" placeholder="Last name" />
+                                {% for error in form.last_name.errors %}<p class="text-xs text-red-400 mt-1">{{ error }}</p>{% endfor %}
+                            </div>
+
+                            <div class="space-y-1.5">
+                                <label class="block text-xs font-medium text-zinc-400 ml-1">Username</label>
+                                <input type="text" name="{{ form.username.name }}" value="{{ form.username.value|default:'' }}" class="input-glass block w-full rounded-xl px-4 py-2.5 text-sm placeholder:text-zinc-600" placeholder="Username" />
+                                {% for error in form.username.errors %}<p class="text-xs text-red-400 mt-1">{{ error }}</p>{% endfor %}
+                            </div>
+
+                            <div class="space-y-1.5">
+                                <label class="block text-xs font-medium text-zinc-400 ml-1">Email address</label>
+                                <input type="email" name="{{ form.email.name }}" value="{{ form.email.value|default:'' }}" class="input-glass block w-full rounded-xl px-4 py-2.5 text-sm placeholder:text-zinc-600" placeholder="Email" />
+                                {% for error in form.email.errors %}<p class="text-xs text-red-400 mt-1">{{ error }}</p>{% endfor %}
+                            </div>
+
+                            <div class="flex items-center justify-end gap-3 md:col-span-2 pt-4 border-t border-white/5 mt-2">
+                                <button type="button" class="rounded-xl px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white transition-colors">Cancel</button>
+                                <button type="submit" class="rounded-xl bg-indigo-600 px-6 py-2 text-xs font-bold text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-500 hover:shadow-indigo-600/40 transition-all">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="grid gap-6 lg:grid-cols-2">
+                        
+                        <div class="glass-card rounded-3xl p-6 sm:p-8">
+                            <div class="mb-6 flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs font-bold uppercase tracking-widest text-zinc-500">Security</p>
+                                    <h3 class="text-lg font-semibold text-white">Account Protection</h3>
+                                </div>
+                                <button class="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-white/10 hover:text-white transition-colors">
+                                    Change Password
+                                </button>
+                            </div>
+
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-4 hover:bg-white/10 transition-colors cursor-pointer">
+                                    <div class="flex items-center gap-3">
+                                        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
+                                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-medium text-white">2FA Authentication</p>
+                                            <p class="text-[10px] text-zinc-400">Authenticator App</p>
+                                        </div>
+                                    </div>
+                                    <span class="text-xs font-semibold text-emerald-400">Enabled</span>
+                                </div>
+
+                                <div class="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-4 hover:bg-white/10 transition-colors cursor-pointer">
+                                    <div class="flex items-center gap-3">
+                                        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/20 text-blue-400">
+                                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-medium text-white">Active Sessions</p>
+                                            <p class="text-[10px] text-zinc-400">Chrome (Mac OS) · Now</p>
+                                        </div>
+                                    </div>
+                                    <span class="text-xs font-semibold text-zinc-400">2 Devices</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="glass-card rounded-3xl p-6 sm:p-8">
+                            <div class="mb-6">
+                                <p class="text-xs font-bold uppercase tracking-widest text-zinc-500">Notifications</p>
+                                <h3 class="text-lg font-semibold text-white">Email Preferences</h3>
+                            </div>
+                            
+                            <div class="space-y-1">
+                                <div class="flex items-center justify-between rounded-xl px-2 py-3 hover:bg-white/5 transition-colors">
+                                    <span class="text-sm text-zinc-300">Product Updates</span>
+                                    <div class="relative inline-flex h-5 w-9 cursor-pointer items-center rounded-full bg-indigo-600 transition-colors">
+                                        <span class="translate-x-4.5 inline-block h-3.5 w-3.5 transform rounded-full bg-white transition shadow-sm"></span>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-center justify-between rounded-xl px-2 py-3 hover:bg-white/5 transition-colors">
+                                    <span class="text-sm text-zinc-300">Weekly Summaries</span>
+                                    <div class="relative inline-flex h-5 w-9 cursor-pointer items-center rounded-full bg-indigo-600 transition-colors">
+                                        <span class="translate-x-4.5 inline-block h-3.5 w-3.5 transform rounded-full bg-white transition shadow-sm"></span>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center justify-between rounded-xl px-2 py-3 hover:bg-white/5 transition-colors">
+                                    <span class="text-sm text-zinc-300">Billing Receipts</span>
+                                    <div class="relative inline-flex h-5 w-9 cursor-pointer items-center rounded-full bg-zinc-700 transition-colors">
+                                        <span class="translate-x-1 inline-block h-3.5 w-3.5 transform rounded-full bg-white transition shadow-sm"></span>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center justify-between rounded-xl px-2 py-3 hover:bg-white/5 transition-colors">
+                                    <span class="text-sm text-zinc-300">Security Alerts</span>
+                                    <div class="relative inline-flex h-5 w-9 cursor-pointer items-center rounded-full bg-indigo-600 transition-colors">
+                                        <span class="translate-x-4.5 inline-block h-3.5 w-3.5 transform rounded-full bg-white transition shadow-sm"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Mobile Sidebar Logic
+        function toggleMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('mobile-backdrop');
+            if (sidebar.classList.contains('-translate-x-full')) {
+                sidebar.classList.remove('-translate-x-full');
+                backdrop.classList.remove('hidden');
+                requestAnimationFrame(() => backdrop.classList.remove('opacity-0'));
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                backdrop.classList.add('opacity-0');
+                setTimeout(() => backdrop.classList.add('hidden'), 300);
+            }
+        }
+
+        // Desktop Sidebar Logic
+        function toggleDesktopSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('sidebar-collapsed');
+        }
+    </script>
+</body>
+</html>

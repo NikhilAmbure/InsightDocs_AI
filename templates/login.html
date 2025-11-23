@@ -1,0 +1,163 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>InsightDocs AI · Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="{% static "js/auth.js" %}"></script> <!-- Token utilities -->
+    <script src="{% static "js/login.js" %}"></script> <!-- Login page logic -->
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        .glass-card {
+            background: rgba(24, 24, 27, 0.4);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Animated Blobs */
+        @keyframes float {
+            0% { transform: translate(0px, 0px) scale(1); }
+            33% { transform: translate(30px, -50px) scale(1.1); }
+            66% { transform: translate(-20px, 20px) scale(0.9); }
+            100% { transform: translate(0px, 0px) scale(1); }
+        }
+        .animate-blob {
+            animation: float 7s infinite;
+        }
+        .animation-delay-2000 {
+            animation-delay: 2s;
+        }
+        .animation-delay-4000 {
+            animation-delay: 4s;
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gray: { 950: '#09090b' }, // Zinc 950
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="relative flex min-h-screen items-center justify-center overflow-hidden bg-gray-950 text-zinc-100 selection:bg-blue-500/30">
+
+    <!-- Background Effects -->
+    <div class="absolute inset-0 overflow-hidden">
+        <div class="absolute -left-4 -top-24 h-96 w-96 animate-blob rounded-full bg-blue-500/20 blur-3xl filter mix-blend-multiply opacity-70"></div>
+        <div class="animation-delay-2000 absolute -right-4 top-1/2 h-96 w-96 animate-blob rounded-full bg-indigo-500/20 blur-3xl filter mix-blend-multiply opacity-70"></div>
+        <div class="animation-delay-4000 absolute bottom-0 left-20 h-96 w-96 animate-blob rounded-full bg-purple-500/20 blur-3xl filter mix-blend-multiply opacity-70"></div>
+        <!-- Radial Gradient Overlay -->
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-transparent via-gray-950/60 to-gray-950"></div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="relative z-10 w-full max-w-5xl px-4 py-8">
+        <div class="glass-card overflow-hidden rounded-[2rem] shadow-2xl shadow-black/50">
+            <div class="grid lg:grid-cols-2">
+
+                <!-- Left: Brand & Marketing -->
+                <div class="relative flex flex-col justify-center p-10 sm:p-12">
+                    <!-- Brand Badge -->
+                    <div class="mb-8">
+                        <span class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-blue-400 shadow-lg shadow-blue-500/10">
+                            <span class="relative flex h-2 w-2">
+                              <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
+                              <span class="relative inline-flex h-2 w-2 rounded-full bg-blue-500"></span>
+                            </span>
+                            InsightDocs AI
+                        </span>
+                    </div>
+
+                    <h1 class="mb-6 text-3xl font-bold leading-tight text-white sm:text-4xl lg:text-5xl">
+                        Sign in and keep chatting with every <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">document.</span>
+                    </h1>
+                    
+                    <p class="text-base leading-relaxed text-zinc-400">
+                        Your last chats, uploads, and workspace automations resume exactly where you left off. Secure, fast, and intelligent.
+                    </p>
+
+                    <div class="mt-10 flex items-center gap-4 text-xs font-medium text-zinc-500">
+                        <div class="flex -space-x-2">
+                            <div class="h-8 w-8 rounded-full border-2 border-gray-900 bg-zinc-700"></div>
+                            <div class="h-8 w-8 rounded-full border-2 border-gray-900 bg-zinc-600"></div>
+                            <div class="h-8 w-8 rounded-full border-2 border-gray-900 bg-zinc-500"></div>
+                        </div>
+                        <p>Trusted by 10,000+ users</p>
+                    </div>
+                </div>
+
+                <!-- Right: Login Form -->
+                <div class="border-t border-white/5 bg-gray-900/30 p-10 backdrop-blur-md sm:p-12 lg:border-l lg:border-t-0">
+                    <div class="mb-8 lg:hidden">
+                        <h2 class="text-xl font-bold text-white">Welcome back</h2>
+                    </div>
+
+                    <form method="POST" action="{% url 'login' %}" class="space-y-6">
+                        {% csrf_token %}
+                        
+                        <!-- Email Input -->
+                        <div class="space-y-1.5">
+                            <label class="block text-xs font-medium text-zinc-300">Email Address</label>
+                            <div class="relative">
+                                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                    <svg class="h-5 w-5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" /></svg>
+                                </div>
+                                <input type="email" name="email" required placeholder="you@example.com"
+                                    class="block w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-10 pr-3 text-sm text-white placeholder:text-zinc-600 focus:border-blue-500/50 focus:bg-white/10 focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-all" />
+                            </div>
+                        </div>
+
+                        <!-- Password Input -->
+                        <div class="space-y-1.5">
+                            <label class="block text-xs font-medium text-zinc-300">Password</label>
+                            <div class="relative">
+                                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                    <svg class="h-5 w-5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                                </div>
+                                <input type="password" name="password" required placeholder="••••••••"
+                                    class="block w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-10 pr-3 text-sm text-white placeholder:text-zinc-600 focus:border-blue-500/50 focus:bg-white/10 focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-all" />
+                            </div>
+                        </div>
+
+                        <!-- Remember & Forgot -->
+                        <div class="flex items-center justify-between text-xs text-zinc-400">
+                            <label class="flex items-center gap-2 cursor-pointer hover:text-zinc-300 transition-colors">
+                                <input type="checkbox" class="h-4 w-4 rounded border-white/10 bg-white/5 text-blue-600 focus:ring-offset-gray-900 focus:ring-blue-500" />
+                                Remember me
+                            </label>
+                            <a href="{% url 'password_reset' %}" class="font-medium text-blue-400 hover:text-blue-300 transition-colors">Forgot password?</a>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <button type="submit"
+                            class="group w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition-all hover:shadow-blue-600/40 hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900">
+                            Sign In
+                            <span class="ml-1 inline-block transition-transform group-hover:translate-x-0.5">→</span>
+                        </button>
+                    </form>
+
+                    <div class="mt-8 text-center">
+                        <p class="text-xs text-zinc-500">
+                            New to InsightDocs?
+                            <a href="{% url 'signup' %}" class="font-medium text-white hover:underline underline-offset-4 decoration-blue-500">Create an account</a>
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</body>
+</html>

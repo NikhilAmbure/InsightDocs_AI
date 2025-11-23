@@ -1,0 +1,606 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>InsightDocs AI · Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+        
+        .glass-panel {
+            background: rgba(24, 24, 27, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .markdown-body p { margin-bottom: 0.75rem; }
+        .markdown-body p:last-child { margin-bottom: 0; }
+        .markdown-body ul { list-style-type: disc; margin-left: 1.5rem; margin-bottom: 0.75rem; }
+        .markdown-body ol { list-style-type: decimal; margin-left: 1.5rem; margin-bottom: 0.75rem; }
+        .markdown-body strong { font-weight: 700; color: #fff; }
+        .markdown-body em { font-style: italic; }
+        .markdown-body h1, .markdown-body h2, .markdown-body h3 { 
+            font-weight: 700; margin-top: 1rem; margin-bottom: 0.5rem; color: #fff; 
+        }
+        .markdown-body pre { 
+            background: #1e1e20; padding: 0.75rem; border-radius: 0.5rem; overflow-x: auto; 
+            margin-bottom: 0.75rem; border: 1px solid rgba(255,255,255,0.1);
+        }
+        .markdown-body code { 
+            font-family: monospace; background: rgba(255,255,255,0.1); 
+            padding: 0.1rem 0.3rem; border-radius: 0.25rem; font-size: 0.85em;
+        }
+        .markdown-body pre code { 
+            background: transparent; padding: 0; color: #e2e8f0; 
+        }
+        .markdown-body a { color: #60a5fa; text-decoration: underline; }
+
+        #chat-input-container textarea {
+            width: 100%;
+            background-color: transparent;
+            color: white;
+            outline: none;
+            border: none;
+            font-size: 0.875rem;
+            padding: 0.5rem;
+            resize: none;
+            max-height: 150px;
+        }
+        #chat-input-container textarea::placeholder { color: #a1a1aa; }
+
+        #sidebar {
+            transition-property: width, transform;
+            transition-duration: 300ms;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .sidebar-collapsed {
+            width: 0 !important;
+            overflow: hidden;
+            border-right: 0 !important;
+        }
+
+        .tab-active { border-bottom: 2px solid #3b82f6; color: white; }
+        .tab-inactive { border-bottom: 2px solid transparent; color: #71717a; }
+
+        .typing-indicator {
+            display: flex;
+            gap: 3px;
+        }
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.6);
+            animation: typing 1.4s infinite;
+        }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typing {
+            0%, 60%, 100% { opacity: 0.3; }
+            30% { opacity: 1; }
+        }
+
+        .error-message {
+            background-color: rgba(239, 68, 68, 0.1);
+            border-left: 3px solid #ef4444;
+            color: #fca5a5;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+        }
+
+        .status-connected {
+            background-color: rgba(34, 197, 94, 0.1);
+            color: #86efac;
+        }
+
+        .status-connecting {
+            background-color: rgba(59, 130, 246, 0.1);
+            color: #93c5fd;
+        }
+
+        .status-disconnected {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: #fca5a5;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-dot.connected { background-color: #22c55e; }
+        .status-dot.connecting { background-color: #3b82f6; animation: pulse 1.5s infinite; }
+        .status-dot.disconnected { background-color: #ef4444; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: { gray: { 950: '#09090b' } }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="h-screen w-full overflow-hidden bg-gray-950 text-zinc-100 selection:bg-blue-500/30">
+
+    <div id="mobile-backdrop" onclick="toggleMobileSidebar()" class="fixed inset-0 z-40 hidden bg-black/80 backdrop-blur-sm transition-opacity lg:hidden"></div>
+
+    <div class="flex h-full w-full">
+
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 flex w-72 -translate-x-full flex-col border-r border-white/5 bg-gray-950 whitespace-nowrap lg:relative lg:translate-x-0">
+            
+            <div class="flex h-16 shrink-0 items-center justify-between border-b border-white/5 px-6">
+                <a href="{% url 'upload' %}" class="flex items-center gap-2">
+                    <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 shadow-lg shadow-blue-500/20">
+                        <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                    </div>
+                    <span class="text-lg font-bold tracking-tight text-white">InsightDocs</span>
+                </a>
+                <button onclick="toggleMobileSidebar()" class="rounded-lg p-1 text-zinc-400 hover:bg-white/5 hover:text-white lg:hidden">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+
+            <div class="flex flex-1 flex-col overflow-y-auto px-4 py-6 scrollbar-thin">
+                
+                <div class="mb-6 rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4 shadow-inner shadow-blue-500/5">
+                    <div class="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-blue-400">
+                        <span class="relative flex h-2 w-2">
+                          <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
+                          <span class="relative inline-flex h-2 w-2 rounded-full bg-blue-500"></span>
+                        </span>
+                        Active Session
+                    </div>
+                    <p class="truncate font-semibold text-white">{{ document.title }}</p>
+                    <p class="text-xs text-zinc-400">Updated {{ document.uploaded_at|timesince }} ago</p>
+                </div>
+
+                <a href="{% url 'upload' %}" class="group mb-8 flex w-full items-center justify-center gap-2 rounded-xl bg-white py-3 text-sm font-semibold text-black transition-all hover:bg-zinc-200 hover:shadow-lg hover:shadow-white/5">
+                    <span>Start new chat</span>
+                    <svg class="h-4 w-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                </a>
+
+                <div class="space-y-1">
+                    <div class="mb-2 flex items-center justify-between px-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                        <span>Recent History</span>
+                    </div>
+                    
+                    {% if recent_documents %}
+                        {% for doc in recent_documents %}
+                        <a href="{% url 'chat' doc.id %}" class="group block rounded-xl border border-transparent p-3 text-left transition-colors hover:bg-white/5">
+                            <div class="flex items-center justify-between">
+                                <span class="truncate text-sm text-zinc-300 group-hover:text-white">{{ doc.title }}</span>
+                                <span class="text-[10px] text-zinc-500">{{ doc.extension|upper }}</span>
+                            </div>
+                            <p class="mt-1 text-xs text-zinc-500">{{ doc.uploaded_at|timesince }} ago</p>
+                        </a>
+                        {% endfor %}
+                    {% else %}
+                        <p class="rounded-xl border border-dashed border-white/5 p-3 text-xs text-zinc-500">Upload another file to see it here.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="border-t border-white/5 p-4">
+                <div class="flex items-center gap-3 rounded-xl border border-white/5 bg-white/5 p-3">
+                    <div class="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 text-xs font-bold text-white">
+                        {{ request.user.get_full_name|default:request.user.username|slice:":2"|upper }}
+                    </div>
+                    <div class="flex-1 overflow-hidden">
+                        <p class="truncate text-sm font-medium text-white">{{ request.user.get_full_name|default:request.user.username }}</p>
+                        <p class="truncate text-xs text-zinc-400">{{ request.user.email }}</p>
+                    </div>
+                    <a href="{% url 'profile' %}" class="rounded-lg px-2 py-1 text-xs font-semibold text-zinc-300 hover:bg-white/10">Profile</a>
+                    <form action="{% url 'logout' %}" method="post">
+                        {% csrf_token %}
+                        <button type="submit" class="rounded-lg p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white" title="Log out">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </aside>
+
+        <main class="relative flex flex-1 flex-col overflow-hidden bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-900/20 via-gray-950 to-gray-950">
+            
+            <header class="glass-panel z-20 flex h-16 shrink-0 items-center justify-between px-4 sm:px-6">
+                <div class="flex items-center gap-3">
+                    <button onclick="toggleMobileSidebar()" class="mr-1 rounded-lg p-2 text-zinc-400 hover:bg-white/10 lg:hidden">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                    </button>
+                    
+                    <button onclick="toggleDesktopSidebar()" class="hidden rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white lg:block" title="Toggle Sidebar">
+                        <svg id="toggle-icon-open" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" /></svg>
+                    </button>
+
+                    <div class="flex flex-col border-l border-white/10 pl-4">
+                        <h1 class="flex items-center gap-2 text-sm font-semibold text-white sm:text-base">
+                            {{ document.title }}
+                            <span class="hidden rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-zinc-300 sm:inline-block">{{ document.extension|upper }}</span>
+                        </h1>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <div id="ws-status" class="connection-status status-connecting">
+                        <span class="status-dot connecting"></span>
+                        <span>Connecting...</span>
+                    </div>
+
+                    <a href="{% url 'subscription' %}" class="group relative hidden items-center gap-2 overflow-hidden rounded-full bg-gradient-to-r from-amber-400 to-orange-500 px-4 py-1.5 text-xs font-bold text-white shadow-[0_0_15px_rgba(245,158,11,0.3)] transition-all hover:shadow-[0_0_25px_rgba(245,158,11,0.5)] sm:flex">
+                        <div class="absolute inset-0 bg-white/20 transition-transform duration-500 group-hover:translate-x-full"></div>
+                        Upgrade Pro
+                    </a>
+                </div>
+            </header>
+
+            <div class="flex h-12 w-full shrink-0 items-center justify-center border-b border-white/5 bg-gray-950/50 lg:hidden">
+                <button onclick="switchMobileTab('chat')" id="tab-btn-chat" class="tab-active flex h-full flex-1 items-center justify-center text-xs font-medium transition-colors">Chat</button>
+                <button onclick="switchMobileTab('doc')" id="tab-btn-doc" class="tab-inactive flex h-full flex-1 items-center justify-center text-xs font-medium transition-colors">Document</button>
+            </div>
+
+            <div class="flex flex-1 overflow-hidden relative">
+                
+                <div id="chat-view-wrapper" class="flex flex-1 flex-col relative h-full w-full">
+                    
+                    <div id="chat-container" class="flex-1 overflow-y-auto px-4 py-6 sm:px-8 scroll-smooth">
+                        <div class="mx-auto max-w-3xl space-y-6">
+                            <div class="flex items-center justify-between border-b border-white/5 pb-4">
+                                <div>
+                                    <h2 class="text-lg font-semibold text-white">Conversation</h2>
+                                    <p class="text-xs text-emerald-400 flex items-center gap-1">
+                                        <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> Context aware
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div id="chat-messages" class="space-y-6 pb-4 flex flex-col">
+                                {% for msg in chat_history %}
+                                    <div class="w-full flex {% if msg.role == 'user' %}justify-end{% else %}justify-start{% endif %}">
+                                        <div class="p-3 my-2 rounded-lg max-w-[85%] sm:max-w-[75%] text-sm leading-relaxed
+                                            {% if msg.role == 'user' %}
+                                                bg-blue-600 text-white
+                                            {% else %}
+                                                bg-zinc-800 text-gray-200 markdown-body shadow-lg
+                                            {% endif %}
+                                        ">
+                                            {% if msg.role == 'user' %}
+                                                {{ msg.content|linebreaksbr }}
+                                            {% else %}
+                                                <div class="markdown-content">{{ msg.content }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="shrink-0 border-t border-white/5 bg-gray-950/80 p-4 backdrop-blur-md z-10">
+                        <div class="mx-auto max-w-3xl">
+                            <form id="chat-form" onsubmit="handleSendMessage(event)" class="relative flex items-end gap-2 rounded-2xl border border-white/10 bg-white/5 p-2 shadow-2xl shadow-black/50 focus-within:border-blue-500/50 focus-within:bg-white/10 transition-colors">
+                                <div id="chat-input-container" class="flex-1 py-2 min-h-[2.5rem] max-h-32 overflow-y-auto">
+                                    <textarea name="content" id="message-input" rows="1" placeholder="Ask something about your document..." required class="w-full bg-transparent text-white outline-none border-none text-sm resize-none focus:ring-0 placeholder-zinc-500"></textarea>
+                                </div>
+                                <button type="submit" id="send-btn" class="mb-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-lg shadow-blue-600/20 hover:bg-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7" /></svg>
+                                </button>
+                            </form>
+                            <p class="mt-2 text-center text-[10px] text-zinc-600">AI can make mistakes. Review generated responses.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <aside id="doc-view-wrapper" class="hidden h-full w-full flex-col border-l border-white/5 bg-gray-950/50 backdrop-blur lg:flex lg:w-96 shrink-0">
+                    <div class="flex h-10 shrink-0 items-center justify-between border-b border-white/5 px-4 lg:h-12">
+                        <h3 class="text-xs font-semibold text-white lg:text-sm">Document Preview</h3>
+                        <a href="{{ document.file.url }}" target="_blank" class="text-[10px] text-blue-400 hover:text-blue-300 lg:text-xs">Open New Tab ↗</a>
+                    </div>
+                    
+                    <div class="flex-1 overflow-hidden bg-zinc-900 relative">
+                        {% if document.is_pdf %}
+                        <iframe src="{{ document.file.url }}#toolbar=0&navpanes=0" class="absolute inset-0 h-full w-full border-none" title="Preview"></iframe>
+                        {% else %}
+                        <div class="flex h-full flex-col items-center justify-center p-6 text-center">
+                            <div class="h-16 w-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
+                                <span class="text-xl font-bold text-zinc-500">{{ document.extension|upper }}</span>
+                            </div>
+                            <p class="text-sm text-zinc-400">Inline preview not available.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </aside>
+
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const DOCUMENT_ID = {{ document.id }};
+        let chatSocket = null;
+        let isConnecting = false;
+
+        // Initialize WebSocket connection
+        function initWebSocket() {
+            if (isConnecting || chatSocket) return;
+            
+            isConnecting = true;
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/chat/${DOCUMENT_ID}/`;
+            
+            console.log('Connecting to WebSocket:', wsUrl);
+            updateStatus('connecting');
+
+            chatSocket = new WebSocket(wsUrl);
+
+            chatSocket.onopen = function(e) {
+                console.log('WebSocket connection established');
+                updateStatus('connected');
+                isConnecting = false;
+            };
+
+            chatSocket.onmessage = function(e) {
+                const data = JSON.parse(e.data);
+                console.log('WebSocket message received:', data.type);
+                handleWebSocketMessage(data);
+            };
+
+            chatSocket.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                updateStatus('disconnected');
+            };
+
+            chatSocket.onclose = function(e) {
+                console.log('WebSocket closed:', e.code);
+                updateStatus('disconnected');
+                isConnecting = false;
+                
+                // Attempt to reconnect after 3 seconds
+                setTimeout(() => {
+                    if (!chatSocket || chatSocket.readyState === WebSocket.CLOSED) {
+                        console.log('Attempting to reconnect...');
+                        initWebSocket();
+                    }
+                }, 3000);
+            };
+        }
+
+        function updateStatus(status) {
+            const statusEl = document.getElementById('ws-status');
+            statusEl.className = `connection-status status-${status}`;
+            
+            const dotEl = statusEl.querySelector('.status-dot');
+            dotEl.className = `status-dot ${status}`;
+            
+            const statusText = {
+                'connected': 'Connected',
+                'connecting': 'Connecting...',
+                'disconnected': 'Disconnected'
+            };
+            
+            statusEl.innerHTML = `<span class="status-dot ${status}"></span><span>${statusText[status]}</span>`;
+        }
+
+        function handleWebSocketMessage(data) {
+            const type = data.type;
+
+            if (type === 'user_message') {
+                addMessageToUI(data.content, 'user', data.id);
+            } else if (type === 'ai_thinking') {
+                addLoadingIndicator();
+            } else if (type === 'ai_message') {
+                removeLoadingIndicator();
+                addMessageToUI(data.content, 'assistant', data.id);
+            } else if (type === 'user_typing') {
+                showTypingIndicator(data.user);
+            } else if (type === 'error') {
+                removeLoadingIndicator();
+                showError(data.message);
+            }
+        }
+
+        function addMessageToUI(content, role, id) {
+            const messagesDiv = document.getElementById('chat-messages');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'w-full flex ' + (role === 'user' ? 'justify-end' : 'justify-start');
+            msgDiv.id = `msg-${id}`;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = `p-3 my-2 rounded-lg max-w-[85%] sm:max-w-[75%] text-sm leading-relaxed ${
+                role === 'user' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-zinc-800 text-gray-200 markdown-body shadow-lg'
+            }`;
+
+            if (role === 'user') {
+                contentDiv.textContent = content;
+            } else {
+                contentDiv.innerHTML = `<div class="markdown-content">${marked.parse(content)}</div>`;
+            }
+
+            msgDiv.appendChild(contentDiv);
+            messagesDiv.appendChild(msgDiv);
+            scrollToBottom();
+        }
+
+        function addLoadingIndicator() {
+            const messagesDiv = document.getElementById('chat-messages');
+            const loaderDiv = document.createElement('div');
+            loaderDiv.id = 'loading-indicator';
+            loaderDiv.className = 'w-full flex justify-start';
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'p-3 my-2 rounded-lg max-w-[85%] sm:max-w-[75%] bg-zinc-800 text-gray-200 markdown-body shadow-lg';
+            contentDiv.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
+
+            loaderDiv.appendChild(contentDiv);
+            messagesDiv.appendChild(loaderDiv);
+            scrollToBottom();
+        }
+
+        function removeLoadingIndicator() {
+            const loader = document.getElementById('loading-indicator');
+            if (loader) loader.remove();
+        }
+
+        function showTypingIndicator(username) {
+            console.log(`${username} is typing...`);
+            // Optional: implement visual typing indicator for other users
+        }
+
+        function handleSendMessage(e) {
+            e.preventDefault();
+
+            const textarea = document.getElementById('message-input');
+            const sendBtn = document.getElementById('send-btn');
+            const content = textarea.value.trim();
+
+            if (!content || !chatSocket || chatSocket.readyState !== WebSocket.OPEN) {
+                if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN) {
+                    showError('WebSocket not connected. Please wait...');
+                }
+                return;
+            }
+
+            sendBtn.disabled = true;
+
+            // Send message via WebSocket
+            chatSocket.send(JSON.stringify({
+                'type': 'chat_message',
+                'content': content
+            }));
+
+            textarea.value = '';
+            textarea.style.height = 'auto';
+
+            sendBtn.disabled = false;
+        }
+
+        function showError(message) {
+            const messagesDiv = document.getElementById('chat-messages');
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message mx-auto max-w-3xl';
+            errorDiv.textContent = '❌ ' + message;
+            messagesDiv.appendChild(errorDiv);
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            const container = document.getElementById('chat-container');
+            if (container) {
+                setTimeout(() => {
+                    container.scrollTop = container.scrollHeight;
+                }, 0);
+            }
+        }
+
+        // Auto-resize textarea
+        const textarea = document.getElementById('message-input');
+        if (textarea) {
+            textarea.addEventListener('input', function () {
+                this.style.height = 'auto';
+                this.style.height = Math.min(this.scrollHeight, 150) + 'px';
+            });
+            textarea.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    document.getElementById('chat-form').dispatchEvent(new Event('submit'));
+                }
+            });
+        }
+
+        // Sidebar functions
+        function toggleMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('mobile-backdrop');
+            if (sidebar.classList.contains('-translate-x-full')) {
+                sidebar.classList.remove('-translate-x-full');
+                backdrop.classList.remove('hidden');
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                backdrop.classList.add('hidden');
+            }
+        }
+
+        function toggleDesktopSidebar() {
+            document.getElementById('sidebar').classList.toggle('sidebar-collapsed');
+        }
+
+        function switchMobileTab(tab) {
+            const chatView = document.getElementById('chat-view-wrapper');
+            const docView = document.getElementById('doc-view-wrapper');
+            const btnChat = document.getElementById('tab-btn-chat');
+            const btnDoc = document.getElementById('tab-btn-doc');
+
+            if (tab === 'chat') {
+                chatView.classList.remove('hidden');
+                docView.classList.add('hidden');
+                btnChat.classList.add('tab-active');
+                btnChat.classList.remove('tab-inactive');
+                btnDoc.classList.remove('tab-active');
+                btnDoc.classList.add('tab-inactive');
+            } else {
+                chatView.classList.add('hidden');
+                docView.classList.remove('hidden');
+                btnDoc.classList.add('tab-active');
+                btnDoc.classList.remove('tab-inactive');
+                btnChat.classList.remove('tab-active');
+                btnChat.classList.add('tab-inactive');
+            }
+        }
+
+        // Initialize WebSocket on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initWebSocket();
+            renderMarkdown();
+            scrollToBottom();
+        });
+
+        function renderMarkdown() {
+            document.querySelectorAll('.markdown-content').forEach(el => {
+                if (!el.dataset.rendered) {
+                    el.innerHTML = marked.parse(el.textContent);
+                    el.dataset.rendered = 'true';
+                }
+            });
+        }
+
+        // Cleanup WebSocket on page unload
+        window.addEventListener('beforeunload', function() {
+            if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+                chatSocket.close();
+            }
+        });
+    </script>
+</body>
+</html>
