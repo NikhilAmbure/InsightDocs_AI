@@ -52,9 +52,15 @@ def get_gemini_response(user_message, file_path, chat_history):
             "role": "user",
             "parts": [
                 uploaded_file,
-                "You are a helpful AI assistant. Answer questions based on the provided document. "
-                "If asked to summarize, provide a clear and concise overview. "
-                "If information isn't in the document, clearly state that."
+               (
+                "You are a helpful AI assistant. "
+                "First check if the user's question can be answered from the document. "
+                "If yes — use the document and reference it directly. "
+                "If no — intelligently use external knowledge to help. "
+                "If the document has questions/exercises, solve them logically using both the document and your knowledge. "
+                "Make answers clear, structured, and accurate."
+                )
+
             ]
         }
         history.append(system_message)
