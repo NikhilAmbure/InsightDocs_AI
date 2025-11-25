@@ -1,4 +1,8 @@
+import os
+
 from django import forms
+from django.conf import settings
+from django.core.exceptions import ValidationError
 
 from .models import Document
 from .models import ChatMessage
@@ -10,6 +14,31 @@ class DocumentUploadForm(forms.ModelForm):
     class Meta:
         model = Document
         fields = ("file", "title")
+
+    def clean_file(self):
+        uploaded_file = self.cleaned_data.get("file")
+        if not uploaded_file:
+            return uploaded_file
+
+        max_size = getattr(settings, "MAX_UPLOAD_SIZE", 15 * 1024 * 1024)
+        if uploaded_file.size > max_size:
+            raise ValidationError(
+                f"File is too large. Maximum allowed size is {max_size // (1024 * 1024)} MB."
+            )
+
+        allowed_extensions = {
+            ext.lower().lstrip(".")
+            for ext in getattr(settings, "ALLOWED_UPLOAD_EXTENSIONS", [])
+        }
+        _, ext = os.path.splitext(uploaded_file.name)
+        normalized_ext = ext.lower().lstrip(".")
+
+        if allowed_extensions and normalized_ext not in allowed_extensions:
+            raise ValidationError(
+                f"Unsupported file type '.{normalized_ext}'. Allowed types: {', '.join(sorted(allowed_extensions))}."
+            )
+
+        return uploaded_file
 
     def clean(self):
         cleaned_data = super().clean()

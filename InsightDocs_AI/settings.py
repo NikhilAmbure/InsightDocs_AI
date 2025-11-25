@@ -11,8 +11,9 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
-import os   
+import os
 from dotenv import load_dotenv
+
 load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -45,6 +46,8 @@ INSTALLED_APPS = [
     'crispy_bootstrap5',
     'channels',
     'corsheaders',
+    'cloudinary',
+    'cloudinary_storage',
     'accounts',
     'documents'
 ]
@@ -105,10 +108,15 @@ CSRF_TRUSTED_ORIGINS = [
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME': 'insightdocs_ai_db',
+        'USER': 'postgres',
+        'PASSWORD': '1702',
+        'HOST': 'localhost',
+        'PORT': ''
     }
 }
 
@@ -198,6 +206,25 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME")
+CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY")
+CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET")
+CLOUDINARY_UPLOAD_FOLDER = os.environ.get("CLOUDINARY_UPLOAD_FOLDER", "insightdocs/documents")
+
+if all([CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET]):
+    CLOUDINARY_STORAGE = {
+        "CLOUD_NAME": CLOUDINARY_CLOUD_NAME,
+        "API_KEY": CLOUDINARY_API_KEY,
+        "API_SECRET": CLOUDINARY_API_SECRET,
+        "SECURE": True,
+        "UPLOAD_OPTIONS": {
+            "folder": CLOUDINARY_UPLOAD_FOLDER,
+            "resource_type": "raw",
+            "overwrite": False,
+        },
+    }
+    DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.RawMediaCloudinaryStorage"
+
 # Allow internal previews (iframes) for uploaded documents
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 
@@ -207,3 +234,10 @@ X_FRAME_OPTIONS = 'SAMEORIGIN'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 GOOGLE_API_KEY= os.environ.get('GOOGLE_API_KEY')
+
+RATE_LIMITS = {
+    "upload": {
+        "limit": int(os.environ.get("UPLOAD_RATE_LIMIT", "5")),
+        "window": int(os.environ.get("UPLOAD_RATE_WINDOW", "60")),  # seconds
+    },
+}

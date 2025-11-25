@@ -1,11 +1,14 @@
 # views.py
+import logging
+
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
-import logging
 
 from .forms import DocumentUploadForm
 from .models import Document, ChatSession, ChatMessage
+from .utils.rate_limit import check_rate_limit
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +26,25 @@ def upload_view(request):
     form = DocumentUploadForm(request.POST or None, request.FILES or None)
 
     if request.method == "POST":
+        upload_rate_limit = getattr(settings, "RATE_LIMITS", {}).get(
+            "upload",
+            {"limit": 5, "window": 60},
+        )
+        limit_result = check_rate_limit(
+            request,
+            scope="upload",
+            limit=upload_rate_limit.get("limit", 5),
+            window=upload_rate_limit.get("window", 60),
+        )
+
+        if limit_result.limited:
+            messages.error(
+                request,
+                f"You have reached the upload rate limit. "
+                f"Please wait {limit_result.retry_after} seconds and try again.",
+            )
+            return redirect("upload")
+
         if form.is_valid():
             document = form.save(commit=False)
             document.owner = request.user
@@ -75,3 +97,7 @@ def chat_view(request, document_id):
         "chat_history": chat_history_qs,
         "recent_documents": recent_docs,
     })
+    
+
+def coming_soon(request):
+    return render(request, 'coming-soon.html')

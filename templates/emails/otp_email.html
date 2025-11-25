@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>InsightDocs AI OTP</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23a78bfa;stop-opacity:1'/%3E%3Cstop offset='100%25' style='stop-color:%237c3aed;stop-opacity:1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='0' y='0' width='64' height='64' rx='16' fill='%23020617'/%3E%3Cpath d='M32 14L50 23V41L32 50L14 41V23Z' fill='url(%23g)' stroke='%23ddd6fe' stroke-width='2'/%3E%3Cpath d='M32 50V32M32 32L50 23M32 32L14 23' stroke='%23ddd6fe' stroke-width='2'/%3E%3C/svg%3E" type="image/svg+xml">
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f4f5; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .header { background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); padding: 30px; text-align: center; }
+        .header h1 { color: #ffffff; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 1px; }
+        .content { padding: 40px 30px; text-align: center; color: #333333; }
+        .content p { font-size: 16px; line-height: 1.6; color: #52525b; margin-bottom: 25px; }
+        .otp-box { background-color: #f0f9ff; border: 1px dashed #3b82f6; border-radius: 8px; padding: 20px; margin: 30px 0; display: inline-block; }
+        .otp-code { font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #1e40af; font-family: monospace; }
+        .footer { background-color: #18181b; padding: 20px; text-align: center; color: #71717a; font-size: 12px; }
+        .footer a { color: #3b82f6; text-decoration: none; }
+        .warning { font-size: 13px; color: #ef4444; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>InsightDocs AI</h1>
+        </div>
+        <div class="content">
+            <h2>Authentication Required</h2>
+            <p>Hello,</p>
+            <p>You requested a verification code for <strong>InsightDocs AI</strong>. Please use the One-Time Password (OTP) below to complete your request.</p>
+            
+            <div class="otp-box">
+                <span class="otp-code">{{ otp }}</span>
+            </div>
+
+            <p>This code is valid for 10 minutes.</p>
+            
+            <p class="warning">If you did not request this code, please ignore this email or contact support.</p>
+        </div>
+        <div class="footer">
+            <p>&copy; {% now "Y" %} InsightDocs AI. All rights reserved.</p>
+            <p>Automated message. Please do not reply.</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -47,9 +47,8 @@ def register_view(request):
         # Generate and send OTP
         otp = random.randint(100000, 999999)
         request.session['registration_otp'] = otp
-        subject = "OTP for Registration"
-        message = f"Your OTP for registration is {otp}"
-        sendOTPToEmail(email, subject, message)
+        subject = "Verify your InsightDocs AI Account"
+        sendOTPToEmail(email, subject, otp) 
 
         messages.success(request, "We have sent a 6-digit OTP to your email.")
         # Redirect to the dedicated OTP verification page
@@ -181,12 +180,10 @@ def password_reset_request(request):
             'email': email,
             'otp': otp,
         }
-
-        subject = "Password reset code"
-        message = f"Your password reset code is {otp}"
-        sendOTPToEmail(email, subject, message)
-
+        subject = "Reset your Password"
+        sendOTPToEmail(email, subject, otp)
         messages.success(request, "We sent a 6-digit verification code to your email.")
+
         return redirect('verify_reset_otp')
 
     # GET request → show email input form
@@ -244,10 +241,8 @@ def resend_reset_otp(request):
     otp = random.randint(100000, 999999)
     reset_data['otp'] = otp
     request.session['reset_password_data'] = reset_data
-
-    subject = "New password reset code"
-    message = f"Your new password reset code is {otp}"
-    sendOTPToEmail(email, subject, message)
+    subject = "New Password Reset Code"
+    sendOTPToEmail(email, subject, otp)
 
     return JsonResponse({'message': 'A new verification code has been sent to your email.'})
 

@@ -1,11 +1,12 @@
-# consumers.py
+
+import asyncio
 import json
 import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from django.contrib.auth.models import User
 from .models import Document, ChatSession, ChatMessage
 from .utils.gemini_chat import get_gemini_response
+from .utils.storage import prepare_local_document
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
         """Handle WebSocket connection"""
         self.user = self.scope["user"]
         self.document_id = self.scope['url_route']['kwargs']['document_id']
+        if not self.user.is_authenticated:
+            await self.close()
+            return
+
         self.room_group_name = f"chat_{self.document_id}_{self.user.id}"
 
         # Check if user has permission to access document
@@ -125,12 +130,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'status': 'processing'
             }))
 
-            # Get AI response (run in thread pool to avoid blocking)
-            ai_response = await self.get_gemini_response_async(
-                user_message,
-                document.file.path,
-                chat_history
-            )
+            # Ensure we have a local copy of the document for Gemini ingestion
+            local_path, cleanup = await asyncio.to_thread(prepare_local_document, document)
+
+            try:
+                ai_response = await self.get_gemini_response_async(
+                    user_message,
+                    local_path,
+                    chat_history
+                )
+            finally:
+                await asyncio.to_thread(cleanup)
 
             # Save AI message
             ai_msg = await self.save_ai_message(session, ai_response)

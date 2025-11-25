@@ -31,7 +31,7 @@ def get_gemini_response(user_message, file_path, chat_history):
         logger.info(f"Starting Gemini response generation for: {user_message[:50]}")
         
         # 1. Initialize Gemini model
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash")
         
         # 2. Upload file to Gemini
         logger.info(f"Uploading file: {file_path}")
@@ -90,25 +90,29 @@ def get_gemini_response(user_message, file_path, chat_history):
         logger.info(f"Response received successfully: {response.text[:50]}")
         return response.text
 
-    except genai.types.BlockedPromptException as e:
-        error_msg = "Your message was blocked by safety filters. Please rephrase your question."
-        logger.warning(f"Blocked prompt: {str(e)}")
-        return error_msg
-    
-    except genai.types.APIError as e:
-        error_msg = f"Gemini API Error: {str(e)}"
-        logger.error(error_msg)
-        return error_msg
-    
-    except TimeoutError as e:
-        error_msg = "Request timed out. The document might be too large. Please try again."
-        logger.error(f"Timeout: {error_msg}")
-        return error_msg
-    
     except Exception as e:
-        error_msg = f"Error: {str(e)}"
-        logger.error(f"Unexpected error in get_gemini_response: {error_msg}", exc_info=True)
-        return error_msg
+        error_type = type(e).__name__
+        
+        # Handle specific known exceptions
+        if "BlockedPromptException" in error_type or "blocked" in str(e).lower():
+            error_msg = "Your message was blocked by safety filters. Please rephrase your question."
+            logger.warning(f"Blocked prompt: {str(e)}")
+            return error_msg
+        
+        elif "APIError" in error_type or "api" in error_type.lower():
+            error_msg = f"Gemini API Error: {str(e)}"
+            logger.error(error_msg)
+            return error_msg
+        
+        elif isinstance(e, TimeoutError):
+            error_msg = "Request timed out. The document might be too large. Please try again."
+            logger.error(f"Timeout: {error_msg}")
+            return error_msg
+        
+        else:
+            error_msg = f"An error occurred. Please try again."
+            logger.error(f"Unexpected error in get_gemini_response: {str(e)}", exc_info=True)
+            return error_msg
 
 
 def upload_file_with_retry(file_path, max_retries=MAX_RETRIES):
@@ -164,18 +168,13 @@ def upload_file_with_retry(file_path, max_retries=MAX_RETRIES):
                     continue
                 return None
         
-        except genai.types.APIError as e:
-            logger.error(f"API Error on upload attempt {attempt + 1}: {str(e)}")
-            if attempt < max_retries - 1:
-                wait_time = (attempt + 1) * 2
-                time.sleep(wait_time)
-                continue
-            return None
-        
         except Exception as e:
-            logger.error(f"Upload attempt {attempt + 1} failed: {str(e)}", exc_info=True)
+            error_type = type(e).__name__
+            logger.error(f"Upload attempt {attempt + 1} failed ({error_type}): {str(e)}")
+            
             if attempt < max_retries - 1:
                 wait_time = (attempt + 1) * 2
+                logger.info(f"Retrying in {wait_time} seconds...")
                 time.sleep(wait_time)
                 continue
             return None

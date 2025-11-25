@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coming Soon | InsightDocs AI</title>
+    
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23a78bfa;stop-opacity:1'/%3E%3Cstop offset='100%25' style='stop-color:%237c3aed;stop-opacity:1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='0' y='0' width='64' height='64' rx='16' fill='%23020617'/%3E%3Cpath d='M32 14L50 23V41L32 50L14 41V23Z' fill='url(%23g)' stroke='%23ddd6fe' stroke-width='2'/%3E%3Cpath d='M32 50V32M32 32L50 23M32 32L14 23' stroke='%23ddd6fe' stroke-width='2'/%3E%3C/svg%3E" type="image/svg+xml">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        background: '#020617',
+                        surface: 'rgba(15, 23, 42, 0.6)', 
+                    },
+                    animation: {
+                        'pulse-deep': 'pulse 6s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'spin-slow': 'spin 12s linear infinite',
+                        'spin-reverse-slow': 'spin 15s linear infinite reverse',
+                        'nebula-shift': 'nebula 20s ease infinite alternate',
+                        'gradient-x': 'gradient-x 5s ease infinite',
+                    },
+                    keyframes: {
+                        nebula: {
+                            '0%': { transform: 'translate(0, 0) scale(1)' },
+                            '100%': { transform: 'translate(5%, 5%) scale(1.1)' },
+                        },
+                        'gradient-x': {
+                            '0%, 100%': { 'background-position': 'left center' },
+                            '50%': { 'background-position': 'right center' },
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { background-color: #020617; color: #f8fafc; overflow: hidden; }
+        
+        /* Noise Overlay */
+        .bg-noise {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 0; opacity: 0.04;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        /* Magic Text */
+        .text-gradient-magic {
+            background: linear-gradient(to right, #a78bfa, #f472b6, #38bdf8, #a78bfa);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradient-x 5s linear infinite;
+        }
+
+        /* Glass Input */
+        .glass-input {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="antialiased h-screen flex flex-col relative">
+
+    <div class="bg-noise"></div>
+    <div class="fixed inset-0 pointer-events-none -z-10">
+        <div class="absolute top-[-10%] left-[20%] w-[60%] h-[60%] bg-violet-800/20 rounded-full blur-[120px] animate-nebula-shift opacity-50"></div>
+        <div class="absolute bottom-[-10%] right-[20%] w-[60%] h-[60%] bg-fuchsia-800/10 rounded-full blur-[120px] animate-nebula-shift opacity-50" style="animation-delay: -5s;"></div>
+    </div>
+
+    <nav class="absolute top-0 w-full p-6 z-50">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <a href="{% url 'landing_page' %}" class="flex items-center gap-2 group cursor-pointer opacity-80 hover:opacity-100 transition-opacity">
+                <div class="relative w-8 h-8 flex items-center justify-center">
+                    <div class="absolute inset-0 bg-violet-500 rounded-lg blur-sm opacity-60"></div>
+                    <div class="relative w-full h-full bg-gradient-to-br from-violet-600 to-indigo-600 rounded-lg flex items-center justify-center border border-white/10">
+                        <i class="fa-solid fa-cube text-white text-xs"></i>
+                    </div>
+                </div>
+                <span class="font-display font-bold text-lg tracking-tight text-white">InsightDocs<span class="text-violet-400">.ai</span></span>
+            </a>
+            
+            <a href="{% url 'landing_page' %}" class="text-sm text-slate-400 hover:text-white transition-colors flex items-center gap-2">
+                <i class="fa-solid fa-arrow-left"></i> Back to Home
+            </a>
+        </div>
+    </nav>
+
+    <main class="flex-1 flex flex-col items-center justify-center px-4 relative z-10 text-center">
+        
+        <div class="relative w-48 h-48 mb-10 flex items-center justify-center">
+            <div class="absolute inset-0 border border-white/5 rounded-full animate-[spin_10s_linear_infinite]"></div>
+            <div class="absolute inset-4 border-2 border-dashed border-violet-500/20 rounded-full animate-spin-slow"></div>
+            <div class="absolute inset-8 border-2 border-dashed border-fuchsia-500/20 rounded-full animate-spin-reverse-slow"></div>
+            
+            <div class="absolute inset-0 bg-violet-500/10 blur-3xl rounded-full animate-pulse-deep"></div>
+            
+            <div class="relative w-20 h-20 bg-slate-900/50 rounded-2xl border border-white/10 backdrop-blur-md flex items-center justify-center shadow-2xl shadow-violet-500/20">
+                <i class="fa-solid fa-hammer text-3xl text-transparent bg-clip-text bg-gradient-to-tr from-violet-200 to-fuchsia-200 animate-pulse"></i>
+            </div>
+        </div>
+
+        <div class="max-w-xl mx-auto space-y-6">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-violet-500/20 bg-violet-500/5 text-violet-300 text-xs font-medium mb-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse"></span>
+                Under Construction
+            </div>
+            
+            <h1 class="font-display text-4xl md:text-6xl font-bold tracking-tight text-white">
+                Crafting the <br />
+                <span class="text-gradient-magic">Extraordinary.</span>
+            </h1>
+            
+            <p class="text-slate-400 text-lg leading-relaxed font-light">
+                We are currently building this section of the InsightDocs Intelligence Engine. It will be available in the next major update.
+            </p>
+
+            <form class="mt-8 flex flex-col sm:flex-row gap-3 max-w-md mx-auto" onsubmit="event.preventDefault(); alert('You have been added to the waitlist!');">
+                <input type="email" placeholder="Enter your email" required 
+                       class="glass-input w-full px-5 py-3 rounded-full text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/50 transition-all">
+                
+                <button type="submit" class="group relative inline-flex items-center justify-center overflow-hidden rounded-full p-0.5 font-bold text-white shadow-lg hover:shadow-violet-500/40 transition-shadow">
+                    <span class="absolute inset-[-1000%] animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#E2CBFF_0%,#393BB2_50%,#E2CBFF_100%)]"></span>
+                    <span class="inline-flex h-full w-full cursor-pointer items-center justify-center rounded-full bg-slate-950/90 px-6 py-3 text-sm font-medium backdrop-blur-3xl transition-all group-hover:bg-slate-900/90 whitespace-nowrap">
+                        Notify Me
+                    </span>
+                </button>
+            </form>
+            
+            <p class="text-slate-600 text-xs mt-4">No spam. Only magical updates.</p>
+        </div>
+    </main>
+
+    <footer class="absolute bottom-6 w-full text-center">
+        <p class="text-slate-600 text-xs">&copy; 2025 InsightDocs AI.</p>
+    </footer>
+
+</body>
+</html>
