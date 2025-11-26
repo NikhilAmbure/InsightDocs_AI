@@ -1,0 +1,1 @@
+web: gunicorn InsightDocs_AI.asgi:application --log-file - 
