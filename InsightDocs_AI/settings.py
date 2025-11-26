@@ -30,14 +30,11 @@ SECRET_KEY = os.environ.get('SECRET_KEY','django-insecure-wf=x56i(l)ng!8z**#1#(5
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
 ALLOWED_HOSTS = [
-    'insightdocs-ai.up.railway.app',
-    '.onrender.com',
-    'insightdocs.in',     # custom domain
-    '.insightdocs.in',    # subdomains 
-    '.vercel.app',        # for Vercel deployment
-    '.now.sh',            # Old Vercel domains
-    'localhost',          # Local development
-    '127.0.0.1',          # Local development
+    "localhost",
+    "127.0.0.1",
+    "insightdocs.in",
+    "www.insightdocs.in",
+    "adventurous-fulfillment-production.up.railway.app",
 ]
 
 
@@ -120,9 +117,9 @@ AUTHENTICATION_BACKENDS = [
 AUTH_USER_MODEL = 'accounts.User'
 
 CSRF_TRUSTED_ORIGINS = [
-    'https://web-production-dcba6.up.railway.app',
-    'https://insightdocs.in',
-    'https://www.insightdocs.in',
+    "https://insightdocs.in",
+    "https://www.insightdocs.in",
+    "https://adventurous-fulfillment-production.up.railway.app",
 ]
 
 # Database
