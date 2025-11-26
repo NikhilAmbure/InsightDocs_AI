@@ -24,17 +24,25 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-wf=x56i(l)ng!8z**#1#(5k@%qvc#a$jvzxzm=lec+s^v)&rg3'
+SECRET_KEY = os.environ.get('SECRET_KEY','django-insecure-wf=x56i(l)ng!8z**#1#(5k@%qvc#a$jvzxzm=lec+s^v)&rg3')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'insightdocs.in',     # custom domain
+    '.insightdocs.in',    # subdomains 
+    '.vercel.app',        # for Vercel deployment
+    '.now.sh',            # Old Vercel domains
+    'localhost',          # Local development
+    '127.0.0.1',          # Local development
+]
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    'jazzmin',
     'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -99,26 +107,30 @@ AUTHENTICATION_BACKENDS = [
 AUTH_USER_MODEL = 'accounts.User'
 
 CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:8000',
-    'http://127.0.0.1:8000',
-    'ws://localhost:8000',
-    'ws://127.0.0.1:8000',
+    "https://insightdocs.in",
+    "https://www.insightdocs.in",
+    "https://*.vercel.app",
 ]
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
+import dj_database_url
 
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'insightdocs_ai_db',
-        'USER': 'postgres',
-        'PASSWORD': '1702',
-        'HOST': 'localhost',
-        'PORT': ''
+if os.getenv("DATABASE_URL"):
+    DATABASES = {
+        "default": dj_database_url.parse(os.getenv("DATABASE_URL"))
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.getenv("NAME"),
+            "USER": os.getenv("USER"),
+            "PASSWORD": os.getenv("PASSWORD"),
+            "HOST": os.getenv("HOST"),
+            "PORT": os.getenv("PORT"),
+        }
+    }
 
 LOGGING = {
     'version': 1,
@@ -179,14 +191,6 @@ EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = "your_email@gmail.com"
-EMAIL_HOST_PASSWORD = "your_app_password"  # Use App Password, not Gmail password
-
-
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = "smtp.gmail.com"
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')# Use App Password, not Gmail password
 
@@ -199,7 +203,6 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
-
 # Where Django will collect static files for production
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
@@ -238,6 +241,11 @@ GOOGLE_API_KEY= os.environ.get('GOOGLE_API_KEY')
 RATE_LIMITS = {
     "upload": {
         "limit": int(os.environ.get("UPLOAD_RATE_LIMIT", "5")),
-        "window": int(os.environ.get("UPLOAD_RATE_WINDOW", "60")),  # seconds
+        "window": int(os.environ.get("UPLOAD_RATE_WINDOW", "60")),
     },
 }
+
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True

@@ -15,10 +15,12 @@ crispy-bootstrap5==2025.6
 crispy-tailwind==1.0.3
 cryptography==46.0.3
 daphne==4.1.0
+dj-database-url==3.0.1
 Django==5.2.8
 django-cloudinary-storage==0.3.0
 django-cors-headers==4.9.0
 django-crispy-forms==2.5
+django-jazzmin==3.0.1
 djangorestframework==3.16.1
 djangorestframework_simplejwt==5.5.1
 dotenv==0.9.9
