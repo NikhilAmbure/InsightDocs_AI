@@ -11,6 +11,7 @@ from .forms import ProfileUpdateForm
 from .models import User
 
 from documents.models import Document
+from threading import Thread
 
 
 def register_view(request):
@@ -181,7 +182,7 @@ def password_reset_request(request):
             'otp': otp,
         }
         subject = "Reset your Password"
-        sendOTPToEmail(email, subject, otp)
+        Thread(target=sendOTPToEmail, args=(email, subject, otp)).start()
         messages.success(request, "We sent a 6-digit verification code to your email.")
 
         return redirect('verify_reset_otp')
