@@ -29,7 +29,8 @@ SECRET_KEY = os.environ.get('SECRET_KEY','django-insecure-wf=x56i(l)ng!8z**#1#(5
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = [\
+ALLOWED_HOSTS = [
+    'insightdocs-ai.up.railway.app',
     '.onrender.com',
     'insightdocs.in',     # custom domain
     '.insightdocs.in',    # subdomains 
@@ -122,6 +123,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://insightdocs.in",
     "https://www.insightdocs.in",
     "https://*.vercel.app",
+    'insightdocs-ai.up.railway.app',
 ]
 
 # Database

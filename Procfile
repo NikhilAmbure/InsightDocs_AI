@@ -1,1 +1,1 @@
-web: daphne InsightDocs_AI.asgi:application --log-file - 
+web: daphne InsightDocs_AI.asgi:application
