@@ -1,27 +1,31 @@
 {
-    "version": 2,
-    "builds": [
-      {
-        "src": "InsightDocs_AI/asgi.py",
-        "use": "@vercel/python",
-        "config": { "maxLambdaSize": "15mb", "runtime": "python3.13" }
-      },
-      {
-        "src": "build_files.sh",
-        "use": "@vercel/static-build",
-        "config": {
-          "distDir": "staticfiles"
-        }
+  "version": 2,
+  "builds": [
+    {
+      "src": "InsightDocs_AI/asgi.py",
+      "use": "@vercel/python",
+      "config": { "maxLambdaSize": "15mb", "runtime": "python3.13" }
+    },
+    {
+      "src": "build_files.sh",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "staticfiles"
       }
-    ],
-    "routes": [
-      {
-        "src": "/static/(.*)",
-        "dest": "/static/$1"
-      },
-      {
-        "src": "/(.*)",
-        "dest": "InsightDocs_AI/asgi.py"
-      }
-    ]
-  }
+    }
+  ],
+  "env": {
+    "DJANGO_SETTINGS_MODULE": "InsightDocs_AI.settings",
+    "DJANGO_COLLECTSTATIC": "1"
+  },
+  "routes": [
+    {
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "InsightDocs_AI/asgi.py"
+    }
+  ]
+}
