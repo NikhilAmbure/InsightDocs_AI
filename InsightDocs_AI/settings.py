@@ -123,7 +123,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://insightdocs.in",
     "https://www.insightdocs.in",
     "https://*.vercel.app",
-    'insightdocs-ai.up.railway.app',
+    'web-production-dcba6.up.railway.app',
 ]
 
 # Database
