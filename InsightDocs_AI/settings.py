@@ -93,14 +93,22 @@ TEMPLATES = [
 
 ASGI_APPLICATION = 'InsightDocs_AI.asgi.application'
 
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            'hosts': [('127.0.0.1', 6379)],
+if os.getenv("REDIS_URL"):
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [os.getenv("REDIS_URL")],
+            },
         },
-    },
-}
+    }
+else:
+    # Local development - in-memory (not for production)
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer"
+        }
+    }
 
 # Use the default authentication backend only
 AUTHENTICATION_BACKENDS = [
@@ -142,6 +150,8 @@ else:
             "PORT": os.getenv("DB_PORT", "5432"),
         }
     }
+    
+DAPHNE_BIND = "0.0.0.0:8000"
 
 LOGGING = {
     'version': 1,

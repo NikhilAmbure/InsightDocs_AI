@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "InsightDocs_AI/wsgi.py",
+      "src": "InsightDocs_AI/asgi.py",
       "use": "@vercel/python",
       "config": {
         "maxLambdaSize": "250mb",
@@ -28,8 +28,12 @@
       "dest": "/static/$1"
     },
     {
+      "src": "/ws/(.*)",
+      "dest": "InsightDocs_AI/asgi.py"
+    },
+    {
       "src": "/(.*)",
-      "dest": "InsightDocs_AI/wsgi.py"
+      "dest": "InsightDocs_AI/asgi.py"
     }
   ]
 }
