@@ -20,3 +20,4 @@ def sendOTPToEmail(email, subject, otp):
         "html": html_content,
         "text": text_content,
     })
+
