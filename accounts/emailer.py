@@ -1,34 +1,21 @@
-from django.core.mail import EmailMultiAlternatives
-from django.conf import settings
+import resend
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
+resend.api_key = os.getenv("RESEND_API_KEY")
+
 def sendOTPToEmail(email, subject, otp):
     """
-    Sends an HTML email with the OTP code.
+    Sends OTP using Resend API (works on Railway free tier).
     """
-    # Context data for the template
-    context = {
-        'otp': otp,
-        'subject': subject
-    }
-
-    # Render HTML content
-    html_content = render_to_string('emails/otp_email.html', context)
-    
-    # Create plain text version (strips HTML tags) for email clients that disable HTML
+    # Prepare HTML content
+    html_content = render_to_string('emails/otp_email.html', {'otp': otp})
     text_content = strip_tags(html_content)
 
-    # Create the email object
-    email_message = EmailMultiAlternatives(
-        subject,
-        text_content, # Content for plain text clients
-        settings.EMAIL_HOST_USER,
-        [email]
-    )
-    
-    # Attach HTML version
-    email_message.attach_alternative(html_content, "text/html")
-    
-    # Send
-    email_message.send()
+    resend.Emails.send({
+        "from": "InsightDocs <onboarding@resend.dev>",
+        "to": email,
+        "subject": subject,
+        "html": html_content,
+        "text": text_content,
+    })
