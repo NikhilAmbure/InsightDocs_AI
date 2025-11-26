@@ -120,18 +120,26 @@ CSRF_TRUSTED_ORIGINS = [
 import dj_database_url
 
 if os.getenv("DATABASE_URL"):
+    # Production (Vercel)
+    db_url = os.getenv("DATABASE_URL")
     DATABASES = {
-        "default": dj_database_url.parse(os.getenv("DATABASE_URL"))
+        "default": dj_database_url.parse(db_url)
+    }
+    # Add connection pooling settings for serverless
+    DATABASES['default']['CONN_MAX_AGE'] = 600
+    DATABASES['default']['OPTIONS'] = {
+        'connect_timeout': 10,
     }
 else:
+    # Local development
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.getenv("NAME"),
-            "USER": os.getenv("USER"),
-            "PASSWORD": os.getenv("PASSWORD"),
-            "HOST": os.getenv("HOST"),
-            "PORT": os.getenv("PORT"),
+            "NAME": os.getenv("DB_NAME", "postgres"),
+            "USER": os.getenv("DB_USER", "postgres"),
+            "PASSWORD": os.getenv("DB_PASSWORD"),
+            "HOST": os.getenv("DB_HOST", "localhost"),
+            "PORT": os.getenv("DB_PORT", "5432"),
         }
     }
 
