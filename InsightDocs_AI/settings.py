@@ -127,23 +127,26 @@ CSRF_TRUSTED_ORIGINS = [
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
+
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 if DEBUG:
+    # dev: fallback to sqlite if DATABASE_URL missing
     DATABASES = {
-        'default': dj_database_url.config(
-            default=os.environ.get('DATABASE_URL', 'sqlite:///db.sqlite3'),
+        "default": dj_database_url.config(
+            default=os.environ.get("DATABASE_URL", "sqlite:///db.sqlite3")
         )
     }
 else:
-    DATABASES = {
-        'default': dj_database_url.config(
-            default=os.environ['DATABASE_URL'],
-            conn_max_age=600,
-            ssl_require=True
+    # production: require DATABASE_URL explicitly
+    if not DATABASE_URL:
+        raise ImproperlyConfigured(
+            "DATABASE_URL is required in production. Set it in environment variables."
         )
+    DATABASES = {
+        "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=True)
     }
-    
-
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -209,17 +212,15 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = '/static/'
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
-# Where Django will look for static files in development
-STATICFILES_DIRS = [
-    BASE_DIR / 'static',
-]
-# Where Django will collect static files for production
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+if DEBUG and (BASE_DIR / "static").exists():
+    STATICFILES_DIRS = [BASE_DIR / "static"]
+else:
+    STATICFILES_DIRS = []
 
 CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME")
 CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY")
