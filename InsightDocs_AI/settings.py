@@ -29,7 +29,8 @@ SECRET_KEY = os.environ.get('SECRET_KEY','django-insecure-wf=x56i(l)ng!8z**#1#(5
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = [
+ALLOWED_HOSTS = [\
+    '.onrender.com',
     'insightdocs.in',     # custom domain
     '.insightdocs.in',    # subdomains 
     '.vercel.app',        # for Vercel deployment

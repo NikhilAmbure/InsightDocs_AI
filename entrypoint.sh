@@ -23,4 +23,4 @@ else:
 END
 
 # Start your application
-exec gunicorn InsightDocs_AI.asgi:application --bind 0.0.0.0:$PORT
+exec daphne InsightDocs_AI.asgi:application --bind 0.0.0.0:$PORT

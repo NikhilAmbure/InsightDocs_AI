@@ -5,4 +5,4 @@ services:
   name: InsightDocs_AI
   runtime: python
   buildCommand: './build.sh'
-  startCommand: 'python -m gunicorn InsightDocs_AI.asgi:application -k uvicorn.workers.UvicornWorker'
+  startCommand: 'python -m daphne InsightDocs_AI.asgi:application -k uvicorn.workers.UvicornWorker'
