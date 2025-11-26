@@ -4,9 +4,10 @@
     {
       "src": "InsightDocs_AI/wsgi.py",
       "use": "@vercel/python",
-      "config": { 
-        "maxLambdaSize": "15mb", 
-        "runtime": "python3.13"
+      "config": {
+        "maxLambdaSize": "250mb",
+        "runtime": "python3.12",
+        "pythonCache": false
       }
     },
     {
