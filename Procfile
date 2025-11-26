@@ -1,1 +1,1 @@
-web: daphne InsightDocs_AI.asgi:application
+web: daphne -b 0.0.0.0 -p $PORT InsightDocs_AI.asgi:application
