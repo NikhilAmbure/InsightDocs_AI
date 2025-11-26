@@ -34,7 +34,7 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "insightdocs.in",
     "www.insightdocs.in",
-    "adventurous-fulfillment-production.up.railway.app",
+    ".railway.app",
 ]
 
 
@@ -120,7 +120,9 @@ CSRF_TRUSTED_ORIGINS = [
     "https://insightdocs.in",
     "https://www.insightdocs.in",
     "https://adventurous-fulfillment-production.up.railway.app",
+    "https://*.railway.app",
 ]
+
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
@@ -134,7 +136,6 @@ DATABASES = {
     )
 }
     
-DAPHNE_BIND = "0.0.0.0:8000"
 
 LOGGING = {
     'version': 1,
@@ -253,3 +254,4 @@ SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
+SECURE_SSL_REDIRECT = False
