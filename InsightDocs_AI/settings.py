@@ -41,7 +41,6 @@ ALLOWED_HOSTS = [
 # Application definition
 
 INSTALLED_APPS = [
-    'jazzmin',
     'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -208,20 +207,28 @@ USE_I18N = True
 
 USE_TZ = True
 
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = "smtp.gmail.com"  # NOT smtp-relay.brevo.com
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
-DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
+import resend
 
-if not DEBUG:
-    if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
-        raise ImproperlyConfigured(
-            "EMAIL_HOST_USER and EMAIL_HOST_PASSWORD must be set in production. "
-            "Set them in Railway environment variables."
-        )
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+if RESEND_API_KEY:
+    resend.api_key = RESEND_API_KEY
+else:
+    print("⚠️ WARNING: RESEND_API_KEY is not set!")
+
+# EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+# EMAIL_HOST = "smtp.gmail.com" 
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
+# EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
+# DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
+
+# if not DEBUG:
+#     if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
+#         raise ImproperlyConfigured(
+#             "EMAIL_HOST_USER and EMAIL_HOST_PASSWORD must be set in production. "
+#             "Set them in Railway environment variables."
+#         )
 
 
 # Static files (CSS, JavaScript, Images)
