@@ -261,8 +261,7 @@ if all([CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET]):
             "type": "upload",
             "access_mode": "public",
             "overwrite": False,
-            "format": "pdf",
-            "mime_type": "application/pdf",
+            
         },
     }
     DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.RawMediaCloudinaryStorage"
