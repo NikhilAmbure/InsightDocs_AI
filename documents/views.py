@@ -49,6 +49,7 @@ def upload_view(request):
             document = form.save(commit=False)
             document.owner = request.user
             document.original_name = document.file.name
+            document.file.file.content_type = "application/pdf"
             if not document.title:
                 document.title = document.original_name
             document.save()

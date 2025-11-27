@@ -4,6 +4,7 @@ from django.conf import settings
 from django.db import models
 from django.utils.text import slugify
 import uuid
+from cloudinary_storage.storage import RawMediaCloudinaryStorage
 
 
 class Document(models.Model):
@@ -13,7 +14,7 @@ class Document(models.Model):
         related_name="documents",
     )
     title = models.CharField(max_length=255)
-    file = models.FileField(upload_to="documents/")
+    file = models.FileField(upload_to="documents/", storage=RawMediaCloudinaryStorage())
     original_name = models.CharField(max_length=255)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     
