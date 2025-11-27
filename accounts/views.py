@@ -5,6 +5,7 @@ from django.http import JsonResponse
 from django.shortcuts import redirect, render
 
 import random
+import logging
 
 from .emailer import sendOTPToEmail
 from .forms import ProfileUpdateForm
@@ -12,6 +13,8 @@ from .models import User
 
 from documents.models import Document
 from threading import Thread
+
+logger = logging.getLogger(__name__)
 
 
 def register_view(request):
@@ -49,11 +52,16 @@ def register_view(request):
         otp = random.randint(100000, 999999)
         request.session['registration_otp'] = otp
         subject = "Verify your InsightDocs AI Account"
-        sendOTPToEmail(email, subject, otp) 
-
-        messages.success(request, "We have sent a 6-digit OTP to your email.")
-        # Redirect to the dedicated OTP verification page
-        return redirect('verify_otp')
+        
+        try:
+            # Use threading to avoid blocking, and add error handling
+            Thread(target=sendOTPToEmail, args=(email, subject, otp)).start()
+            messages.success(request, "We have sent a 6-digit OTP to your email.")
+            return redirect('verify_otp')
+        except Exception as e:
+            logger.error(f"Failed to send OTP to {email}: {str(e)}")
+            messages.error(request, "Failed to send OTP. Please try again.")
+            return render(request, 'signup.html')
 
     # GET request → show signup form
     return render(request, 'signup.html')
@@ -243,9 +251,13 @@ def resend_reset_otp(request):
     reset_data['otp'] = otp
     request.session['reset_password_data'] = reset_data
     subject = "New Password Reset Code"
-    sendOTPToEmail(email, subject, otp)
-
-    return JsonResponse({'message': 'A new verification code has been sent to your email.'})
+    
+    try:
+        Thread(target=sendOTPToEmail, args=(email, subject, otp)).start()
+        return JsonResponse({'message': 'A new verification code has been sent to your email.'})
+    except Exception as e:
+        logger.error(f"Failed to resend OTP to {email}: {str(e)}")
+        return JsonResponse({'error': 'Failed to send verification code. Please try again.'}, status=500)
 
 
 def reset_password(request):
