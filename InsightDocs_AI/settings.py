@@ -147,7 +147,8 @@ else:
     DATABASES = {
         "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=True)
     }
-LOGGING = {
+    
+ LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
@@ -163,6 +164,11 @@ LOGGING = {
         },
     },
     'loggers': {
+        'accounts.emailer': {  
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
         'documents': {
             'handlers': ['console'],
             'level': 'INFO',
