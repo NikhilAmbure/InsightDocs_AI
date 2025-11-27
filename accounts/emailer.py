@@ -8,7 +8,7 @@ def sendOTPToEmail(email, subject, otp):
         text_content = strip_tags(html_content)
 
         resend.Emails.send({
-            "from": "InsightDocs <onboarding@resend.dev>",
+            "from": "noreply@insightdocs.in",
             "to": email,
             "subject": subject,
             "html": html_content,
