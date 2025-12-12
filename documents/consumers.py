@@ -72,7 +72,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.send_error("Invalid JSON format")
         except Exception as e:
             logger.error(f"Error in receive: {str(e)}", exc_info=True)
-            await self.send_error(f"Server error: {str(e)}")
+            await self.send_error("An unexpected error occurred.")
 
     async def handle_chat_message(self, data):
         """Handle incoming chat message"""
@@ -131,6 +131,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             }))
 
             # Ensure we have a local copy of the document for Gemini ingestion
+            # This uses the DB content now (no 401 error)
             local_path, cleanup = await asyncio.to_thread(prepare_local_document, document)
 
             try:
@@ -155,7 +156,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         except Exception as e:
             logger.error(f"Error processing AI response: {str(e)}", exc_info=True)
-            await self.send_error(f"AI Error: {str(e)}")
+
+            # Sending generic friendly error
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'message': "I apologize, but I'm having trouble reading this document right now. Please try re-uploading it."
+            }))
 
     async def send_error(self, message):
         """Send error message to client"""

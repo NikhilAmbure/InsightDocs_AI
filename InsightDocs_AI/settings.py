@@ -52,8 +52,8 @@ INSTALLED_APPS = [
     'crispy_bootstrap5',
     'channels',
     'corsheaders',
-    'cloudinary',
-    'cloudinary_storage',
+    # 'cloudinary',
+    # 'cloudinary_storage',
     'accounts',
     'documents'
 ]
@@ -215,21 +215,6 @@ if RESEND_API_KEY:
 else:
     print("⚠️ WARNING: RESEND_API_KEY is not set!")
 
-# EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-# EMAIL_HOST = "smtp.gmail.com" 
-# EMAIL_PORT = 587
-# EMAIL_USE_TLS = True
-# EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
-# EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
-# DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
-
-# if not DEBUG:
-#     if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
-#         raise ImproperlyConfigured(
-#             "EMAIL_HOST_USER and EMAIL_HOST_PASSWORD must be set in production. "
-#             "Set them in Railway environment variables."
-#         )
-
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
@@ -244,27 +229,6 @@ if DEBUG and (BASE_DIR / "static").exists():
 else:
     STATICFILES_DIRS = []
 
-CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME")
-CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY")
-CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET")
-CLOUDINARY_UPLOAD_FOLDER = os.environ.get("CLOUDINARY_UPLOAD_FOLDER", "insightdocs/documents")
-
-if all([CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET]):
-    CLOUDINARY_STORAGE = {
-        "CLOUD_NAME": CLOUDINARY_CLOUD_NAME,
-        "API_KEY": CLOUDINARY_API_KEY,
-        "API_SECRET": CLOUDINARY_API_SECRET,
-        "SECURE": True,
-        "UPLOAD_OPTIONS": {
-            "folder": CLOUDINARY_UPLOAD_FOLDER,
-            "resource_type": "raw",
-            "type": "upload",
-            "access_mode": "public",
-            "overwrite": False,
-            
-        },
-    }
-    DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.RawMediaCloudinaryStorage"
 
 # Allow internal previews (iframes) for uploaded documents
 X_FRAME_OPTIONS = 'SAMEORIGIN'

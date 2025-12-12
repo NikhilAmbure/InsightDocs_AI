@@ -5,6 +5,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.http import HttpResponse, Http404
 
 from .forms import DocumentUploadForm
 from .models import Document, ChatSession, ChatMessage
@@ -49,7 +50,7 @@ def upload_view(request):
             document = form.save(commit=False)
             document.owner = request.user
             document.original_name = document.file.name
-            document.file.file.content_type = "application/pdf"
+            
             if not document.title:
                 document.title = document.original_name
             document.save()
@@ -98,7 +99,31 @@ def chat_view(request, document_id):
         "chat_history": chat_history_qs,
         "recent_documents": recent_docs,
     })
+
+@login_required(login_url='login')
+def serve_document_view(request, document_id):
+    """
+    Serve the document file directly from the DB content
+    """
+    document = get_object_or_404(Document, id=document_id, owner=request.user)
+
+    # Serve from DB BinaryField
+    if document.file_content:
+        response = HttpResponse(document.file_content, content_type='application/pdf')
+        response['Content-Disposition'] = f'inline; filename="{document.original_name}"'
+        return response
     
+    # Fallback to file system if present
+    try:
+        if document.file and os.path.exists(document.file.path):
+            with open(document.file.path, 'rb') as f:
+                response = HttpResponse(f.read(), content_type='application/pdf')
+                response['Content-Disposition'] = f'inline; filename="{document.original_name}"'
+                return response
+    except Exception:
+        pass
+
+    raise Http404("Document content not found.")
 
 def coming_soon(request):
     return render(request, 'coming-soon.html')

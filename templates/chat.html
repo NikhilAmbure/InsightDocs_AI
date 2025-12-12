@@ -316,7 +316,7 @@
                     
                     <div class="flex-1 overflow-hidden bg-zinc-900 relative group">
                         <iframe 
-                            src="{{ document.file.url }}" 
+                            src="{% url 'serve_document' document.id %}" 
                             class="absolute inset-0 h-full w-full border-none bg-white" 
                             title="Preview"
                             onerror="this.style.display='none'; document.getElementById('preview-error').style.display='flex';"

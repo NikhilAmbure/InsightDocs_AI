@@ -49,6 +49,27 @@ class DocumentUploadForm(forms.ModelForm):
             cleaned_data["title"] = uploaded_file.name
 
         return cleaned_data
+    
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+
+        uploaded_file = self.cleaned_data.get("file")
+
+        if self.cleaned_data.get("file"):
+            f = self.cleaned_data["file"]
+            # Read file content into the BinaryField for DB storage
+            if hasattr(f, 'seek'):
+                f.seek(0)
+            instance.file_content = f.read()
+
+            # Reset cursor for standard save
+            if hasattr(f, 'seek'):
+                f.seek(0)
+
+            if commit: 
+                instance.save()
+            
+        return instance
 
 class ChatMessageForm(forms.ModelForm):
     class Meta:

@@ -17,7 +17,9 @@ def _safe_remove(path: str) -> None:
 def _get_local_field_path(field_file) -> Optional[str]:
     try:
         path = field_file.path
-        return path
+        if os.path.exists(path):
+            return path
+        return None
     except (NotImplementedError, AttributeError, FileNotFoundError, ValueError):
         return None
 
@@ -25,17 +27,33 @@ def _get_local_field_path(field_file) -> Optional[str]:
 def prepare_local_document(document) -> Tuple[str, Callable[[], None]]:
     """
     Ensure a Document.file is accessible from the local filesystem.
+    Prioritizes DB BinaryField content, then local filesystem path, then URL.
 
     Returns:
         tuple[str, Callable]: (path_to_file, cleanup_callback)
     """
+    
+    # 1. Check if we have content stored in DB (BinaryField)
+    if hasattr(document, 'file_content') and document.file_content:
+        suffix = os.path.splitext(document.file.name or "")[1] or ".tmp"
+        fd, tmp_path = tempfile.mkstemp(suffix=suffix)
+        try:
+            with os.fdopen(fd, "wb") as tmp_file:
+                tmp_file.write(document.file_content)
+            return tmp_path, lambda: _safe_remove(tmp_path)
+        except Exception:
+            _safe_remove(tmp_path)
+            raise
+
+    # 2. Check if file exists locally on disk
     local_path = _get_local_field_path(document.file)
     if local_path:
         return local_path, lambda: None
 
+    # 3. Fallback to URL download (only if not in DB and not on disk)
     file_url = getattr(document.file, "url", None)
     if not file_url:
-        raise RuntimeError("Document file is not accessible via URL.")
+        raise RuntimeError("Document file is not accessible via URL or DB.")
 
     suffix = os.path.splitext(document.file.name or "")[1] or ".tmp"
     fd, tmp_path = tempfile.mkstemp(suffix=suffix)
@@ -52,4 +70,3 @@ def prepare_local_document(document) -> Tuple[str, Callable[[], None]]:
         raise
 
     return tmp_path, lambda: _safe_remove(tmp_path)
-

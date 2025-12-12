@@ -10,5 +10,5 @@ urlpatterns = [
     path("subscription/", views.subscription_view, name="subscription"),
 
     path("chat/<int:document_id>/", views.chat_view, name="chat"),
-    
+    path("document/<int:document_id>/serve/", views.serve_document_view, name="serve_document"),
 ]
