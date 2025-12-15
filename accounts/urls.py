@@ -11,6 +11,15 @@ urlpatterns = [
     # Registration OTP verification
     path('verify-otp/', views.verify_otp_view, name='verify_otp'),
 
+    # 2FA Login Verification
+    path('verify-login-2fa/', views.verify_login_2fa_view, name='verify_login_2fa'),
+
+    # 2FA Management (Enable/Disable)
+    path('2fa/enable/init/', views.enable_2fa_init_view, name='enable_2fa_init'),
+    path('2fa/enable/verify/', views.verify_enable_2fa_otp_view, name='verify_enable_2fa_otp'),
+    path('2fa/disable/init/', views.disable_2fa_init_view, name='disable_2fa_init'),
+    path('2fa/disable/verify/', views.verify_disable_2fa_otp_view, name='verify_disable_2fa_otp'),
+
     # Password reset (email + OTP + new password)
     path('password-reset/', views.password_reset_request, name='password_reset'),
     path('verify-reset-otp/', views.verify_reset_otp, name='verify_reset_otp'),

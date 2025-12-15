@@ -6,4 +6,4 @@ import datetime
 
 class User(AbstractUser):
     email_verified = models.BooleanField(default=False)
-
+    is_2fa_enabled = models.BooleanField(default=False)

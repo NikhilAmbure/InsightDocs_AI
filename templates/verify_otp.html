@@ -93,8 +93,12 @@
                         We've sent a 6-digit verification code to your registered email address. Enter the code below to securely access your account.
                     </p>
                     
+                    </div>
+
+                <div class="rounded-[2rem] glass-container p-8 bg-white/5">
+                    
                     {% if messages %}
-                    <div class="mt-4 space-y-3">
+                    <div class="mb-6 space-y-2">
                         {% for message in messages %}
                         <div class="rounded-xl p-4 text-sm {% if message.tags == 'error' %}bg-red-500/20 text-red-300 border border-red-500/30{% else %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/30{% endif %}">
                             <p class="font-medium">{{ message }}</p>
@@ -102,9 +106,7 @@
                         {% endfor %}
                     </div>
                     {% endif %}
-                </div>
 
-                <div class="rounded-[2rem] glass-container p-8 bg-white/5">
                     <form method="POST" action="{% url 'verify_otp' %}" class="space-y-8">
                         {% csrf_token %}
                         

@@ -10,7 +10,6 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
-    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23a78bfa;stop-opacity:1'/%3E%3Cstop offset='100%25' style='stop-color:%237c3aed;stop-opacity:1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='0' y='0' width='64' height='64' rx='16' fill='%23020617'/%3E%3Cpath d='M32 14L50 23V41L32 50L14 41V23Z' fill='url(%23g)' stroke='%23ddd6fe' stroke-width='2'/%3E%3Cpath d='M32 50V32M32 32L50 23M32 32L14 23' stroke='%23ddd6fe' stroke-width='2'/%3E%3C/svg%3E" type="image/svg+xml">
@@ -172,13 +171,32 @@
                     </div>
                     {% if recent_documents %}
                         {% for doc in recent_documents %}
-                        <a href="{% url 'chat' doc.id %}" class="group block rounded-xl border border-transparent p-3 text-left transition-colors hover:bg-white/5">
-                            <div class="flex items-center justify-between">
-                                <span class="truncate text-sm text-zinc-300 group-hover:text-white">{{ doc.title }}</span>
-                                <span class="text-[10px] text-zinc-500">{{ doc.extension|upper }}</span>
+                        <div class="group relative flex items-center rounded-xl border border-transparent hover:bg-white/5 transition-colors">
+                            <a href="{% url 'chat' doc.id %}" class="flex-1 min-w-0 p-3 text-left">
+                                <div class="flex items-center justify-between">
+                                    <span class="truncate text-sm text-zinc-300 group-hover:text-white">{{ doc.title }}</span>
+                                    <span class="ml-2 text-[10px] text-zinc-500">{{ doc.extension|upper }}</span>
+                                </div>
+                                <p class="mt-1 text-xs text-zinc-500">{{ doc.uploaded_at|timesince }} ago</p>
+                            </a>
+                            
+                            <div class="relative px-2">
+                                <button onclick="toggleDocMenu(event, 'menu-{{ doc.id }}')" 
+                                    class="p-1.5 text-zinc-500 hover:text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity rounded-lg hover:bg-white/10"
+                                    title="Options">
+                                    <i class="fa-solid fa-ellipsis-vertical"></i>
+                                </button>
+                                
+                                <div id="menu-{{ doc.id }}" class="hidden absolute right-0 top-8 w-32 bg-zinc-900 border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden">
+                                    <form action="{% url 'delete_document' doc.id %}" method="POST" onsubmit="return confirm('Are you sure? This will delete the document and all chat history permanently.');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="w-full text-left px-4 py-2.5 text-xs text-red-400 hover:bg-white/5 hover:text-red-300 flex items-center gap-2 transition-colors">
+                                            <i class="fa-solid fa-trash-can"></i> Delete
+                                        </button>
+                                    </form>
+                                </div>
                             </div>
-                            <p class="mt-1 text-xs text-zinc-500">{{ doc.uploaded_at|timesince }} ago</p>
-                        </a>
+                        </div>
                         {% endfor %}
                     {% else %}
                         <p class="rounded-xl border border-dashed border-white/5 p-3 text-xs text-zinc-500">Upload another file to see it here.</p>
@@ -236,7 +254,8 @@
                         <span class="hidden sm:inline">Connecting...</span>
                     </div>
 
-                    <a href="{% url 'subscription' %}" class="hidden items-center gap-2 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-1.5 text-xs font-bold text-white shadow-lg shadow-violet-500/20 hover:scale-105 hover:shadow-violet-500/30 transition-all sm:flex">
+                    <a href="{% url 'subscription' %}" class="flex items-center gap-2 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-1.5 text-xs font-bold text-white shadow-lg shadow-violet-500/20 hover:scale-105 hover:shadow-violet-500/30 transition-all">
+                        <i class="fa-solid fa-crown text-[10px]"></i>
                         Upgrade Pro
                     </a>
                 </div>
@@ -527,6 +546,32 @@
                 }
             });
         }
+
+        // Toggle Document Menu
+        function toggleDocMenu(event, menuId) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            // Close all other menus first
+            document.querySelectorAll('[id^="menu-"]').forEach(el => {
+                if (el.id !== menuId) el.classList.add('hidden');
+            });
+
+            const menu = document.getElementById(menuId);
+            menu.classList.toggle('hidden');
+        }
+
+        // Close menu when clicking elsewhere
+        document.addEventListener('click', function(event) {
+            const isButton = event.target.closest('button');
+            const isMenu = event.target.closest('[id^="menu-"]');
+            
+            if (!isButton && !isMenu) {
+                document.querySelectorAll('[id^="menu-"]').forEach(el => {
+                    el.classList.add('hidden');
+                });
+            }
+        });
 
         // Sidebar functions
         function toggleMobileSidebar() {

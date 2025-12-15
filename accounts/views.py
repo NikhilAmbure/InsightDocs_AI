@@ -16,7 +16,7 @@ from threading import Thread
 
 logger = logging.getLogger(__name__)
 
-
+# ----------------- Register -----------------
 def register_view(request):
     """
     Handles user registration and sending OTP to email.
@@ -63,10 +63,9 @@ def register_view(request):
             messages.error(request, "Failed to send OTP. Please try again.")
             return render(request, 'signup.html')
 
-    # GET request → show signup form
     return render(request, 'signup.html')
 
-# ----------------- Login & Dashboard -----------------
+# ----------------- Login & 2FA Logic -----------------
 def login_view(request):
     if request.method == 'POST':
         email = request.POST.get('email')
@@ -75,23 +74,177 @@ def login_view(request):
         try:
             user = User.objects.get(email=email)
             if user.check_password(password):
-                login(request, user)
-                return redirect('upload')
+                # CHECK 2FA STATUS
+                if user.is_2fa_enabled:
+                    otp = random.randint(100000, 999999)
+
+                    request.session['pre_2fa_login_user_id'] = user.id
+                    request.session['login_2fa_otp'] = otp
+
+                    subject = "Login Verification Code"
+                    Thread(target=sendOTPToEmail, args=(user.email, subject, otp)).start()
+
+                    messages.success(request, "Enter the code sent to your email to log in.")
+                    return redirect('verify_login_2fa')
+                else:
+                    # Standard Login
+                    login(request, user)
+                    return redirect('upload')
             else:
                 messages.error(request, "Invalid password")
         except User.DoesNotExist:
             messages.error(request, "User does not exist")
 
-        return redirect('login')
+        return render(request, 'login.html')
 
     return render(request, 'login.html')
 
+def verify_login_2fa_view(request):
+    """
+    Step 2 of Login: User enters OTP to finalize login.
+    """
+    user_id = request.session.get('pre_2fa_login_user_id')
+    stored_otp = request.session.get('login_2fa_otp')
 
+    if not user_id or not stored_otp:
+        messages.error(request, "Session expired. Please log in again.")
+        return redirect('login')
+
+    if request.method == 'POST':
+        entered_otp = request.POST.get('otp')
+        
+        try:
+            if int(entered_otp) == int(stored_otp):
+                # Verify Success
+                user = User.objects.get(id=user_id)
+                login(request, user)
+                
+                # Cleanup session
+                request.session.pop('pre_2fa_login_user_id', None)
+                request.session.pop('login_2fa_otp', None)
+                
+                return redirect('upload')
+            else:
+                messages.error(request, "Invalid code. Please try again.")
+        except (ValueError, User.DoesNotExist):
+            messages.error(request, "Invalid input or user not found.")
+
+    return render(request, 'otp_reset_template.html', {'mode': 'otp_verification', 'action_url': 'verify_login_2fa'})
+
+
+# ----------------- 2FA Management (Enable/Disable) -----------------
+@login_required(login_url='login')
+def enable_2fa_init_view(request):
+    """
+    Step 1 Enable: Ask user to confirm/enter email for 2FA.
+    """
+    if request.method == 'POST':
+        email = request.POST.get('email')
+        
+        if not email:
+            messages.error(request, "Email is required.")
+            return redirect('enable_2fa_init')
+            
+        # Check if email matches account or allow different email?
+        # Typically 2FA email matches account email.
+        if email != request.user.email:
+             messages.warning(request, "For security, we are using your account email.")
+             email = request.user.email
+
+        # Generate OTP
+        otp = random.randint(100000, 999999)
+        request.session['enable_2fa_data'] = {'email': email, 'otp': otp}
+        
+        subject = "Verify 2FA Setup"
+        Thread(target=sendOTPToEmail, args=(email, subject, otp)).start()
+        
+        messages.success(request, "We sent a code to your email to enable 2FA.")
+        return redirect('verify_enable_2fa_otp')
+
+    return render(request, 'two_factor/enable_2fa_email.html')
+
+@login_required(login_url='login')
+def verify_enable_2fa_otp_view(request):
+    """
+    Step 2 Enable: Verify OTP and set is_2fa_enabled = True.
+    """
+    data = request.session.get('enable_2fa_data')
+    if not data:
+        messages.error(request, "Setup session expired. Please start again.")
+        return redirect('profile')
+
+    if request.method == 'POST':
+        entered_otp = request.POST.get('otp')
+        try:
+            if int(entered_otp) == int(data['otp']):
+                request.user.is_2fa_enabled = True
+                request.user.save()
+                
+                request.session.pop('enable_2fa_data', None)
+                messages.success(request, "Two-Factor Authentication has been ENABLED.")
+                return redirect('profile')
+            else:
+                messages.error(request, "Invalid code.")
+        except ValueError:
+            messages.error(request, "Invalid code format.")
+
+    return render(request, 'otp_reset_template.html', {
+        'mode': 'otp_verification', 
+        'action_url': 'verify_enable_2fa_otp',
+        'subtitle': 'Verify to Enable 2FA' 
+    })
+
+@login_required(login_url='login')
+def disable_2fa_init_view(request):
+    """
+    Step 1 Disable: Send OTP to verify user before disabling.
+    """
+    otp = random.randint(100000, 999999)
+    request.session['disable_2fa_otp'] = otp
+    
+    subject = "Verify 2FA Deactivation"
+    Thread(target=sendOTPToEmail, args=(request.user.email, subject, otp)).start()
+    
+    messages.success(request, "We sent a code to your email to confirm deactivation.")
+    return redirect('verify_disable_2fa_otp')
+
+@login_required(login_url='login')
+def verify_disable_2fa_otp_view(request):
+    """
+    Step 2 Disable: Verify OTP and set is_2fa_enabled = False.
+    """
+    stored_otp = request.session.get('disable_2fa_otp')
+    if not stored_otp:
+        messages.error(request, "Session expired.")
+        return redirect('profile')
+
+    if request.method == 'POST':
+        entered_otp = request.POST.get('otp')
+        try:
+            if int(entered_otp) == int(stored_otp):
+                request.user.is_2fa_enabled = False
+                request.user.save()
+                
+                request.session.pop('disable_2fa_otp', None)
+                messages.success(request, "Two-Factor Authentication has been DISABLED.")
+                return redirect('profile')
+            else:
+                messages.error(request, "Invalid code.")
+        except ValueError:
+            messages.error(request, "Invalid code format.")
+
+    return render(request, 'otp_reset_template.html', {
+        'mode': 'otp_verification', 
+        'action_url': 'verify_disable_2fa_otp',
+        'subtitle': 'Verify to Disable 2FA'
+    })
+
+# ----------------- Logout ----------------- 
 def logout_view(request):
     logout(request)
     return redirect('login')
 
-
+# ----------------- Profile -----------------
 @login_required(login_url='login')
 def profile_view(request):
     """
@@ -127,7 +280,8 @@ def verify_otp_view(request):
 
         if not entered_otp:
             messages.error(request, "Please enter the OTP.")
-            return redirect('verify_otp')
+            # Using render instead of redirect -> to show error immediately on the form
+            return render(request, 'verify_otp.html')
 
         try:
             if int(entered_otp) == int(stored_otp):
@@ -137,14 +291,18 @@ def verify_otp_view(request):
                     email=registration_data['email'],
                 )
                 user.set_password(registration_data['password'])
+                # Ensure 2FA is False by default
+                user.is_2fa_enabled = False
                 user.save()
+
+                # --- Auto Login the user immediately ---
+                login(request, user)
 
                 # Clear session data
                 request.session.pop('registration_data', None)
                 request.session.pop('registration_otp', None)
 
-                messages.success(request, "Account created successfully. Please login.")
-                return redirect('login')
+                return redirect('upload')
             else:
                 messages.error(request, "Invalid OTP. Please try again.")
         except ValueError:
@@ -227,9 +385,8 @@ def verify_reset_otp(request):
         except ValueError:
             messages.error(request, "Verification code must be a 6-digit number.")
 
-        return redirect('verify_reset_otp')
+        return render(request, 'otp_reset_templte.html', {'mode': 'otp_verification'})
 
-    # GET request → show OTP input form
     return render(request, 'otp_reset_template.html', {'mode': 'otp_verification'})
 
 
@@ -301,5 +458,4 @@ def reset_password(request):
         messages.success(request, "Your password has been reset successfully. Please login.")
         return redirect('login')
 
-    # GET request → show new password form
     return render(request, 'otp_reset_template.html', {'mode': 'password_reset'})

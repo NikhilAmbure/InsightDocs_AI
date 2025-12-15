@@ -1,5 +1,6 @@
 # views.py
 import logging
+import os
 
 from django.conf import settings
 from django.contrib import messages
@@ -127,3 +128,26 @@ def serve_document_view(request, document_id):
 
 def coming_soon(request):
     return render(request, 'coming-soon.html')
+
+@login_required(login_url='login')
+def delete_document_view(request, document_id):
+    """
+    Delete a document and its associated chat session/messages.
+    """
+    if request.method == "POST":
+        document = get_object_or_404(Document, id=document_id, owner=request.user)
+        
+        # Delete the actual file from storage
+        if document.file:
+            try:
+                document.file.delete(save=False)
+            except Exception as e:
+                logger.error(f"Error deleting file for doc {document.id}: {e}")
+
+        # This will cascade delete ChatSession and ChatMessages due to on_delete=models.CASCADE
+        document.delete()
+        
+        messages.success(request, "Chat and document deleted successfully.")
+        return redirect("upload")
+    
+    return redirect("upload")

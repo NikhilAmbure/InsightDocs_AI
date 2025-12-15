@@ -1,16 +1,21 @@
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>InsightDocs AI | Intelligent Document Analysis</title>
-    
+
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
-    
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
+        rel="stylesheet">
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23a78bfa;stop-opacity:1'/%3E%3Cstop offset='100%25' style='stop-color:%237c3aed;stop-opacity:1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='0' y='0' width='64' height='64' rx='16' fill='%23020617'/%3E%3Cpath d='M32 14L50 23V41L32 50L14 41V23Z' fill='url(%23g)' stroke='%23ddd6fe' stroke-width='2'/%3E%3Cpath d='M32 50V32M32 32L50 23M32 32L14 23' stroke='%23ddd6fe' stroke-width='2'/%3E%3C/svg%3E" type="image/svg+xml">
+    <link rel="icon"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23a78bfa;stop-opacity:1'/%3E%3Cstop offset='100%25' style='stop-color:%237c3aed;stop-opacity:1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='0' y='0' width='64' height='64' rx='16' fill='%23020617'/%3E%3Cpath d='M32 14L50 23V41L32 50L14 41V23Z' fill='url(%23g)' stroke='%23ddd6fe' stroke-width='2'/%3E%3Cpath d='M32 50V32M32 32L50 23M32 32L14 23' stroke='%23ddd6fe' stroke-width='2'/%3E%3C/svg%3E"
+        type="image/svg+xml">
 
     <script>
         tailwind.config = {
@@ -22,8 +27,8 @@
                     },
                     colors: {
                         background: '#020617', // Deeper, darker blue/black
-                        surface: 'rgba(15, 23, 42, 0.6)', 
-                        magic: '#8b5cf6',   
+                        surface: 'rgba(15, 23, 42, 0.6)',
+                        magic: '#8b5cf6',
                     },
                     animation: {
                         'float-slow': 'float 8s ease-in-out infinite',
@@ -68,7 +73,10 @@
         /* Cinematic Noise Overlay */
         .bg-noise {
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             pointer-events: none;
             z-index: 0;
             opacity: 0.04;
@@ -91,10 +99,11 @@
             position: relative;
             z-index: 0;
             overflow: hidden;
-            padding: 2px; /* padding for the border */
+            padding: 2px;
+            /* padding for the border */
             border-radius: 9999px;
         }
-        
+
         .btn-conic::before {
             content: '';
             position: absolute;
@@ -109,7 +118,7 @@
             background-image: conic-gradient(transparent, #8b5cf6, #f472b6, transparent 30%);
             animation: spin-slow 4s linear infinite;
         }
-        
+
         .btn-conic-inner {
             background-color: #0f172a;
             border-radius: 9999px;
@@ -120,6 +129,7 @@
             width: 100%;
             transition: background-color 0.3s;
         }
+
         .btn-conic:hover .btn-conic-inner {
             background-color: #1e293b;
         }
@@ -127,13 +137,14 @@
         /* Enhanced Glass Spotlight */
         .spotlight-card {
             position: relative;
-            background: rgba(15, 23, 42, 0.4); /* More transparent */
+            background: rgba(15, 23, 42, 0.4);
+            /* More transparent */
             backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.05);
             overflow: hidden;
             transition: all 0.5s ease;
         }
-        
+
         .spotlight-card:hover {
             border-color: rgba(139, 92, 246, 0.3);
             box-shadow: 0 0 30px -5px rgba(139, 92, 246, 0.2);
@@ -142,20 +153,25 @@
         .spotlight-card::before {
             content: '';
             position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: radial-gradient(
-                500px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), 
-                rgba(139, 92, 246, 0.15), /* Purple glow */
-                rgba(56, 189, 248, 0.05), /* Blue hint */
-                transparent 50%
-            );
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(500px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+                    rgba(139, 92, 246, 0.15),
+                    /* Purple glow */
+                    rgba(56, 189, 248, 0.05),
+                    /* Blue hint */
+                    transparent 50%);
             opacity: 0;
             transition: opacity 0.5s;
             pointer-events: none;
             z-index: 1;
         }
-        
-        .spotlight-card:hover::before { opacity: 1; }
+
+        .spotlight-card:hover::before {
+            opacity: 1;
+        }
 
 
         /* Scroll Reveal */
@@ -165,6 +181,7 @@
             filter: blur(12px);
             transition: all 1s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
+
         .reveal-up.active {
             opacity: 1;
             transform: translateY(0) scale(1);
@@ -178,113 +195,160 @@
         }
     </style>
 </head>
+
 <body class="antialiased selection:bg-violet-500/30 selection:text-violet-200">
 
     <div class="bg-noise"></div>
 
     <div class="fixed inset-0 pointer-events-none -z-10 overflow-hidden bg-background">
-        <div class="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] bg-violet-800/20 rounded-full blur-[120px] animate-nebula-shift opacity-60"></div>
-        <div class="absolute bottom-[-20%] right-[-10%] w-[70%] h-[70%] bg-fuchsia-800/20 rounded-full blur-[120px] animate-nebula-shift opacity-60" style="animation-delay: -5s;"></div>
-        <div class="absolute top-[40%] left-[30%] w-[50%] h-[50%] bg-sky-800/20 rounded-full blur-[120px] animate-pulse-deep opacity-40"></div>
+        <div
+            class="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] bg-violet-800/20 rounded-full blur-[120px] animate-nebula-shift opacity-60">
+        </div>
+        <div class="absolute bottom-[-20%] right-[-10%] w-[70%] h-[70%] bg-fuchsia-800/20 rounded-full blur-[120px] animate-nebula-shift opacity-60"
+            style="animation-delay: -5s;"></div>
+        <div
+            class="absolute top-[40%] left-[30%] w-[50%] h-[50%] bg-sky-800/20 rounded-full blur-[120px] animate-pulse-deep opacity-40">
+        </div>
     </div>
 
     <nav class="fixed w-full z-50 transition-all duration-500 border-b border-transparent py-2" id="navbar">
-        <div class="absolute inset-0 bg-background/20 backdrop-blur-xl -z-10 transition-all duration-500" id="navbar-bg"></div>
+        <div class="absolute inset-0 bg-background/20 backdrop-blur-xl -z-10 transition-all duration-500"
+            id="navbar-bg"></div>
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <div class="flex items-center gap-2 cursor-pointer group">
-                    <div class="relative w-9 h-9 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
-                        <div class="absolute inset-0 bg-violet-500 rounded-xl blur-md opacity-50 group-hover:opacity-80 transition-opacity"></div>
-                        <div class="relative w-full h-full bg-gradient-to-br from-violet-600 to-indigo-600 rounded-xl flex items-center justify-center border border-white/10 shadow-lg shadow-violet-500/20">
+                    <div
+                        class="relative w-9 h-9 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                        <div
+                            class="absolute inset-0 bg-violet-500 rounded-xl blur-md opacity-50 group-hover:opacity-80 transition-opacity">
+                        </div>
+                        <div
+                            class="relative w-full h-full bg-gradient-to-br from-violet-600 to-indigo-600 rounded-xl flex items-center justify-center border border-white/10 shadow-lg shadow-violet-500/20">
                             <i class="fa-solid fa-cube text-white text-sm"></i>
                         </div>
                     </div>
-                    <span class="font-display font-bold text-xl tracking-tight text-white drop-shadow-[0_0_10px_rgba(167,139,250,0.5)]">InsightDocs<span class="text-violet-400">.ai</span></span>
+                    <span
+                        class="font-display font-bold text-xl tracking-tight text-white drop-shadow-[0_0_10px_rgba(167,139,250,0.5)]">InsightDocs<span
+                            class="text-violet-400">.ai</span></span>
                 </div>
 
                 <div class="hidden md:flex items-center gap-8">
-                    <a href="#features" class="text-sm font-medium text-slate-300/80 hover:text-violet-300 hover:drop-shadow-[0_0_6px_rgba(167,139,250,0.6)] transition-all">Features</a>
-                    <a href="#how-it-works" class="text-sm font-medium text-slate-300/80 hover:text-violet-300 hover:drop-shadow-[0_0_6px_rgba(167,139,250,0.6)] transition-all">Process</a>
+                    <a href="#features"
+                        class="text-sm font-medium text-slate-300/80 hover:text-violet-300 hover:drop-shadow-[0_0_6px_rgba(167,139,250,0.6)] transition-all">Features</a>
+                    <a href="#how-it-works"
+                        class="text-sm font-medium text-slate-300/80 hover:text-violet-300 hover:drop-shadow-[0_0_6px_rgba(167,139,250,0.6)] transition-all">Process</a>
                 </div>
 
                 <div class="hidden md:flex items-center gap-4">
-                    <a href="{% url 'login' %}" class="text-sm font-medium text-slate-300/80 hover:text-white transition-colors">Sign In</a>
-                    <a href="{% url 'signup' %}" class="group relative inline-flex items-center justify-center overflow-hidden rounded-full p-0.5 font-bold text-white shadow-2xl hover:shadow-violet-500/50 transition-shadow duration-300">
-                        <span class="absolute inset-[-1000%] animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#E2CBFF_0%,#393BB2_50%,#E2CBFF_100%)]"></span>
-                        <span class="inline-flex h-full w-full cursor-pointer items-center justify-center rounded-full bg-slate-950/90 px-5 py-2 text-xs backdrop-blur-3xl transition-all group-hover:bg-slate-900/90">
-                          Get Started
+                    <a href="{% url 'login' %}"
+                        class="text-sm font-medium text-slate-300/80 hover:text-white transition-colors">Sign In</a>
+                    <a href="{% url 'signup' %}"
+                        class="group relative inline-flex items-center justify-center overflow-hidden rounded-full p-0.5 font-bold text-white shadow-2xl hover:shadow-violet-500/50 transition-shadow duration-300">
+                        <span
+                            class="absolute inset-[-1000%] animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#E2CBFF_0%,#393BB2_50%,#E2CBFF_100%)]"></span>
+                        <span
+                            class="inline-flex h-full w-full cursor-pointer items-center justify-center rounded-full bg-slate-950/90 px-5 py-2 text-xs backdrop-blur-3xl transition-all group-hover:bg-slate-900/90">
+                            Get Started
                         </span>
                     </a>
                 </div>
 
-                <button id="mobile-toggle" class="md:hidden text-slate-300 p-2 focus:outline-none hover:text-white transition-colors">
+                <button id="mobile-toggle"
+                    class="md:hidden text-slate-300 p-2 focus:outline-none hover:text-white transition-colors">
                     <i class="fa-solid fa-bars text-xl"></i>
                 </button>
             </div>
         </div>
-        
-        <div id="mobile-menu" class="hidden md:hidden border-t border-white/5 bg-background/95 backdrop-blur-2xl absolute w-full left-0 top-20 transition-all duration-300">
+
+        <div id="mobile-menu"
+            class="hidden md:hidden border-t border-white/5 bg-background/95 backdrop-blur-2xl absolute w-full left-0 top-20 transition-all duration-300">
             <div class="p-4 space-y-4">
                 <a href="#features" class="block text-slate-300 font-medium text-sm hover:text-violet-300">Features</a>
-                <a href="#how-it-works" class="block text-slate-300 font-medium text-sm hover:text-violet-300">Process</a>
-                <a href="{% url 'signup' %}" class="block w-full text-center py-3 bg-violet-600/80 hover:bg-violet-500 rounded-xl text-white font-bold text-sm transition-colors shadow-lg shadow-violet-900/20">Get Started</a>
+                <a href="#how-it-works"
+                    class="block text-slate-300 font-medium text-sm hover:text-violet-300">Process</a>
+                <a href="{% url 'signup' %}"
+                    class="block w-full text-center py-3 bg-violet-600/80 hover:bg-violet-500 rounded-xl text-white font-bold text-sm transition-colors shadow-lg shadow-violet-900/20">Get
+                    Started</a>
             </div>
         </div>
     </nav>
 
     <section class="pt-32 pb-20 lg:pt-52 lg:pb-32 relative overflow-hidden">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center z-10 relative">
-            
-            <div class="reveal-up inline-flex items-center gap-3 px-4 py-1.5 rounded-full border border-amber-400/20 bg-amber-400/5 text-amber-200/90 text-[11px] md:text-xs font-medium mb-8 hover:border-amber-400/40 hover:bg-amber-400/10 transition-all duration-300 cursor-pointer group shadow-[0_0_20px_-5px_rgba(251,191,36,0.2)]">
+
+            <div
+                class="reveal-up inline-flex items-center gap-3 px-4 py-1.5 rounded-full border border-amber-400/20 bg-amber-400/5 text-amber-200/90 text-[11px] md:text-xs font-medium mb-8 hover:border-amber-400/40 hover:bg-amber-400/10 transition-all duration-300 cursor-pointer group shadow-[0_0_20px_-5px_rgba(251,191,36,0.2)]">
                 <span class="relative flex h-2.5 w-2.5">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                  <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500 shadow-[0_0_10px_rgba(251,191,36,0.8)]"></span>
+                    <span
+                        class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span
+                        class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500 shadow-[0_0_10px_rgba(251,191,36,0.8)]"></span>
                 </span>
                 Now Available: Intelligent Document Chat
             </div>
 
-            <h1 class="reveal-up delay-100 font-display text-5xl sm:text-6xl md:text-8xl font-extrabold tracking-tight mb-8 leading-[1.1] md:leading-[1.05] drop-shadow-2xl">
+            <h1
+                class="reveal-up delay-100 font-display text-5xl sm:text-6xl md:text-8xl font-extrabold tracking-tight mb-8 leading-[1.1] md:leading-[1.05] drop-shadow-2xl">
                 Chat with your data, <br class="hidden md:block" />
                 <span class="text-gradient-magic relative z-10">Instant answers.</span>
             </h1>
-            
-            <p class="reveal-up delay-200 mt-4 text-lg md:text-xl text-slate-400/90 max-w-2xl mx-auto mb-12 leading-relaxed px-4 font-light">
-                Transform static documents into active conversations. Upload contracts, research, or reports and let our AI extract knowledge in seconds.
+
+            <p
+                class="reveal-up delay-200 mt-4 text-lg md:text-xl text-slate-400/90 max-w-2xl mx-auto mb-12 leading-relaxed px-4 font-light">
+                Transform static documents into active conversations. Upload contracts, research, or reports and let our
+                AI extract knowledge in seconds.
             </p>
 
             <div class="reveal-up delay-300 flex justify-center mb-20 px-6 relative z-20">
                 <a href="{% url 'signup' %}" class="btn-conic group w-full sm:w-auto">
-                    <span class="btn-conic-inner px-8 py-4 text-white font-bold text-base sm:text-lg shadow-2xl shadow-violet-500/20 group-hover:shadow-violet-500/40 transition-shadow gap-3">
-                       Start Analyzing Free <i class="fa-solid fa-sparkles text-violet-200 group-hover:rotate-12 transition-transform duration-500"></i>
+                    <span
+                        class="btn-conic-inner px-8 py-4 text-white font-bold text-base sm:text-lg shadow-2xl shadow-violet-500/20 group-hover:shadow-violet-500/40 transition-shadow gap-3">
+                        Start Analyzing Free <i
+                            class="fa-solid fa-sparkles text-violet-200 group-hover:rotate-12 transition-transform duration-500"></i>
                     </span>
                 </a>
             </div>
 
             <div class="reveal-up delay-500 relative mx-auto max-w-5xl animate-float-medium px-2 z-10">
-                <div class="absolute -inset-4 bg-gradient-to-r from-violet-600/30 via-fuchsia-500/30 to-sky-500/30 rounded-[2rem] blur-3xl -z-10 opacity-60 animate-pulse-deep"></div>
-                <div class="absolute -inset-1 bg-gradient-to-b from-white/10 to-transparent rounded-[2rem] blur-sm -z-10"></div>
-                
-                <div class="bg-slate-900/70 backdrop-blur-xl border border-white/10 rounded-2xl md:rounded-[2rem] overflow-hidden shadow-[0_0_50px_-10px_rgba(139,92,246,0.3)] ring-1 ring-white/5 relative z-10">
+                <div
+                    class="absolute -inset-4 bg-gradient-to-r from-violet-600/30 via-fuchsia-500/30 to-sky-500/30 rounded-[2rem] blur-3xl -z-10 opacity-60 animate-pulse-deep">
+                </div>
+                <div
+                    class="absolute -inset-1 bg-gradient-to-b from-white/10 to-transparent rounded-[2rem] blur-sm -z-10">
+                </div>
+
+                <div
+                    class="bg-slate-900/70 backdrop-blur-xl border border-white/10 rounded-2xl md:rounded-[2rem] overflow-hidden shadow-[0_0_50px_-10px_rgba(139,92,246,0.3)] ring-1 ring-white/5 relative z-10">
                     <div class="h-9 md:h-11 bg-slate-950/50 border-b border-white/5 flex items-center px-4 gap-3">
                         <div class="flex gap-2">
-                            <div class="w-2.5 h-2.5 rounded-full bg-red-500/30 border border-red-500/60 shadow-[0_0_5px_rgba(239,68,68,0.5)]"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-amber-500/30 border border-amber-500/60 shadow-[0_0_5px_rgba(245,158,11,0.5)]"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-500/30 border border-emerald-500/60 shadow-[0_0_5px_rgba(16,185,129,0.5)]"></div>
+                            <div
+                                class="w-2.5 h-2.5 rounded-full bg-red-500/30 border border-red-500/60 shadow-[0_0_5px_rgba(239,68,68,0.5)]">
+                            </div>
+                            <div
+                                class="w-2.5 h-2.5 rounded-full bg-amber-500/30 border border-amber-500/60 shadow-[0_0_5px_rgba(245,158,11,0.5)]">
+                            </div>
+                            <div
+                                class="w-2.5 h-2.5 rounded-full bg-emerald-500/30 border border-emerald-500/60 shadow-[0_0_5px_rgba(16,185,129,0.5)]">
+                            </div>
                         </div>
-                        <div class="mx-auto text-[10px] md:text-xs text-slate-400/80 font-mono flex items-center gap-2 opacity-70">
+                        <div
+                            class="mx-auto text-[10px] md:text-xs text-slate-400/80 font-mono flex items-center gap-2 opacity-70">
                             <i class="fa-solid fa-lock text-[8px]"></i> insightdocs.ai/app/session_42x9A
                         </div>
                     </div>
 
                     <div class="flex h-[400px] md:h-[550px] text-left relative">
                         <div class="hidden md:block w-[220px] bg-slate-950/30 border-r border-white/5 p-4 space-y-3">
-                            <div class="h-8 w-full bg-violet-500/10 border border-violet-500/30 rounded-lg flex items-center px-3 text-xs text-violet-200 gap-2 shadow-[0_0_10px_rgba(139,92,246,0.1)]">
+                            <div
+                                class="h-8 w-full bg-violet-500/10 border border-violet-500/30 rounded-lg flex items-center px-3 text-xs text-violet-200 gap-2 shadow-[0_0_10px_rgba(139,92,246,0.1)]">
                                 <i class="fa-solid fa-file-pdf"></i> Q3_Report.pdf
                             </div>
-                             <div class="h-8 w-full bg-slate-800/30 border border-white/5 rounded-lg flex items-center px-3 text-xs text-slate-500 gap-2 opacity-60">
+                            <div
+                                class="h-8 w-full bg-slate-800/30 border border-white/5 rounded-lg flex items-center px-3 text-xs text-slate-500 gap-2 opacity-60">
                                 <i class="fa-solid fa-file-pdf"></i> Legal_Docs.pdf
                             </div>
-                             <div class="h-8 w-full bg-slate-800/30 border border-white/5 rounded-lg flex items-center px-3 text-xs text-slate-500 gap-2 opacity-60">
+                            <div
+                                class="h-8 w-full bg-slate-800/30 border border-white/5 rounded-lg flex items-center px-3 text-xs text-slate-500 gap-2 opacity-60">
                                 <i class="fa-solid fa-file-word"></i> Notes.docx
                             </div>
                         </div>
@@ -292,47 +356,70 @@
                         <div class="flex-1 flex flex-col bg-slate-950/10 relative z-10">
                             <div class="flex-1 p-4 md:p-6 space-y-6 overflow-hidden relative">
                                 <div class="flex gap-3 md:gap-4 relative">
-                                    <div class="absolute -left-2 -top-2 w-12 h-12 bg-violet-500/20 blur-xl rounded-full -z-10 animate-pulse-deep"></div>
-                                    <div class="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shrink-0 shadow-lg shadow-violet-500/20 border border-white/10">
+                                    <div
+                                        class="absolute -left-2 -top-2 w-12 h-12 bg-violet-500/20 blur-xl rounded-full -z-10 animate-pulse-deep">
+                                    </div>
+                                    <div
+                                        class="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shrink-0 shadow-lg shadow-violet-500/20 border border-white/10">
                                         <i class="fa-solid fa-wand-magic-sparkles text-white text-xs"></i>
                                     </div>
                                     <div class="space-y-1 md:space-y-2 max-w-[85%]">
-                                        <div class="p-4 bg-slate-800/60 border border-white/5 rounded-2xl rounded-tl-none text-sm text-slate-200 leading-relaxed backdrop-blur-md shadow-sm relative overflow-hidden">
-                                            <div class="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-transparent pointer-events-none"></div>
-                                            Based on the analysis of the <span class="text-violet-300 border-b border-violet-500/30 cursor-pointer hover:text-violet-200 transition-colors">Q3 Report</span>, the key revenue driver was the <strong>Enterprise subscription tier</strong>, which grew by 22% YoY, contributing $4.5M to the bottom line.
+                                        <div
+                                            class="p-4 bg-slate-800/60 border border-white/5 rounded-2xl rounded-tl-none text-sm text-slate-200 leading-relaxed backdrop-blur-md shadow-sm relative overflow-hidden">
+                                            <div
+                                                class="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-transparent pointer-events-none">
+                                            </div>
+                                            Based on the analysis of the <span
+                                                class="text-violet-300 border-b border-violet-500/30 cursor-pointer hover:text-violet-200 transition-colors">Q3
+                                                Report</span>, the key revenue driver was the <strong>Enterprise
+                                                subscription tier</strong>, which grew by 22% YoY, contributing $4.5M to
+                                            the bottom line.
                                         </div>
                                     </div>
                                 </div>
 
                                 <div class="flex gap-3 md:gap-4 flex-row-reverse relative">
-                                    <div class="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-slate-800 flex items-center justify-center shrink-0 border border-white/5">
+                                    <div
+                                        class="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-slate-800 flex items-center justify-center shrink-0 border border-white/5">
                                         <i class="fa-solid fa-user text-slate-400 text-xs"></i>
                                     </div>
                                     <div class="space-y-2 text-right max-w-[85%]">
-                                        <div class="p-4 bg-violet-600/90 text-white rounded-2xl rounded-tr-none text-sm shadow-lg shadow-violet-500/20 backdrop-blur-md border border-violet-400/20 relative overflow-hidden leading-relaxed">
-                                             <div class="absolute inset-0 bg-gradient-to-tl from-white/10 to-transparent pointer-events-none"></div>
-                                            That's great. Can you break down the growth by region specifically for that tier?
+                                        <div
+                                            class="p-4 bg-violet-600/90 text-white rounded-2xl rounded-tr-none text-sm shadow-lg shadow-violet-500/20 backdrop-blur-md border border-violet-400/20 relative overflow-hidden leading-relaxed">
+                                            <div
+                                                class="absolute inset-0 bg-gradient-to-tl from-white/10 to-transparent pointer-events-none">
+                                            </div>
+                                            That's great. Can you break down the growth by region specifically for that
+                                            tier?
                                         </div>
                                     </div>
                                 </div>
-                                
-                                 <div class="flex gap-3 md:gap-4 relative opacity-70">
-                                    <div class="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shrink-0 border border-white/10">
+
+                                <div class="flex gap-3 md:gap-4 relative opacity-70">
+                                    <div
+                                        class="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shrink-0 border border-white/10">
                                         <i class="fa-solid fa-wand-magic-sparkles text-white text-xs"></i>
                                     </div>
-                                     <div class="flex items-center gap-1 p-4 bg-slate-800/40 border border-white/5 rounded-2xl rounded-tl-none backdrop-blur-md">
+                                    <div
+                                        class="flex items-center gap-1 p-4 bg-slate-800/40 border border-white/5 rounded-2xl rounded-tl-none backdrop-blur-md">
                                         <span class="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce"></span>
-                                        <span class="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></span>
-                                        <span class="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></span>
+                                        <span class="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce"
+                                            style="animation-delay: 0.2s"></span>
+                                        <span class="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce"
+                                            style="animation-delay: 0.4s"></span>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="p-4 border-t border-white/5 bg-slate-950/60 backdrop-blur-lg relative z-20">
                                 <div class="relative group">
-                                    <div class="absolute -inset-0.5 bg-gradient-to-r from-violet-600/50 to-fuchsia-600/50 rounded-xl blur opacity-0 group-hover:opacity-100 transition duration-1000 group-focus-within:opacity-100"></div>
-                                    <input type="text" placeholder="Ask further questions..." class="relative w-full bg-slate-900/80 border border-white/10 rounded-xl py-3 px-4 text-sm text-white focus:outline-none focus:border-violet-500/50 placeholder-slate-500/70 transition-all shadow-inner">
-                                    <div class="absolute right-2 top-2 p-2 bg-violet-600/80 rounded-lg cursor-pointer hover:bg-violet-500 transition-colors hover:shadow-lg hover:shadow-violet-500/30 hover:scale-105 active:scale-95 flex items-center justify-center z-10">
+                                    <div
+                                        class="absolute -inset-0.5 bg-gradient-to-r from-violet-600/50 to-fuchsia-600/50 rounded-xl blur opacity-0 group-hover:opacity-100 transition duration-1000 group-focus-within:opacity-100">
+                                    </div>
+                                    <input type="text" placeholder="Ask further questions..."
+                                        class="relative w-full bg-slate-900/80 border border-white/10 rounded-xl py-3 px-4 text-sm text-white focus:outline-none focus:border-violet-500/50 placeholder-slate-500/70 transition-all shadow-inner">
+                                    <div
+                                        class="absolute right-2 top-2 p-2 bg-violet-600/80 rounded-lg cursor-pointer hover:bg-violet-500 transition-colors hover:shadow-lg hover:shadow-violet-500/30 hover:scale-105 active:scale-95 flex items-center justify-center z-10">
                                         <i class="fa-solid fa-arrow-up text-white text-xs"></i>
                                     </div>
                                 </div>
@@ -349,105 +436,176 @@
     <section id="features" class="py-24 relative z-10">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-20 relative">
-                 <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/2 h-32 bg-violet-500/20 blur-[100px] -z-10 pointer-events-none opacity-50"></div>
-                <h2 class="reveal-up text-violet-400 font-semibold tracking-[0.2em] uppercase text-xs mb-3 drop-shadow-[0_0_10px_rgba(139,92,246,0.4)]">Powers & Capabilities</h2>
-                <h3 class="reveal-up delay-100 font-display text-3xl md:text-5xl font-bold text-white leading-tight">Intelligence, <span class="text-gradient-magic">Elevated.</span></h3>
+                <div
+                    class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/2 h-32 bg-violet-500/20 blur-[100px] -z-10 pointer-events-none opacity-50">
+                </div>
+                <h2
+                    class="reveal-up text-violet-400 font-semibold tracking-[0.2em] uppercase text-xs mb-3 drop-shadow-[0_0_10px_rgba(139,92,246,0.4)]">
+                    Powers & Capabilities</h2>
+                <h3 class="reveal-up delay-100 font-display text-3xl md:text-5xl font-bold text-white leading-tight">
+                    Intelligence, <span class="text-gradient-magic">Elevated.</span></h3>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="cards-container">
-                <div class="reveal-up spotlight-card rounded-[2rem] p-8 flex flex-col items-center text-center group cursor-default relative">
-                    <div class="absolute top-8 right-8 text-violet-500/20 text-4xl animate-float-slow opacity-0 group-hover:opacity-100 transition-opacity duration-700"><i class="fa-brands fa-rocketchat"></i></div>
-                    
+                <div
+                    class="reveal-up spotlight-card rounded-[2rem] p-8 flex flex-col items-center text-center group cursor-default relative">
+                    <div
+                        class="absolute top-8 right-8 text-violet-500/20 text-4xl animate-float-slow opacity-0 group-hover:opacity-100 transition-opacity duration-700">
+                        <i class="fa-brands fa-rocketchat"></i>
+                    </div>
+
                     <div class="w-16 h-16 relative shrink-0 mb-6">
-                         <div class="absolute inset-0 bg-violet-600/30 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-500 animate-pulse-deep"></div>
-                        <div class="relative w-full h-full bg-gradient-to-br from-violet-950 to-slate-900 rounded-2xl flex items-center justify-center border border-violet-500/30 group-hover:scale-110 transition-transform duration-500 shadow-xl">
-                            <i class="fa-solid fa-comments text-violet-300 text-2xl drop-shadow-[0_0_8px_rgba(167,139,250,0.8)]"></i>
+                        <div
+                            class="absolute inset-0 bg-violet-600/30 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-500 animate-pulse-deep">
+                        </div>
+                        <div
+                            class="relative w-full h-full bg-gradient-to-br from-violet-950 to-slate-900 rounded-2xl flex items-center justify-center border border-violet-500/30 group-hover:scale-110 transition-transform duration-500 shadow-xl">
+                            <i
+                                class="fa-solid fa-comments text-violet-300 text-2xl drop-shadow-[0_0_8px_rgba(167,139,250,0.8)]"></i>
                         </div>
                     </div>
                     <div class="z-10">
-                        <h4 class="font-display text-xl font-bold text-white mb-3 group-hover:text-violet-100 transition-colors">Conversational Core</h4>
-                        <p class="text-slate-400/90 text-sm leading-relaxed font-light">Context-aware chat that understands the nuance of complex documents. It's not keyword matching; it's comprehension.</p>
+                        <h4
+                            class="font-display text-xl font-bold text-white mb-3 group-hover:text-violet-100 transition-colors">
+                            Conversational Core</h4>
+                        <p class="text-slate-400/90 text-sm leading-relaxed font-light">Context-aware chat that
+                            understands the nuance of complex documents. It's not keyword matching; it's comprehension.
+                        </p>
                     </div>
                 </div>
 
-                 <div class="reveal-up delay-100 spotlight-card rounded-[2rem] p-8 flex flex-col items-center text-center group cursor-default relative overflow-hidden">
-                    <div class="absolute -bottom-10 -right-10 text-sky-500/10 text-8xl animate-float-medium opacity-0 group-hover:opacity-100 transition-opacity duration-700 rotate-12"><i class="fa-solid fa-bolt"></i></div>
-                    
+                <div
+                    class="reveal-up delay-100 spotlight-card rounded-[2rem] p-8 flex flex-col items-center text-center group cursor-default relative overflow-hidden">
+                    <div
+                        class="absolute -bottom-10 -right-10 text-sky-500/10 text-8xl animate-float-medium opacity-0 group-hover:opacity-100 transition-opacity duration-700 rotate-12">
+                        <i class="fa-solid fa-bolt"></i>
+                    </div>
+
                     <div class="w-16 h-16 relative mb-6">
-                        <div class="absolute inset-0 bg-sky-600/30 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-500 animate-pulse-deep"></div>
-                        <div class="relative w-full h-full bg-gradient-to-br from-sky-950 to-slate-900 rounded-2xl flex items-center justify-center border border-sky-500/30 group-hover:scale-110 transition-transform duration-500 shadow-xl">
-                            <i class="fa-solid fa-bolt text-sky-300 text-2xl drop-shadow-[0_0_8px_rgba(56,189,248,0.8)]"></i>
+                        <div
+                            class="absolute inset-0 bg-sky-600/30 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-500 animate-pulse-deep">
+                        </div>
+                        <div
+                            class="relative w-full h-full bg-gradient-to-br from-sky-950 to-slate-900 rounded-2xl flex items-center justify-center border border-sky-500/30 group-hover:scale-110 transition-transform duration-500 shadow-xl">
+                            <i
+                                class="fa-solid fa-bolt text-sky-300 text-2xl drop-shadow-[0_0_8px_rgba(56,189,248,0.8)]"></i>
                         </div>
                     </div>
-                    <h4 class="font-display text-xl font-bold text-white mb-3 group-hover:text-sky-100 transition-colors relative z-10">Instant Synthesis</h4>
-                    <p class="text-slate-400/90 text-sm leading-relaxed font-light relative z-10">Turn 100 pages into a 1-page executive brief. Extract key points, dates, and action items in milliseconds.</p>
+                    <h4
+                        class="font-display text-xl font-bold text-white mb-3 group-hover:text-sky-100 transition-colors relative z-10">
+                        Instant Synthesis</h4>
+                    <p class="text-slate-400/90 text-sm leading-relaxed font-light relative z-10">Turn 100 pages into a
+                        1-page executive brief. Extract key points, dates, and action items in milliseconds.</p>
                 </div>
 
-                 <div class="reveal-up delay-200 spotlight-card rounded-[2rem] p-8 flex flex-col items-center text-center group cursor-default relative">
+                <div
+                    class="reveal-up delay-200 spotlight-card rounded-[2rem] p-8 flex flex-col items-center text-center group cursor-default relative">
                     <div class="w-16 h-16 relative mb-6">
-                         <div class="absolute inset-0 bg-fuchsia-600/30 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-500 animate-pulse-deep"></div>
-                        <div class="relative w-full h-full bg-gradient-to-br from-fuchsia-950 to-slate-900 rounded-2xl flex items-center justify-center border border-fuchsia-500/30 group-hover:scale-110 transition-transform duration-500 shadow-xl">
-                            <i class="fa-solid fa-language text-fuchsia-300 text-2xl drop-shadow-[0_0_8px_rgba(232,121,249,0.8)]"></i>
+                        <div
+                            class="absolute inset-0 bg-fuchsia-600/30 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-500 animate-pulse-deep">
+                        </div>
+                        <div
+                            class="relative w-full h-full bg-gradient-to-br from-fuchsia-950 to-slate-900 rounded-2xl flex items-center justify-center border border-fuchsia-500/30 group-hover:scale-110 transition-transform duration-500 shadow-xl">
+                            <i
+                                class="fa-solid fa-language text-fuchsia-300 text-2xl drop-shadow-[0_0_8px_rgba(232,121,249,0.8)]"></i>
                         </div>
                     </div>
-                    <h4 class="font-display text-xl font-bold text-white mb-3 group-hover:text-fuchsia-100 transition-colors">Polyglot Engine</h4>
-                    <p class="text-slate-400/90 text-sm leading-relaxed font-light">Upload a contract in Japanese and query it in English. Seamlessly cross language barriers across 95+ locales.</p>
+                    <h4
+                        class="font-display text-xl font-bold text-white mb-3 group-hover:text-fuchsia-100 transition-colors">
+                        Polyglot Engine</h4>
+                    <p class="text-slate-400/90 text-sm leading-relaxed font-light">Upload a contract in Japanese and
+                        query it in English. Seamlessly cross language barriers across 95+ locales.</p>
                 </div>
             </div>
         </div>
     </section>
 
     <section id="how-it-works" class="py-24 relative overflow-hidden">
-        <div class="absolute top-0 left-1/4 w-1/2 h-1/2 bg-violet-800/10 blur-[150px] -z-10 pointer-events-none opacity-70 animate-pulse-deep"></div>
-        <div class="absolute bottom-0 right-1/4 w-1/2 h-1/2 bg-sky-800/10 blur-[150px] -z-10 pointer-events-none opacity-70 animate-pulse-deep" style="animation-delay: -3s;"></div>
+        <div
+            class="absolute top-0 left-1/4 w-1/2 h-1/2 bg-violet-800/10 blur-[150px] -z-10 pointer-events-none opacity-70 animate-pulse-deep">
+        </div>
+        <div class="absolute bottom-0 right-1/4 w-1/2 h-1/2 bg-sky-800/10 blur-[150px] -z-10 pointer-events-none opacity-70 animate-pulse-deep"
+            style="animation-delay: -3s;"></div>
 
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
             <div class="text-center mb-24 relative z-10">
-                <h2 class="reveal-up text-violet-400 font-semibold tracking-[0.2em] uppercase text-xs mb-3 drop-shadow-[0_0_10px_rgba(139,92,246,0.4)]">The Methodology</h2>
-                <h3 class="reveal-up delay-100 font-display text-3xl md:text-5xl font-bold text-white leading-tight">From Chaos to <span class="text-gradient-magic">Clarity.</span></h3>
+                <h2
+                    class="reveal-up text-violet-400 font-semibold tracking-[0.2em] uppercase text-xs mb-3 drop-shadow-[0_0_10px_rgba(139,92,246,0.4)]">
+                    The Methodology</h2>
+                <h3 class="reveal-up delay-100 font-display text-3xl md:text-5xl font-bold text-white leading-tight">
+                    From Chaos to <span class="text-gradient-magic">Clarity.</span></h3>
             </div>
 
             <div class="relative grid grid-cols-1 md:grid-cols-3 gap-16 md:gap-8 items-start">
-                <div class="hidden md:block absolute top-20 left-[20%] right-[20%] h-[3px] bg-gradient-to-r from-violet-500/0 via-violet-500/50 to-violet-500/0 blur-[2px] animate-pulse-deep z-0"></div>
-                 <div class="hidden md:block absolute top-20 left-[20%] right-[20%] h-[1px] bg-gradient-to-r from-violet-200/0 via-violet-200/80 to-violet-200/0 z-0"></div>
-                
+                <div
+                    class="hidden md:block absolute top-20 left-[20%] right-[20%] h-[3px] bg-gradient-to-r from-violet-500/0 via-violet-500/50 to-violet-500/0 blur-[2px] animate-pulse-deep z-0">
+                </div>
+                <div
+                    class="hidden md:block absolute top-20 left-[20%] right-[20%] h-[1px] bg-gradient-to-r from-violet-200/0 via-violet-200/80 to-violet-200/0 z-0">
+                </div>
+
                 <div class="reveal-up relative flex flex-col items-center text-center group z-10">
                     <div class="w-40 h-40 relative flex items-center justify-center mb-8">
-                        <div class="absolute inset-0 rounded-full border-[3px] border-dashed border-violet-500/30 animate-[spin_20s_linear_infinite] group-hover:border-violet-400/60 transition-colors"></div>
-                        <div class="absolute inset-4 rounded-full bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 blur-xl group-hover:blur-2xl transition-all duration-500 animate-pulse-deep"></div>
-                        <div class="relative w-24 h-24 bg-slate-900/80 rounded-full border border-violet-500/50 flex items-center justify-center shadow-[0_0_30px_-5px_rgba(139,92,246,0.5)] group-hover:scale-105 transition-transform backdrop-blur-sm">
-                             <i class="fa-solid fa-cloud-arrow-up text-4xl text-transparent bg-clip-text bg-gradient-to-tr from-violet-200 to-fuchsia-200 drop-shadow-[0_0_10px_rgba(167,139,250,0.8)] animate-float-medium"></i>
+                        <div
+                            class="absolute inset-0 rounded-full border-[3px] border-dashed border-violet-500/30 animate-[spin_20s_linear_infinite] group-hover:border-violet-400/60 transition-colors">
                         </div>
-                        <div class="absolute -right-2 top-0 w-10 h-10 rounded-full bg-slate-900 border-2 border-violet-400 flex items-center justify-center text-lg font-bold text-violet-200 shadow-[0_0_15px_rgba(139,92,246,0.6)]">1</div>
+                        <div
+                            class="absolute inset-4 rounded-full bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 blur-xl group-hover:blur-2xl transition-all duration-500 animate-pulse-deep">
+                        </div>
+                        <div
+                            class="relative w-24 h-24 bg-slate-900/80 rounded-full border border-violet-500/50 flex items-center justify-center shadow-[0_0_30px_-5px_rgba(139,92,246,0.5)] group-hover:scale-105 transition-transform backdrop-blur-sm">
+                            <i
+                                class="fa-solid fa-cloud-arrow-up text-4xl text-transparent bg-clip-text bg-gradient-to-tr from-violet-200 to-fuchsia-200 drop-shadow-[0_0_10px_rgba(167,139,250,0.8)] animate-float-medium"></i>
+                        </div>
+                        <div
+                            class="absolute -right-2 top-0 w-10 h-10 rounded-full bg-slate-900 border-2 border-violet-400 flex items-center justify-center text-lg font-bold text-violet-200 shadow-[0_0_15px_rgba(139,92,246,0.6)]">
+                            1</div>
                     </div>
                     <h4 class="text-2xl font-bold text-white mb-4 drop-shadow-lg">Ingest & Vectorize</h4>
-                    <p class="text-slate-400/90 max-w-xs text-base leading-relaxed font-light">Drag & drop any format. We instantly map the semantic DNA of your documents into a high-dimensional vector space.</p>
+                    <p class="text-slate-400/90 max-w-xs text-base leading-relaxed font-light">Drag & drop any format.
+                        We instantly map the semantic DNA of your documents into a high-dimensional vector space.</p>
                 </div>
 
                 <div class="reveal-up delay-200 relative flex flex-col items-center text-center group z-10">
-                     <div class="w-40 h-40 relative flex items-center justify-center mb-8">
-                        <div class="absolute inset-0 rounded-full border-[3px] border-dashed border-sky-500/30 animate-[spin_20s_linear_infinite_reverse] group-hover:border-sky-400/60 transition-colors"></div>
-                        <div class="absolute inset-4 rounded-full bg-gradient-to-br from-sky-600/20 to-cyan-600/20 blur-xl group-hover:blur-2xl transition-all duration-500 animate-pulse-deep" style="animation-delay: -2s;"></div>
-                        <div class="relative w-24 h-24 bg-slate-900/80 rounded-full border border-sky-500/50 flex items-center justify-center shadow-[0_0_30px_-5px_rgba(56,189,248,0.5)] group-hover:scale-105 transition-transform backdrop-blur-sm">
-                             <i class="fa-solid fa-microchip text-4xl text-transparent bg-clip-text bg-gradient-to-tr from-sky-200 to-cyan-200 drop-shadow-[0_0_10px_rgba(56,189,248,0.8)] animate-float-slow" style="animation-delay: -1s;"></i>
+                    <div class="w-40 h-40 relative flex items-center justify-center mb-8">
+                        <div
+                            class="absolute inset-0 rounded-full border-[3px] border-dashed border-sky-500/30 animate-[spin_20s_linear_infinite_reverse] group-hover:border-sky-400/60 transition-colors">
                         </div>
-                        <div class="absolute -right-2 top-0 w-10 h-10 rounded-full bg-slate-900 border-2 border-sky-400 flex items-center justify-center text-lg font-bold text-sky-200 shadow-[0_0_15px_rgba(56,189,248,0.6)]">2</div>
+                        <div class="absolute inset-4 rounded-full bg-gradient-to-br from-sky-600/20 to-cyan-600/20 blur-xl group-hover:blur-2xl transition-all duration-500 animate-pulse-deep"
+                            style="animation-delay: -2s;"></div>
+                        <div
+                            class="relative w-24 h-24 bg-slate-900/80 rounded-full border border-sky-500/50 flex items-center justify-center shadow-[0_0_30px_-5px_rgba(56,189,248,0.5)] group-hover:scale-105 transition-transform backdrop-blur-sm">
+                            <i class="fa-solid fa-microchip text-4xl text-transparent bg-clip-text bg-gradient-to-tr from-sky-200 to-cyan-200 drop-shadow-[0_0_10px_rgba(56,189,248,0.8)] animate-float-slow"
+                                style="animation-delay: -1s;"></i>
+                        </div>
+                        <div
+                            class="absolute -right-2 top-0 w-10 h-10 rounded-full bg-slate-900 border-2 border-sky-400 flex items-center justify-center text-lg font-bold text-sky-200 shadow-[0_0_15px_rgba(56,189,248,0.6)]">
+                            2</div>
                     </div>
                     <h4 class="text-2xl font-bold text-white mb-4 drop-shadow-lg">Cognitive Processing</h4>
-                    <p class="text-slate-400/90 max-w-xs text-base leading-relaxed font-light">Our neural engines identify relationships, entities, and context across thousands of pages simultaneously.</p>
+                    <p class="text-slate-400/90 max-w-xs text-base leading-relaxed font-light">Our neural engines
+                        identify relationships, entities, and context across thousands of pages simultaneously.</p>
                 </div>
 
                 <div class="reveal-up delay-400 relative flex flex-col items-center text-center group z-10">
-                     <div class="w-40 h-40 relative flex items-center justify-center mb-8">
-                        <div class="absolute inset-0 rounded-full border-[3px] border-dashed border-fuchsia-500/30 animate-[spin_20s_linear_infinite] group-hover:border-fuchsia-400/60 transition-colors"></div>
-                        <div class="absolute inset-4 rounded-full bg-gradient-to-br from-fuchsia-600/20 to-pink-600/20 blur-xl group-hover:blur-2xl transition-all duration-500 animate-pulse-deep" style="animation-delay: -4s;"></div>
-                        <div class="relative w-24 h-24 bg-slate-900/80 rounded-full border border-fuchsia-500/50 flex items-center justify-center shadow-[0_0_30px_-5px_rgba(232,121,249,0.5)] group-hover:scale-105 transition-transform backdrop-blur-sm">
-                             <i class="fa-solid fa-wand-magic-sparkles text-4xl text-transparent bg-clip-text bg-gradient-to-tr from-fuchsia-200 to-pink-200 drop-shadow-[0_0_10px_rgba(232,121,249,0.8)] animate-float-medium" style="animation-delay: -2s;"></i>
+                    <div class="w-40 h-40 relative flex items-center justify-center mb-8">
+                        <div
+                            class="absolute inset-0 rounded-full border-[3px] border-dashed border-fuchsia-500/30 animate-[spin_20s_linear_infinite] group-hover:border-fuchsia-400/60 transition-colors">
                         </div>
-                        <div class="absolute -right-2 top-0 w-10 h-10 rounded-full bg-slate-900 border-2 border-fuchsia-400 flex items-center justify-center text-lg font-bold text-fuchsia-200 shadow-[0_0_15px_rgba(232,121,249,0.6)]">3</div>
+                        <div class="absolute inset-4 rounded-full bg-gradient-to-br from-fuchsia-600/20 to-pink-600/20 blur-xl group-hover:blur-2xl transition-all duration-500 animate-pulse-deep"
+                            style="animation-delay: -4s;"></div>
+                        <div
+                            class="relative w-24 h-24 bg-slate-900/80 rounded-full border border-fuchsia-500/50 flex items-center justify-center shadow-[0_0_30px_-5px_rgba(232,121,249,0.5)] group-hover:scale-105 transition-transform backdrop-blur-sm">
+                            <i class="fa-solid fa-wand-magic-sparkles text-4xl text-transparent bg-clip-text bg-gradient-to-tr from-fuchsia-200 to-pink-200 drop-shadow-[0_0_10px_rgba(232,121,249,0.8)] animate-float-medium"
+                                style="animation-delay: -2s;"></i>
+                        </div>
+                        <div
+                            class="absolute -right-2 top-0 w-10 h-10 rounded-full bg-slate-900 border-2 border-fuchsia-400 flex items-center justify-center text-lg font-bold text-fuchsia-200 shadow-[0_0_15px_rgba(232,121,249,0.6)]">
+                            3</div>
                     </div>
                     <h4 class="text-2xl font-bold text-white mb-4 drop-shadow-lg">Insight Extraction</h4>
-                    <p class="text-slate-400/90 max-w-xs text-base leading-relaxed font-light">Interact naturally. Ask questions, identify risks, and uncover hidden opportunities instantly.</p>
+                    <p class="text-slate-400/90 max-w-xs text-base leading-relaxed font-light">Interact naturally. Ask
+                        questions, identify risks, and uncover hidden opportunities instantly.</p>
                 </div>
             </div>
         </div>
@@ -455,46 +613,43 @@
 
 
     <footer class="border-t border-white/5 bg-slate-950/50 pt-16 pb-12 text-sm relative overflow-hidden">
-         <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-32 bg-violet-900/20 blur-[100px] -z-10 pointer-events-none opacity-30"></div>
+        <div
+            class="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-32 bg-violet-900/20 blur-[100px] -z-10 pointer-events-none opacity-30">
+        </div>
 
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
-                <div class="col-span-2">
-                    <div class="flex items-center gap-2 mb-6">
-                        <div class="relative w-7 h-7 flex items-center justify-center">
-                            <div class="absolute inset-0 bg-violet-500 rounded-lg blur-sm opacity-60"></div>
-                            <div class="relative w-full h-full bg-gradient-to-br from-violet-600 to-indigo-600 rounded-lg flex items-center justify-center border border-white/10">
-                                <i class="fa-solid fa-cube text-white text-[10px]"></i>
-                            </div>
+
+            <div class="mb-12">
+                <div class="flex items-center gap-2 mb-6">
+                    <div class="relative w-7 h-7 flex items-center justify-center">
+                        <div class="absolute inset-0 bg-violet-500 rounded-lg blur-sm opacity-60"></div>
+                        <div
+                            class="relative w-full h-full bg-gradient-to-br from-violet-600 to-indigo-600 rounded-lg flex items-center justify-center border border-white/10">
+                            <i class="fa-solid fa-cube text-white text-[10px]"></i>
                         </div>
-                        <span class="font-bold text-white text-lg tracking-tight">InsightDocs<span class="text-violet-400">.ai</span></span>
                     </div>
-                    <p class="text-slate-400/80 text-sm leading-relaxed max-w-xs font-light">Pioneering the future of knowledge retrieval through generative artificial intelligence.</p>
+                    <span class="font-bold text-white text-lg tracking-tight">InsightDocs<span
+                            class="text-violet-400">.ai</span></span>
                 </div>
-                <div>
-                    <h4 class="font-bold text-white mb-6 tracking-wider uppercase text-xs text-violet-300/70">Company</h4>
-                    <ul class="space-y-3 text-slate-400/80 font-light">
-                        <li><a href="{% url 'coming_soon' %}" class="hover:text-violet-300 hover:drop-shadow-[0_0_5px_rgba(167,139,250,0.5)] transition-all">About Us</a></li>
-                        <li><a href="{% url 'coming_soon' %}" class="hover:text-violet-300 hover:drop-shadow-[0_0_5px_rgba(167,139,250,0.5)] transition-all">Research Blog</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <h4 class="font-bold text-white mb-6 tracking-wider uppercase text-xs text-violet-300/70">Legal</h4>
-                    <ul class="space-y-3 text-slate-400/80 font-light">
-                        <li><a href="{% url 'coming_soon' %}" class="hover:text-violet-300 hover:drop-shadow-[0_0_5px_rgba(167,139,250,0.5)] transition-all">Privacy Policy</a></li>
-                        <li><a href="{% url 'coming_soon' %}" class="hover:text-violet-300 hover:drop-shadow-[0_0_5px_rgba(167,139,250,0.5)] transition-all">Terms of Service</a></li>
-                    </ul>
-                </div>
+                <p class="text-slate-400/80 text-sm leading-relaxed max-w-md font-light">
+                    Pioneering the future of knowledge retrieval through generative artificial intelligence. Transform
+                    your static documents into active conversations instantly.
+                </p>
             </div>
-            
+
             <div class="glow-divider mb-8 opacity-30"></div>
 
             <div class="flex flex-col md:flex-row justify-between items-center gap-4">
                 <p class="text-slate-500 text-xs font-light">&copy; 2025 InsightDocs AI Inc. Crafted in the ether.</p>
                 <div class="flex gap-5 text-slate-500">
-                    <a href="{% url 'coming_soon' %}" class="hover:text-violet-300 hover:scale-110 transition-all duration-300"><i class="fa-brands fa-x-twitter"></i></a>
-                    <a href="{% url 'coming_soon' %}" class="hover:text-violet-300 hover:scale-110 transition-all duration-300"><i class="fa-brands fa-github"></i></a>
-                    <a href="{% url 'coming_soon' %}" class="hover:text-violet-300 hover:scale-110 transition-all duration-300"><i class="fa-brands fa-linkedin-in"></i></a>
+                    <a href="https://x.com/InsightDocsAI" target="_blank"
+                        class="hover:text-violet-300 hover:scale-110 transition-all duration-300">
+                        <i class="fa-brands fa-twitter"></i>
+                    </a>
+                    <a href="https://github.com/NikhilAmbure/InsightDocs_AI" target="_blank"
+                        class="hover:text-violet-300 hover:scale-110 transition-all duration-300">
+                        <i class="fa-brands fa-github"></i>
+                    </a>
                 </div>
             </div>
         </div>
@@ -504,7 +659,7 @@
         // 1. Mobile Toggle with smooth transition
         const btn = document.getElementById('mobile-toggle');
         const menu = document.getElementById('mobile-menu');
-        
+
         btn.addEventListener('click', () => {
             menu.classList.toggle('hidden');
             const icon = btn.querySelector('i');
@@ -516,8 +671,8 @@
             } else {
                 icon.classList.remove('fa-bars');
                 icon.classList.add('fa-xmark');
-                 menu.style.opacity = '1';
-                 menu.style.transform = 'translateY(0)';
+                menu.style.opacity = '1';
+                menu.style.transform = 'translateY(0)';
             }
         });
 
@@ -533,7 +688,7 @@
             } else {
                 nav.classList.add('border-transparent', 'py-2');
                 nav.classList.remove('border-white/5');
-                 navBg.classList.add('bg-background/20', 'backdrop-blur-xl');
+                navBg.classList.add('bg-background/20', 'backdrop-blur-xl');
                 navBg.classList.remove('bg-slate-950/80', 'backdrop-blur-2xl');
             }
         });
@@ -544,7 +699,7 @@
                 if (entry.isIntersecting) {
                     // Add a small delay based on the element's vertical position to create a cascading effect
                     setTimeout(() => {
-                         entry.target.classList.add('active');
+                        entry.target.classList.add('active');
                     }, entry.boundingClientRect.top / 10); // subtle dynamic delay
                     observer.unobserve(entry.target);
                 }
@@ -555,14 +710,14 @@
 
         // 4. Enhanced Spotlight Effect Logic (Desktop Only)
         const cardsContainer = document.getElementById('cards-container');
-        
-        if(cardsContainer) {
-             cardsContainer.onmousemove = e => {
-                for(const card of document.getElementsByClassName("spotlight-card")) {
+
+        if (cardsContainer) {
+            cardsContainer.onmousemove = e => {
+                for (const card of document.getElementsByClassName("spotlight-card")) {
                     const rect = card.getBoundingClientRect();
                     const x = e.clientX - rect.left;
                     const y = e.clientY - rect.top;
-                    
+
                     card.style.setProperty("--mouse-x", `${x}px`);
                     card.style.setProperty("--mouse-y", `${y}px`);
                 }
@@ -570,4 +725,5 @@
         }
     </script>
 </body>
+
 </html>

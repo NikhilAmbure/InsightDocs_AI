@@ -6,169 +6,164 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>InsightDocs AI · Verify</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23a78bfa;stop-opacity:1'/%3E%3Cstop offset='100%25' style='stop-color:%237c3aed;stop-opacity:1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='0' y='0' width='64' height='64' rx='16' fill='%23020617'/%3E%3Cpath d='M32 14L50 23V41L32 50L14 41V23Z' fill='url(%23g)' stroke='%23ddd6fe' stroke-width='2'/%3E%3Cpath d='M32 50V32M32 32L50 23M32 32L14 23' stroke='%23ddd6fe' stroke-width='2'/%3E%3C/svg%3E" type="image/svg+xml">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
     <style>
         body { font-family: 'Inter', sans-serif; }
-        
         .glass-card {
             background: rgba(24, 24, 27, 0.4);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border: 1px solid rgba(255, 255, 255, 0.08);
         }
-
-        /* Animated Blobs */
         @keyframes float {
             0% { transform: translate(0px, 0px) scale(1); }
             33% { transform: translate(30px, -50px) scale(1.1); }
             66% { transform: translate(-20px, 20px) scale(0.9); }
             100% { transform: translate(0px, 0px) scale(1); }
         }
-        .animate-blob {
-            animation: float 7s infinite;
-        }
-        .animation-delay-2000 {
-            animation-delay: 2s;
-        }
-        
-        /* Hide number spinners */
+        .animate-blob { animation: float 7s infinite; }
+        .animation-delay-2000 { animation-delay: 2s; }
         input[type=number]::-webkit-inner-spin-button, 
-        input[type=number]::-webkit-outer-spin-button { 
-            -webkit-appearance: none; 
-            margin: 0; 
-        }
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
     </style>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        gray: { 950: '#09090b' }, // Zinc 950
-                    }
-                }
-            }
-        }
-    </script>
 </head>
-<body class="relative flex min-h-screen items-center justify-center overflow-hidden bg-gray-950 text-zinc-100 selection:bg-blue-500/30">
+<body class="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 text-white selection:bg-violet-500/30">
 
-    <!-- Background Effects -->
-    <div class="absolute inset-0 overflow-hidden">
-        <div class="absolute -left-4 top-0 h-72 w-72 animate-blob rounded-full bg-blue-500/20 blur-3xl filter mix-blend-multiply opacity-70"></div>
-        <div class="animation-delay-2000 absolute -right-4 bottom-0 h-72 w-72 animate-blob rounded-full bg-indigo-500/20 blur-3xl filter mix-blend-multiply opacity-70"></div>
-        <!-- Radial Gradient Overlay -->
-        <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-transparent via-gray-950/60 to-gray-950"></div>
+    <div class="absolute inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute -left-4 top-0 h-72 w-72 rounded-full bg-violet-500/20 blur-3xl filter mix-blend-multiply opacity-70 animate-blob"></div>
+        <div class="absolute -right-4 bottom-0 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl filter mix-blend-multiply opacity-70 animate-blob animation-delay-2000"></div>
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-transparent via-slate-950/60 to-slate-950"></div>
     </div>
 
-    <!-- Main Container -->
-    <div class="relative z-10 w-full max-w-md px-4">
+    <div class="relative z-10 w-full max-w-sm px-4">
         
-        <!-- Brand Header -->
         <div class="mb-8 text-center">
-            <a href="{% url 'login' %}" class="inline-flex items-center gap-2">
-                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 shadow-lg shadow-blue-500/20">
-                    <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+            <a href="{% url 'login' %}" class="inline-flex items-center gap-3 group cursor-pointer">
+                <div class="relative w-8 h-8 flex items-center justify-center">
+                    <div class="absolute inset-0 bg-violet-500 rounded-lg blur-sm opacity-50 group-hover:opacity-75 transition-opacity"></div>
+                    <div class="relative w-full h-full bg-gradient-to-br from-violet-600 to-indigo-600 rounded-lg flex items-center justify-center border border-white/10">
+                        <i class="fa-solid fa-cube text-white text-xs"></i>
+                    </div>
                 </div>
-                <span class="text-lg font-bold tracking-tight text-white">InsightDocs AI</span>
+                <span class="font-display font-bold text-lg tracking-tight text-white">InsightDocs<span class="text-violet-400">.ai</span></span>
             </a>
         </div>
 
-        <!-- Card -->
-        <div class="glass-card rounded-3xl p-8 shadow-2xl shadow-black/50 sm:p-10">
-            
-            <!-- Icon & Title -->
+        <div class="glass-card rounded-2xl p-6 shadow-2xl shadow-black/50 sm:p-8">
             <div class="mb-6 text-center">
-                <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-white/5 border border-white/10 text-blue-400 shadow-inner shadow-white/5">
+                <div class="mx-auto mb-3 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-white/5 border border-white/10 text-violet-400 shadow-inner shadow-white/5">
                     {% if mode == "otp_verification" %}
-                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                        <i class="fa-solid fa-envelope-open-text text-base sm:text-lg"></i>
                     {% else %}
-                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
+                        <i class="fa-solid fa-lock text-base sm:text-lg"></i>
                     {% endif %}
                 </div>
                 
-                <h1 class="text-xl font-bold text-white">
-                    {% if mode == "otp_verification" %}Check your email{% else %}Set new password{% endif %}
+                <h1 class="text-lg sm:text-xl font-bold text-white font-display">
+                    {% if subtitle %}{{ subtitle }}{% elif mode == "otp_verification" %}Check your email{% else %}Set new password{% endif %}
                 </h1>
                 
                 {% if mode == "otp_verification" %}
-                    <p class="mt-2 text-sm text-zinc-400">We sent a 6-digit code to</p>
-                    <p class="mt-1 text-sm font-medium text-white">{{ request.session.reset_password_data.email }}</p>
+                    <p class="mt-1.5 text-xs sm:text-sm text-zinc-400">Enter the 6-digit code sent to your email.</p>
                 {% else %}
-                    <p class="mt-2 text-sm text-zinc-400">Please create a secure password for your account.</p>
+                    <p class="mt-1.5 text-xs sm:text-sm text-zinc-400">Please create a secure password.</p>
                 {% endif %}
             </div>
 
-            <!-- Form -->
-            <form class="space-y-6" method="POST" action="{% if mode == 'otp_verification' %}{% url 'verify_reset_otp' %}{% else %}{% url 'reset_password' %}{% endif %}">
+            {% if messages %}
+            <div class="mb-5 space-y-2">
+                {% for message in messages %}
+                    <div class="flex items-center gap-2 rounded-lg border p-2.5 text-xs font-medium 
+                        {% if message.tags == 'error' %} border-red-500/20 bg-red-500/10 text-red-400
+                        {% elif message.tags == 'success' %} border-green-500/20 bg-green-500/10 text-green-400
+                        {% else %} border-blue-500/20 bg-blue-500/10 text-blue-400 {% endif %}">
+                        
+                        {% if message.tags == 'error' %}
+                            <i class="fa-solid fa-circle-exclamation"></i>
+                        {% elif message.tags == 'success' %}
+                            <i class="fa-solid fa-circle-check"></i>
+                        {% else %}
+                            <i class="fa-solid fa-circle-info"></i>
+                        {% endif %}
+                        
+                        <span>{{ message }}</span>
+                    </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <form class="space-y-5 sm:space-y-6" method="POST" action="{% if action_url %}{% url action_url %}{% elif mode == 'otp_verification' %}{% url 'verify_reset_otp' %}{% else %}{% url 'reset_password' %}{% endif %}">
                 {% csrf_token %}
 
                 {% if mode == "otp_verification" %}
-                    <!-- OTP Inputs -->
                     <div class="space-y-2">
-                        <label class="block text-center text-xs font-medium text-zinc-500 uppercase tracking-wider">Enter Verification Code</label>
-                        <div class="flex justify-between gap-2">
+                        <label class="block text-center text-[10px] sm:text-xs font-medium text-zinc-500 uppercase tracking-wider">Verification Code</label>
+                        <div class="flex justify-between gap-1.5 sm:gap-2">
                             {% for i in "123456" %}
                             <input type="text" maxlength="1" pattern="[0-9]*" inputmode="numeric"
-                                class="otp-input h-12 w-full rounded-xl border border-white/10 bg-white/5 text-center text-lg font-bold text-white focus:border-blue-500/50 focus:bg-white/10 focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-all" />
+                                class="otp-input h-10 w-full rounded-xl border border-white/10 bg-white/5 text-center text-base sm:text-lg font-bold text-white focus:border-violet-500/50 focus:bg-white/10 focus:outline-none focus:ring-1 focus:ring-violet-500/50 transition-all" />
                             {% endfor %}
                         </div>
                         <input type="hidden" name="otp" id="otp-input" required />
                     </div>
-
-                    <!-- Resend Link -->
+                    
                     <div class="text-center">
-                        <p class="text-xs text-zinc-500">
+                        <p class="text-[10px] sm:text-xs text-zinc-500">
                             Didn't receive the code?
-                            <button type="button" id="resend-btn" class="font-medium text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                                Resend code
+                            <button type="button" id="resend-btn" class="font-medium text-violet-400 hover:text-violet-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                Resend
                             </button>
                         </p>
                         <p id="countdown" class="mt-1 text-[10px] font-medium text-zinc-600"></p>
                     </div>
 
                 {% else %}
-                    <!-- New Password Inputs -->
-                    <div class="space-y-4">
-                        <div class="space-y-1.5">
-                            <label class="block text-xs font-medium text-zinc-300">New Password</label>
-                            <input type="password" name="new_password" required placeholder="••••••••"
-                                class="block w-full rounded-xl border border-white/10 bg-white/5 py-2.5 px-3 text-sm text-white placeholder:text-zinc-600 focus:border-blue-500/50 focus:bg-white/10 focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-all" />
+                    <div class="space-y-3 sm:space-y-4">
+                        <div class="space-y-1">
+                            <label class="block text-[10px] sm:text-xs font-medium text-zinc-300 ml-1">New Password</label>
+                            <input type="password" name="new_password" required placeholder="••••••••" class="block w-full rounded-xl border border-white/10 bg-white/5 py-2 sm:py-2.5 px-3 text-xs sm:text-sm text-white focus:outline-none focus:ring-1 focus:ring-violet-500/50 transition-all" />
                         </div>
-                        <div class="space-y-1.5">
-                            <label class="block text-xs font-medium text-zinc-300">Confirm Password</label>
-                            <input type="password" name="confirm_password" required placeholder="••••••••"
-                                class="block w-full rounded-xl border border-white/10 bg-white/5 py-2.5 px-3 text-sm text-white placeholder:text-zinc-600 focus:border-blue-500/50 focus:bg-white/10 focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-all" />
+                        <div class="space-y-1">
+                            <label class="block text-[10px] sm:text-xs font-medium text-zinc-300 ml-1">Confirm Password</label>
+                            <input type="password" name="confirm_password" required placeholder="••••••••" class="block w-full rounded-xl border border-white/10 bg-white/5 py-2 sm:py-2.5 px-3 text-xs sm:text-sm text-white focus:outline-none focus:ring-1 focus:ring-violet-500/50 transition-all" />
                         </div>
                     </div>
                 {% endif %}
 
                 <button type="submit"
-                    class="group w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition-all hover:shadow-blue-600/40 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900">
-                    {% if mode == "otp_verification" %}Verify Code{% else %}Reset Password{% endif %}
-                    <span class="ml-1 inline-block transition-transform group-hover:translate-x-0.5">→</span>
+                    class="group w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-white shadow-lg shadow-violet-600/20 transition-all hover:shadow-violet-600/40 hover:from-violet-500 hover:to-indigo-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 focus:ring-offset-gray-900">
+                    Verify & Continue <span class="ml-1 inline-block transition-transform group-hover:translate-x-0.5">→</span>
                 </button>
             </form>
-
-            <!-- Footer -->
-            <div class="mt-8 border-t border-white/5 pt-6 text-center">
-                <a href="{% url 'login' %}" class="inline-flex items-center gap-2 text-xs font-medium text-zinc-400 hover:text-white transition-colors">
+            
+            {% if not action_url %}
+            <div class="mt-6 border-t border-white/5 pt-5 text-center">
+                <a href="{% url 'login' %}" class="inline-flex items-center gap-2 text-[10px] sm:text-xs font-medium text-zinc-400 hover:text-white transition-colors">
                     <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7 7-7m8 14l-7-7 7-7" />
                     </svg>
                     Back to Sign In
                 </a>
             </div>
+            {% endif %}
         </div>
-
-        <!-- Copyright/Footer -->
-        <p class="mt-8 text-center text-[10px] text-zinc-600">
+        
+        <p class="mt-6 sm:mt-8 text-center text-[10px] text-zinc-600">
             &copy; 2025 InsightDocs AI. Secure Encryption Enabled.
         </p>
     </div>
@@ -182,46 +177,24 @@
             const countdownEl = document.getElementById('countdown');
             let countdown = 30;
 
-            // Auto-focus first input
             if (inputs.length > 0) inputs[0].focus();
 
             inputs.forEach((input, index) => {
-                // Handle numeric input and auto-advance
                 input.addEventListener('input', function(e) {
-                    // Allow only numbers
                     this.value = this.value.replace(/[^0-9]/g, '');
-
-                    if (this.value.length === 1) {
-                        if (index < inputs.length - 1) {
-                            inputs[index + 1].focus();
-                        }
-                    }
-                    // Sync to hidden input
+                    if (this.value.length === 1 && index < inputs.length - 1) inputs[index + 1].focus();
                     otpInput.value = Array.from(inputs).map(i => i.value).join('');
                 });
-
-                // Handle backspace
                 input.addEventListener('keydown', function(e) {
-                    if (e.key === 'Backspace') {
-                        if (this.value === '' && index > 0) {
-                            inputs[index - 1].focus();
-                        }
-                    }
+                    if (e.key === 'Backspace' && this.value === '' && index > 0) inputs[index - 1].focus();
                 });
-
-                // Handle paste
                 input.addEventListener('paste', function(e) {
                     e.preventDefault();
                     const pastedData = e.clipboardData.getData('text').replace(/[^0-9]/g, '').slice(0, 6);
-                    
                     if (pastedData) {
-                        pastedData.split('').forEach((char, i) => {
-                            if (inputs[i]) inputs[i].value = char;
-                        });
-                        // Focus the next empty input or the last one
-                        const nextIndex = Math.min(pastedData.length, inputs.length - 1);
-                        inputs[nextIndex].focus();
+                        pastedData.split('').forEach((char, i) => { if (inputs[i]) inputs[i].value = char; });
                         otpInput.value = Array.from(inputs).map(i => i.value).join('');
+                        inputs[Math.min(pastedData.length, inputs.length - 1)].focus();
                     }
                 });
             });
@@ -240,22 +213,22 @@
                 }
             }
 
-            resendBtn.addEventListener('click', function() {
-                resendBtn.disabled = true;
-                countdown = 30;
+            if(resendBtn) {
+                resendBtn.addEventListener('click', function() {
+                    resendBtn.disabled = true;
+                    countdown = 30;
+                    updateCountdown();
+
+                    fetch("{% url 'resend_reset_otp' %}")
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.error) alert(data.error);
+                            else alert(data.message || "Code resent successfully!");
+                        })
+                        .catch(err => console.error(err));
+                });
                 updateCountdown();
-
-                fetch("{% url 'resend_reset_otp' %}")
-                    .then(response => response.json())
-                    .then(data => {
-                        // Simple alert for feedback - in a real app, use a toast
-                        if (data.error) alert(data.error);
-                        else alert(data.message || "Code resent successfully!");
-                    })
-                    .catch(err => console.error(err));
-            });
-
-            updateCountdown();
+            }
         });
     </script>
     {% endif %}
