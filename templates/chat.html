@@ -395,6 +395,7 @@
                 console.log('WebSocket closed:', e.code);
                 updateStatus('disconnected');
                 isConnecting = false;
+                chatSocket = null;
                 
                 // Attempt to reconnect
                 setTimeout(() => {
