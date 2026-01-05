@@ -1,7 +1,6 @@
 -----
 
 # InsightDocs AI 🧠📄
-# InsightDocs AI 🧠📄
 
 **InsightDocs AI** is an intelligent SaaS platform that transforms static documents into active conversations. By leveraging Google's **Gemini 2.5 Flash**, users can upload contracts, research papers, or reports and interact with them using natural language to extract insights, summaries, and answers instantly.
 
