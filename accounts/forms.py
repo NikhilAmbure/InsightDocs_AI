@@ -32,6 +32,9 @@ class ProfileUpdateForm(forms.ModelForm):
         email = self.cleaned_data.get('email')
         if not email:
             raise forms.ValidationError("Email is required.")
+        
+        if not email.lower().endswith('@gmail.com'):
+            raise forms.ValidationError("Only @gmail.com email addresses are allowed.")
 
         qs = User.objects.filter(email__iexact=email).exclude(pk=self.instance.pk)
         if qs.exists():

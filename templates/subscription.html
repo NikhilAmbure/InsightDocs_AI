@@ -163,9 +163,9 @@
                 </div>
 
                 <div class="flex items-center gap-3">
-                    <button class="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/10">
+                    <a href="{% url 'coming_soon' %}" class="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/10">
                         <i class="fa-solid fa-file-invoice-dollar mr-1.5"></i> Billing History
-                    </button>
+                    </a>
                 </div>
             </header>
 
@@ -185,7 +185,7 @@
                     </div>
                 
                     <div class="grid gap-6 lg:grid-cols-3 pb-12">
-                        
+    
                         <div class="pricing-card flex flex-col rounded-3xl border border-white/10 bg-white/5 p-6 sm:p-8">
                             <div class="mb-4">
                                 <h3 class="text-lg font-semibold text-white">Free</h3>
@@ -196,37 +196,51 @@
                                 <p class="mt-2 text-xs text-zinc-400">Perfect for trying out InsightDocs.</p>
                             </div>
                             <ul class="mb-8 space-y-3 text-sm text-zinc-300 flex-1">
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-emerald-400 mt-1"></i> 10 document uploads</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-emerald-400 mt-1"></i> 10 active documents</li>
                                 <li class="flex gap-3"><i class="fa-solid fa-check text-emerald-400 mt-1"></i> 500 AI chats</li>
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-emerald-400 mt-1"></i> 5 GB storage</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-emerald-400 mt-1"></i> 10 MB max file size</li>
+                                <li class="flex gap-3 text-zinc-500"><i class="fa-solid fa-xmark mt-1"></i> Basic Support</li>
                             </ul>
-                            <button class="w-full rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-zinc-400 cursor-not-allowed">Current Plan</button>
+                            
+                            {% if not request.user.is_premium %}
+                                <button class="w-full rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-zinc-400 cursor-not-allowed">Current Plan</button>
+                            {% else %}
+                                <button class="w-full rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-white hover:bg-white/10">Downgrade</button>
+                            {% endif %}
                         </div>
-                
-                        <div class="relative flex flex-col rounded-3xl border border-white/10 bg-white/5 opacity-75 grayscale-[0.5] p-6 sm:p-8 transition-all hover:opacity-100 hover:grayscale-0">
-                            <div class="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-zinc-300 shadow-lg">
-                                Coming Soon
+
+                        <div class="relative flex flex-col rounded-3xl border border-violet-500/30 bg-violet-500/5 p-6 sm:p-8 transition-all hover:border-violet-500/50 hover:bg-violet-500/10">
+                            <div class="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full border border-violet-500 bg-violet-900 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-lg shadow-violet-500/20">
+                                Recommended
                             </div>
+
                             <div class="mb-4">
                                 <h3 class="text-lg font-semibold text-white">Pro</h3>
                                 <div class="mt-2 flex items-baseline gap-1">
                                     <span class="text-3xl font-bold text-white">$29</span>
                                     <span class="text-sm text-zinc-400">/month</span>
                                 </div>
-                                <p class="mt-2 text-xs text-zinc-400">For power users needing more context.</p>
+                                <p class="mt-2 text-xs text-zinc-400">For power users needing more capacity.</p>
                             </div>
                             <ul class="mb-8 space-y-3 text-sm text-zinc-300 flex-1">
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-emerald-400 mt-1"></i> 100 document uploads</li>
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-emerald-400 mt-1"></i> 5,000 AI chats</li>
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-emerald-400 mt-1"></i> 50 GB storage</li>
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-emerald-400 mt-1"></i> Advanced OCR</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-violet-400 mt-1"></i> 50 active documents</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-violet-400 mt-1"></i> 5,000 AI chats</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-violet-400 mt-1"></i> 50 MB max file size</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-violet-400 mt-1"></i> Priority Support</li>
                             </ul>
-                            <button disabled class="w-full rounded-xl border border-white/5 bg-white/5 py-3 text-sm font-semibold text-zinc-500 cursor-not-allowed">Coming Soon</button>
+
+                            {% if request.user.is_premium %}
+                                <button class="w-full rounded-xl border border-violet-500 bg-violet-600 py-3 text-sm font-semibold text-white cursor-default">Active Plan</button>
+                            {% else %}
+                                <button class="w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 py-3 text-sm font-bold text-white shadow-lg shadow-violet-600/20 hover:shadow-violet-600/40 hover:scale-[1.02] transition-all">
+                                    Upgrade to Pro
+                                </button>
+                            {% endif %}
                         </div>
-                
-                        <div class="flex flex-col rounded-3xl border border-white/10 bg-white/5 opacity-75 grayscale-[0.5] p-6 sm:p-8 hover:opacity-100 hover:grayscale-0 transition-all">
+
+                        <div class="flex flex-col rounded-3xl border border-white/10 bg-white/5 opacity-60 grayscale-[0.8] p-6 sm:p-8 hover:opacity-100 hover:grayscale-0 transition-all">
                             <div class="mb-4">
-                                <h3 class="text-lg font-semibold text-white">Premium</h3>
+                                <h3 class="text-lg font-semibold text-white">Enterprise</h3>
                                 <div class="mt-2 flex items-baseline gap-1">
                                     <span class="text-3xl font-bold text-white">$99</span>
                                     <span class="text-sm text-zinc-400">/month</span>
@@ -234,14 +248,14 @@
                                 <p class="mt-2 text-xs text-zinc-400">For teams and high-volume needs.</p>
                             </div>
                             <ul class="mb-8 space-y-3 text-sm text-zinc-300 flex-1">
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-emerald-400 mt-1"></i> Unlimited uploads</li>
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-emerald-400 mt-1"></i> Unlimited chats</li>
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-emerald-400 mt-1"></i> 500 GB storage</li>
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-emerald-400 mt-1"></i> API Access</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-zinc-500 mt-1"></i> Unlimited uploads</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-zinc-500 mt-1"></i> Unlimited chats</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-zinc-500 mt-1"></i> 500 MB max file size</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-zinc-500 mt-1"></i> API Access</li>
                             </ul>
                             <button disabled class="w-full rounded-xl border border-white/5 bg-white/5 py-3 text-sm font-semibold text-zinc-500 cursor-not-allowed">Coming Soon</button>
                         </div>
-                
+
                     </div>
                 </div>
             </div>

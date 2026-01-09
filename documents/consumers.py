@@ -81,6 +81,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if not content:
             await self.send_error("Message cannot be empty")
             return
+        
+        # CHECK CHAT LIMIT
+        limit_reached = await self.check_chat_limit()
+        if limit_reached:
+            await self.send_error("You have reached your chat message limit. Upgrade to Pro to continue.")
+            return
+    
 
         # Get document and session
         document = await self.get_document()
@@ -137,6 +144,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             try:
                 ai_response = await self.get_gemini_response_async(
                     user_message,
+                    document,   
                     local_path,
                     chat_history
                 )
@@ -235,6 +243,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
         ]
 
     @database_sync_to_async
-    def get_gemini_response_async(self, user_message, file_path, chat_history):
+    def get_gemini_response_async(self, user_message, document, file_path, chat_history):
         """Async wrapper for Gemini response"""
-        return get_gemini_response(user_message, file_path, chat_history)
+        return get_gemini_response(user_message, document, file_path, chat_history)
+    
+    @database_sync_to_async
+    def check_chat_limit(self):
+        """Check if user has exceeded their chat quota"""
+        # Count all messages sent by this user across all documents
+        # Note: We filter by role='user' to count questions asked
+        user_msg_count = ChatMessage.objects.filter(
+            session__user=self.user, 
+            role='user'
+        ).count()
+
+        if self.user.is_premium:
+            return user_msg_count >= 5000
+        else:
+            return user_msg_count >= 500

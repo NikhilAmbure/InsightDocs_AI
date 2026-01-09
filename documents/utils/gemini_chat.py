@@ -10,11 +10,11 @@ genai.configure(api_key=settings.GOOGLE_API_KEY)
 
 # Constants
 FILE_UPLOAD_TIMEOUT = 30  # seconds
-API_RESPONSE_TIMEOUT = 60  # seconds
+API_RESPONSE_TIMEOUT = 60  # seconds 
 MAX_RETRIES = 3
 
 
-def get_gemini_response(user_message, file_path, chat_history):
+def get_gemini_response(user_message, document, file_path, chat_history):
     """
     Get response from Gemini with document context.
     
@@ -32,17 +32,29 @@ def get_gemini_response(user_message, file_path, chat_history):
         
         # 1. Initialize Gemini model
         model = genai.GenerativeModel("gemini-2.5-flash")
-        
-        # 2. Upload file to Gemini
-        logger.info(f"Uploading file: {file_path}")
-        uploaded_file = upload_file_with_retry(file_path)
-        
-        if not uploaded_file:
-            error_msg = "Could not process the document. Please ensure it's a valid PDF, DOCX, or text file."
-            logger.error(error_msg)
-            return error_msg
 
-        logger.info(f"File uploaded successfully: {uploaded_file.name}")
+        gemini_file = None
+
+        if document.gemini_file_ref:
+            try:
+                logger.info(f"Found existing Gemini file reference: {document.gemini_file_ref}")
+                gemini_file = genai.get_file(document.gemini_file_ref)
+
+                if gemini_file.state.name != "ACTIVE":
+                    logger.warning(f"Existing Gemini file failed. Re-uploading...")
+                    gemini_file = None
+            except Exception as e:
+                logger.error(f"Could not retrieve existing Gemini file (might be expired): {str(e)}")
+                gemini_file = None
+        
+        if not gemini_file:
+            logger.info(f"Uploading new file to Gemini : {file_path}")
+            gemini_file = upload_file_with_retry(file_path)
+
+            document.gemini_file_ref = gemini_file.name if gemini_file else None
+            document.save()
+            logger.info(f"Saved Gemini file reference to document: {gemini_file.name}")
+
 
         # 3. Build conversation history
         history = []
@@ -51,7 +63,7 @@ def get_gemini_response(user_message, file_path, chat_history):
         system_message = {
             "role": "user",
             "parts": [
-                uploaded_file,
+                gemini_file,
                (
                 "You are a helpful AI assistant. "
                 "First check if the user's question can be answered from the document. "
@@ -82,10 +94,7 @@ def get_gemini_response(user_message, file_path, chat_history):
                 })
         
         # 5. Start chat and send current message
-        logger.info(f"Starting chat session...")
         chat = model.start_chat(history=history)
-        
-        logger.info(f"Sending user message: {user_message[:50]}")
         response = chat.send_message(user_message)
         
         if not response or not response.text:

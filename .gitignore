@@ -56,3 +56,8 @@ ENV/
 Thumbs.db 
 
 project_report.txt
+notes.txt
+
+db.sqlite3
+media/
+staticfiles/

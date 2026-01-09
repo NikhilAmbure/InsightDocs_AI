@@ -25,7 +25,7 @@ def landing_page_view(request):
 @login_required(login_url='login')
 def upload_view(request):
     """Handle document upload and display user's documents."""
-    form = DocumentUploadForm(request.POST or None, request.FILES or None)
+    form = DocumentUploadForm(request.POST or None, request.FILES or None, user=request.user)
 
     if request.method == "POST":
         upload_rate_limit = getattr(settings, "RATE_LIMITS", {}).get(
@@ -46,6 +46,21 @@ def upload_view(request):
                 f"Please wait {limit_result.retry_after} seconds and try again.",
             )
             return redirect("upload")
+        
+        # CHECK UPLOAD COUNT LIMIT 
+        current_doc_count = Document.objects.filter(owner=request.user).count()
+        
+        if request.user.is_premium:
+            doc_limit = 50
+        else:
+            doc_limit = 10
+        
+        if current_doc_count >= doc_limit:
+            messages.error(request, 
+                f"You have reached your document limit of {doc_limit}. "
+                "Please delete existing documents or upgrade your plan."
+            )
+            return redirect("upload")
 
         if form.is_valid():
             document = form.save(commit=False)
@@ -58,10 +73,11 @@ def upload_view(request):
             
             # Create a chat session
             ChatSession.objects.create(document=document, user=request.user)
-            
             return redirect("chat", document_id=document.id)
         else:
-            messages.error(request, "Something went wrong while uploading your file.")
+            # If the file is too big, the error will be in form.errors
+
+            messages.error(request, "Upload failed. Please check the file requirements.")
 
     documents = Document.objects.filter(owner=request.user).order_by('-uploaded_at')
     context = {"form": form, "recent_documents": documents}

@@ -70,7 +70,15 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True   
+
+# CORS_ALLOW_ALL_ORIGINS = True #This allows any website to make requests to your backend.
+CORS_ALLOWED_ORIGINS = [
+    "https://insightdocs.in",
+    "https://www.insightdocs.in",
+]
+CORS_ALLOW_ALL_ORIGINS = False 
+
+
 
 ROOT_URLCONF = 'InsightDocs_AI.urls'
 
@@ -90,7 +98,11 @@ TEMPLATES = [
     },
 ]
 
+
+
 ASGI_APPLICATION = 'InsightDocs_AI.asgi.application'
+
+
 
 if os.getenv("REDIS_URL"):
     CHANNEL_LAYERS = {
@@ -109,6 +121,8 @@ else:
         }
     }
 
+
+
 # Use the default authentication backend only
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
@@ -116,6 +130,8 @@ AUTHENTICATION_BACKENDS = [
 
 AUTH_USER_MODEL = 'accounts.User'
 
+
+# CSRF Trusted Origins
 CSRF_TRUSTED_ORIGINS = [
     "https://insightdocs.in",
     "https://www.insightdocs.in",
@@ -153,6 +169,8 @@ else:
 #             default=os.environ.get("DATABASE_URL", "sqlite:///db.sqlite3")
 #         )
 #     }
+
+
     
 LOGGING = {
     'version': 1,
@@ -185,7 +203,6 @@ LOGGING = {
 
 
 # Password validation
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -203,11 +220,19 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 # Internationalization
-
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Asia/Kolkata'
 USE_I18N = True
 USE_TZ = True
+
+
+# Celery Configuration
+CELERY_BROKER_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6380/0")
+CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL", "redis://127.0.0.1:6380/0")
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
 
 
 import resend
@@ -218,8 +243,8 @@ else:
     print("⚠️ WARNING: RESEND_API_KEY is not set!")
 
 
-# Static files (CSS, JavaScript, Images)
 
+# Static files (CSS, JavaScript, Images)
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
@@ -234,14 +259,15 @@ if DEBUG and (BASE_DIR / "static").exists():
 else:
     STATICFILES_DIRS = []
 
-# Allow internal previews (iframes) for uploaded documents
 
+# Allow internal previews (iframes) for uploaded documents
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 
-# Default primary key field type
 
+# Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# API Keys and Rate Limits
 GOOGLE_API_KEY= os.environ.get('GOOGLE_API_KEY')
 
 RATE_LIMITS = {
@@ -251,6 +277,7 @@ RATE_LIMITS = {
     },
 }
 
+# Security Settings
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SESSION_COOKIE_SECURE = True

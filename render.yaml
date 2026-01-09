@@ -1,8 +1,0 @@
-
-services:
-  type: web
-  plan: free
-  name: InsightDocs_AI
-  runtime: python
-  buildCommand: './build.sh'
-  startCommand: 'python -m daphne InsightDocs_AI.asgi:application -k uvicorn.workers.UvicornWorker'

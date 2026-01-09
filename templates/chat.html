@@ -90,7 +90,11 @@
             transition-duration: 300ms;
             transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .sidebar-collapsed { width: 0 !important; overflow: hidden; border-right: 0 !important; }
+        
+        /* IMPORTANT FIX: Ensure sidebar-collapsed only affects desktop */
+        @media (min-width: 1024px) {
+            .sidebar-collapsed { width: 0 !important; overflow: hidden; border-right: 0 !important; }
+        }
 
         /* Status Dot Pulse */
         @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
@@ -102,12 +106,17 @@
         @media (max-width: 1023px) {
             #doc-view-wrapper.mobile-active {
                 display: flex !important; position: absolute; inset: 0; z-index: 30;
-                width: 100%; border-left: none; background-color: rgba(2, 6, 23, 0.98);
+                width: 100% !important; border-left: none; background-color: rgba(2, 6, 23, 0.98);
             }
         }
 
         .tab-active { border-bottom: 2px solid #8b5cf6; color: white; }
         .tab-inactive { border-bottom: 2px solid transparent; color: #71717a; }
+
+        /* Resizer specific styles */
+        #drag-handle:hover > div { background-color: #8b5cf6; }
+        body.resizing { cursor: col-resize; user-select: none; }
+        body.resizing iframe { pointer-events: none; }
     </style>
     <script>
         tailwind.config = {
@@ -126,11 +135,11 @@
 </head>
 <body class="h-screen w-full overflow-hidden bg-gray-950 text-zinc-100 selection:bg-violet-500/30">
 
-    <div id="mobile-backdrop" onclick="toggleMobileSidebar()" class="fixed inset-0 z-40 hidden bg-black/80 backdrop-blur-sm transition-opacity lg:hidden"></div>
+    <div id="mobile-backdrop" onclick="toggleMobileSidebar()" class="fixed inset-0 z-40 hidden bg-black/80 backdrop-blur-sm opacity-0 transition-opacity duration-300 lg:hidden"></div>
 
     <div class="flex h-full w-full">
 
-        <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 flex w-72 -translate-x-full flex-col border-r border-white/5 bg-gray-950 whitespace-nowrap lg:relative lg:translate-x-0">
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 flex w-72 transform -translate-x-full transition-transform duration-300 flex-col border-r border-white/5 bg-gray-950 whitespace-nowrap lg:relative lg:translate-x-0">
             
             <div class="flex h-20 shrink-0 items-center justify-between border-b border-white/5 px-6">
                 <a href="{% url 'upload' %}" class="flex items-center gap-3 group cursor-pointer">
@@ -268,7 +277,7 @@
 
             <div class="flex flex-1 overflow-hidden relative">
                 
-                <div id="chat-view-wrapper" class="flex flex-1 flex-col relative h-full w-full">
+                <div id="chat-view-wrapper" class="flex flex-1 flex-col relative h-full w-full min-w-0">
                     
                     <div id="chat-container" class="flex-1 overflow-y-auto px-4 py-6 sm:px-8 scroll-smooth scrollbar-thin">
                         <div class="mx-auto max-w-3xl space-y-8 pb-32">
@@ -283,7 +292,7 @@
                             <div id="chat-messages" class="space-y-6 flex flex-col">
                                 {% for msg in chat_history %}
                                     <div class="w-full flex msg-animate {% if msg.role == 'user' %}justify-end{% else %}justify-start{% endif %}">
-                                        <div class="relative px-5 py-3.5 rounded-2xl max-w-[85%] sm:max-w-[75%] text-sm leading-relaxed shadow-lg
+                                        <div class="relative group px-5 py-3.5 rounded-2xl max-w-[85%] sm:max-w-[75%] text-sm leading-relaxed shadow-lg
                                             {% if msg.role == 'user' %}
                                                 bg-gradient-to-br from-violet-600 to-indigo-600 text-white rounded-br-none
                                             {% else %}
@@ -293,7 +302,10 @@
                                             {% if msg.role == 'user' %}
                                                 {{ msg.content|linebreaksbr }}
                                             {% else %}
-                                                <div class="markdown-content">{{ msg.content }}</div>
+                                                <div class="markdown-content pr-6">{{ msg.content }}</div>
+                                                <button onclick="copyMessage(this)" class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-zinc-400 hover:text-white bg-black/20 hover:bg-black/40 rounded-lg backdrop-blur-sm" title="Copy">
+                                                    <i class="fa-regular fa-copy text-xs"></i>
+                                                </button>
                                             {% endif %}
                                         </div>
                                     </div>
@@ -322,7 +334,11 @@
                     </div>
                 </div>
 
-                <aside id="doc-view-wrapper" class="hidden relative h-full w-full flex-col border-l border-white/5 bg-gray-950/70 backdrop-blur lg:flex lg:w-96 lg:relative shrink-0">
+                <div id="drag-handle" class="hidden lg:flex w-2 hover:w-3 cursor-col-resize items-center justify-center hover:bg-white/5 active:bg-violet-600 transition-all z-20 shrink-0 border-l border-white/5 select-none relative -mr-[1px]">
+                     <div class="h-8 w-1 rounded-full bg-white/20 pointer-events-none"></div>
+                </div>
+
+                <aside id="doc-view-wrapper" style="width: 450px;" class="hidden relative h-full flex-col bg-gray-950/70 backdrop-blur lg:flex shrink-0 border-l border-white/5">
                     <div class="flex h-10 shrink-0 items-center justify-between border-b border-white/5 px-4 lg:h-12">
                         <h3 class="text-xs font-semibold text-white lg:text-sm">Document Preview</h3>
                         <div class="flex items-center gap-2">
@@ -330,6 +346,9 @@
                                 Open in New Tab <i class="fa-solid fa-arrow-up-right-from-square ml-1"></i>
                             </a>
                             <button type="button" onclick="switchMobileTab('chat')" class="lg:hidden rounded-full border border-white/10 px-2 py-0.5 text-[10px] font-medium text-zinc-200 hover:bg-white/10">Close</button>
+                             <button type="button" onclick="toggleDesktopDocPanel()" class="hidden lg:block rounded-md p-1 text-zinc-400 hover:text-white hover:bg-white/10" title="Collapse Panel">
+                                <i class="fa-solid fa-angles-right"></i>
+                             </button>
                         </div>
                     </div>
                     
@@ -352,6 +371,10 @@
                         </div>
                     </div>
                 </aside>
+                
+                <button id="show-doc-btn" onclick="toggleDesktopDocPanel()" class="hidden absolute right-4 top-20 z-10 rounded-full bg-violet-600 p-3 text-white shadow-lg hover:bg-violet-500 transition-all">
+                    <i class="fa-solid fa-file-lines"></i>
+                </button>
 
             </div>
         </main>
@@ -362,10 +385,95 @@
         let chatSocket = null;
         let isConnecting = false;
 
-        // Initialize WebSocket connection
+        // --- Copy to Clipboard Logic ---
+        function copyMessage(btn) {
+            const contentDiv = btn.parentElement.querySelector('.markdown-content');
+            if (!contentDiv) return;
+            const text = contentDiv.innerText;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                const icon = btn.querySelector('i');
+                icon.className = 'fa-solid fa-check text-green-400 text-xs';
+                setTimeout(() => { icon.className = 'fa-regular fa-copy text-xs'; }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+            });
+        }
+
+        // --- Resizing Logic ---
+        const dragHandle = document.getElementById('drag-handle');
+        const docWrapper = document.getElementById('doc-view-wrapper');
+        const showDocBtn = document.getElementById('show-doc-btn');
+        const mainContainer = document.querySelector('main');
+        let isResizing = false;
+        let lastWidth = 450; 
+
+        const savedWidth = localStorage.getItem('insightDocs_panelWidth');
+        if (savedWidth) {
+            lastWidth = parseInt(savedWidth);
+            if(lastWidth > 50) {
+                docWrapper.style.width = `${lastWidth}px`;
+            } else {
+                toggleDesktopDocPanel();
+            }
+        }
+
+        dragHandle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            isResizing = true;
+            document.body.classList.add('resizing'); 
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', stopResize);
+        });
+
+        function handleMouseMove(e) {
+            if (!isResizing) return;
+            const containerRight = mainContainer.getBoundingClientRect().right;
+            const newWidth = containerRight - e.clientX;
+
+            if (newWidth > 200 && newWidth < 800) {
+                docWrapper.style.width = `${newWidth}px`;
+                docWrapper.style.display = 'flex'; 
+            } else if (newWidth <= 150) {
+                 toggleDesktopDocPanel(true); 
+                 stopResize();
+            }
+        }
+
+        function stopResize() {
+            isResizing = false;
+            document.body.classList.remove('resizing');
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', stopResize);
+            
+            if (docWrapper.style.display !== 'none') {
+                const currentWidth = parseInt(docWrapper.style.width);
+                localStorage.setItem('insightDocs_panelWidth', currentWidth);
+                lastWidth = currentWidth;
+            }
+        }
+
+        function toggleDesktopDocPanel(forceClose = false) {
+            const isHidden = docWrapper.style.display === 'none' || docWrapper.classList.contains('hidden');
+            
+            if (!isHidden || forceClose === true) {
+                docWrapper.style.display = 'none';
+                dragHandle.style.display = 'none';
+                showDocBtn.classList.remove('hidden');
+                localStorage.setItem('insightDocs_panelWidth', 0);
+            } else {
+                docWrapper.style.display = 'flex';
+                docWrapper.classList.remove('hidden'); 
+                dragHandle.style.display = 'flex';
+                docWrapper.style.width = `${lastWidth > 200 ? lastWidth : 450}px`;
+                showDocBtn.classList.add('hidden');
+                localStorage.setItem('insightDocs_panelWidth', lastWidth);
+            }
+        }
+
+        // --- WebSocket Logic ---
         function initWebSocket() {
             if (isConnecting || chatSocket) return;
-            
             isConnecting = true;
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}/ws/chat/${DOCUMENT_ID}/`;
@@ -396,8 +504,6 @@
                 updateStatus('disconnected');
                 isConnecting = false;
                 chatSocket = null;
-                
-                // Attempt to reconnect
                 setTimeout(() => {
                     if (!chatSocket || chatSocket.readyState === WebSocket.CLOSED) {
                         initWebSocket();
@@ -410,7 +516,6 @@
             const statusEl = document.getElementById('ws-status');
             const dotEl = statusEl.querySelector('.status-dot');
             const textEl = statusEl.querySelector('span:last-child');
-            
             dotEl.className = `status-dot ${status}`;
             
             if (status === 'connected') {
@@ -427,7 +532,6 @@
 
         function handleWebSocketMessage(data) {
             const type = data.type;
-
             if (type === 'user_message') {
                 addMessageToUI(data.content, 'user', data.id);
             } else if (type === 'ai_thinking') {
@@ -444,14 +548,11 @@
         function addMessageToUI(content, role, id) {
             const messagesDiv = document.getElementById('chat-messages');
             const msgDiv = document.createElement('div');
-            
-            // Flex alignment
             msgDiv.className = 'w-full flex msg-animate ' + (role === 'user' ? 'justify-end' : 'justify-start');
             msgDiv.id = `msg-${id}`;
 
-            // Modern Bubble Styles
             const contentDiv = document.createElement('div');
-            contentDiv.className = `relative px-5 py-3.5 rounded-2xl max-w-[85%] sm:max-w-[75%] text-sm leading-relaxed shadow-lg ${
+            contentDiv.className = `relative group px-5 py-3.5 rounded-2xl max-w-[85%] sm:max-w-[75%] text-sm leading-relaxed shadow-lg ${
                 role === 'user' 
                     ? 'bg-gradient-to-br from-violet-600 to-indigo-600 text-white rounded-br-none' 
                     : 'bg-zinc-900/70 backdrop-blur-md border border-white/10 text-zinc-100 markdown-body rounded-bl-none'
@@ -460,7 +561,13 @@
             if (role === 'user') {
                 contentDiv.textContent = content;
             } else {
-                contentDiv.innerHTML = `<div class="markdown-content">${marked.parse(content)}</div>`;
+                contentDiv.innerHTML = `<div class="markdown-content pr-6">${marked.parse(content)}</div>`;
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-zinc-400 hover:text-white bg-black/20 hover:bg-black/40 rounded-lg backdrop-blur-sm';
+                copyBtn.title = 'Copy';
+                copyBtn.innerHTML = '<i class="fa-regular fa-copy text-xs"></i>';
+                copyBtn.onclick = function() { copyMessage(this); };
+                contentDiv.appendChild(copyBtn);
             }
 
             msgDiv.appendChild(contentDiv);
@@ -473,11 +580,9 @@
             const loaderDiv = document.createElement('div');
             loaderDiv.id = 'loading-indicator';
             loaderDiv.className = 'w-full flex justify-start msg-animate';
-
             const contentDiv = document.createElement('div');
             contentDiv.className = 'px-4 py-3 rounded-2xl bg-zinc-900/50 backdrop-blur-sm border border-white/5 text-gray-200 rounded-bl-none';
             contentDiv.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
-
             loaderDiv.appendChild(contentDiv);
             messagesDiv.appendChild(loaderDiv);
             scrollToBottom();
@@ -490,7 +595,6 @@
 
         function handleSendMessage(e) {
             e.preventDefault();
-
             const textarea = document.getElementById('message-input');
             const sendBtn = document.getElementById('send-btn');
             const content = textarea.value.trim();
@@ -503,15 +607,9 @@
             }
 
             sendBtn.disabled = true;
-
-            chatSocket.send(JSON.stringify({
-                'type': 'chat_message',
-                'content': content
-            }));
-
+            chatSocket.send(JSON.stringify({ 'type': 'chat_message', 'content': content }));
             textarea.value = '';
             textarea.style.height = 'auto';
-
             sendBtn.disabled = false;
         }
 
@@ -527,13 +625,10 @@
         function scrollToBottom() {
             const container = document.getElementById('chat-container');
             if (container) {
-                setTimeout(() => {
-                    container.scrollTop = container.scrollHeight;
-                }, 0);
+                setTimeout(() => { container.scrollTop = container.scrollHeight; }, 0);
             }
         }
 
-        // Auto-resize textarea
         const textarea = document.getElementById('message-input');
         if (textarea) {
             textarea.addEventListener('input', function () {
@@ -548,25 +643,19 @@
             });
         }
 
-        // Toggle Document Menu
         function toggleDocMenu(event, menuId) {
             event.preventDefault();
             event.stopPropagation();
-            
-            // Close all other menus first
             document.querySelectorAll('[id^="menu-"]').forEach(el => {
                 if (el.id !== menuId) el.classList.add('hidden');
             });
-
             const menu = document.getElementById(menuId);
             menu.classList.toggle('hidden');
         }
 
-        // Close menu when clicking elsewhere
         document.addEventListener('click', function(event) {
             const isButton = event.target.closest('button');
             const isMenu = event.target.closest('[id^="menu-"]');
-            
             if (!isButton && !isMenu) {
                 document.querySelectorAll('[id^="menu-"]').forEach(el => {
                     el.classList.add('hidden');
@@ -574,16 +663,24 @@
             }
         });
 
-        // Sidebar functions
+        // --- Sidebar Functions (Mobile Fix) ---
         function toggleMobileSidebar() {
             const sidebar = document.getElementById('sidebar');
             const backdrop = document.getElementById('mobile-backdrop');
+            
+            // Check if it has negative translation (hidden state)
             if (sidebar.classList.contains('-translate-x-full')) {
                 sidebar.classList.remove('-translate-x-full');
+                sidebar.classList.add('translate-x-0'); // Explicitly add visible state
+                
                 backdrop.classList.remove('hidden');
+                requestAnimationFrame(() => backdrop.classList.remove('opacity-0'));
             } else {
+                sidebar.classList.remove('translate-x-0');
                 sidebar.classList.add('-translate-x-full');
-                backdrop.classList.add('hidden');
+                
+                backdrop.classList.add('opacity-0');
+                setTimeout(() => backdrop.classList.add('hidden'), 300);
             }
         }
 
@@ -596,19 +693,24 @@
             const docView = document.getElementById('doc-view-wrapper');
             const btnChat = document.getElementById('tab-btn-chat');
             const btnDoc = document.getElementById('tab-btn-doc');
+            const dragHandle = document.getElementById('drag-handle');
 
             if (tab === 'chat') {
                 chatView.classList.remove('hidden');
-                docView.classList.add('hidden');
+                docView.style.display = 'none'; 
                 docView.classList.remove('mobile-active');
+                if(dragHandle) dragHandle.style.display = 'none'; 
+                
                 btnChat.classList.add('tab-active');
                 btnChat.classList.remove('tab-inactive');
                 btnDoc.classList.remove('tab-active');
                 btnDoc.classList.add('tab-inactive');
             } else {
                 chatView.classList.add('hidden');
-                docView.classList.remove('hidden');
+                docView.style.display = 'flex'; 
                 docView.classList.add('mobile-active');
+                docView.style.width = '100%'; 
+                
                 btnDoc.classList.add('tab-active');
                 btnDoc.classList.remove('tab-inactive');
                 btnChat.classList.remove('tab-active');
@@ -616,7 +718,6 @@
             }
         }
 
-        // Initialize WebSocket on page load
         document.addEventListener('DOMContentLoaded', function() {
             initWebSocket();
             renderMarkdown();
@@ -632,7 +733,6 @@
             });
         }
 
-        // Cleanup WebSocket on page unload
         window.addEventListener('beforeunload', function() {
             if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
                 chatSocket.close();

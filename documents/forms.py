@@ -15,15 +15,26 @@ class DocumentUploadForm(forms.ModelForm):
         model = Document
         fields = ("file", "title")
 
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop("user", None)
+        super().__init__(*args, **kwargs)
+
     def clean_file(self):
         uploaded_file = self.cleaned_data.get("file")
         if not uploaded_file:
             return uploaded_file
 
-        max_size = getattr(settings, "MAX_UPLOAD_SIZE", 15 * 1024 * 1024)
+        if self.user and self.user.is_premium:
+            max_size = 50 * 1024 * 1024  # 50 MB for premium users
+            limit_lable = "50 MB (Premium)"
+        else:
+            max_size = 10 * 1024 * 1024  # 10 MB for free
+            limit_lable = "10 MB (Free Tier)"
+
         if uploaded_file.size > max_size:
             raise ValidationError(
-                f"File is too large. Maximum allowed size is {max_size // (1024 * 1024)} MB."
+                f"File is too large. Maximum allowed size is {limit_lable} MB."
+                f"Current file size is {uploaded_file.size / (1024 * 1024):.2f} MB."
             )
 
         allowed_extensions = {

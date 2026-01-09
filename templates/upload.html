@@ -239,7 +239,19 @@
                                 </div>
                                 <h2 class="text-2xl font-bold text-white font-display">Drop your files here</h2>
                                 <p class="mt-2 max-w-sm text-sm text-zinc-400">Support for PDF, DOCX, PPT, and Images. Max 50MB per file.</p>
-                                
+                                <br>
+                                <div class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs">
+                                    <span>Max size:</span>
+                                    {% if request.user.is_premium %}
+                                        <span class="font-bold text-emerald-400">50MB (Premium)</span>
+                                    {% else %}
+                                        <span class="font-bold text-amber-400">10MB (Free Tier)</span>
+                                        <a href="{% url 'subscription' %}" class="ml-1 font-medium text-violet-400 underline hover:text-violet-300">
+                                            Upgrade
+                                        </a>
+                                    {% endif %}
+                                </div>
+
                                 <label for="document-upload-input" class="group mt-8 cursor-pointer">
                                     <span class="relative inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-600/20 transition-all hover:shadow-violet-600/40 hover:-translate-y-0.5">
                                         Browse Files

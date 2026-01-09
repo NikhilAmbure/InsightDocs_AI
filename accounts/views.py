@@ -12,7 +12,7 @@ from .forms import ProfileUpdateForm
 from .models import User
 
 from documents.models import Document
-from threading import Thread
+from .tasks import send_otp_email_task
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,10 @@ def register_view(request):
         # Basic validation
         if not username or not email or not password:
             messages.error(request, "All fields are required.")
+            return render(request, 'signup.html')
+        
+        if not email.lower().endswith('@gmail.com'):
+            messages.error(request, "Only @gmail.com emails are allowed.")
             return render(request, 'signup.html')
 
         if User.objects.filter(username=username).exists():
@@ -54,8 +58,9 @@ def register_view(request):
         subject = "Verify your InsightDocs AI Account"
         
         try:
-            # Use threading to avoid blocking, and add error handling
-            Thread(target=sendOTPToEmail, args=(email, subject, otp)).start()
+            # Celery task to send OTP email
+            send_otp_email_task.delay(email, subject, otp)
+            
             messages.success(request, "We have sent a 6-digit OTP to your email.")
             return redirect('verify_otp')
         except Exception as e:
@@ -82,7 +87,9 @@ def login_view(request):
                     request.session['login_2fa_otp'] = otp
 
                     subject = "Login Verification Code"
-                    Thread(target=sendOTPToEmail, args=(user.email, subject, otp)).start()
+                    
+                    # Celery task to send OTP email
+                    send_otp_email_task.delay(user.email, subject, otp)
 
                     messages.success(request, "Enter the code sent to your email to log in.")
                     return redirect('verify_login_2fa')
@@ -156,7 +163,9 @@ def enable_2fa_init_view(request):
         request.session['enable_2fa_data'] = {'email': email, 'otp': otp}
         
         subject = "Verify 2FA Setup"
-        Thread(target=sendOTPToEmail, args=(email, subject, otp)).start()
+        
+        # Celery task to send OTP email
+        send_otp_email_task.delay(email, subject, otp)
         
         messages.success(request, "We sent a code to your email to enable 2FA.")
         return redirect('verify_enable_2fa_otp')
@@ -203,8 +212,10 @@ def disable_2fa_init_view(request):
     request.session['disable_2fa_otp'] = otp
     
     subject = "Verify 2FA Deactivation"
-    Thread(target=sendOTPToEmail, args=(request.user.email, subject, otp)).start()
-    
+
+    # Celery task to send OTP email
+    send_otp_email_task.delay(request.user.email, subject, otp)   
+
     messages.success(request, "We sent a code to your email to confirm deactivation.")
     return redirect('verify_disable_2fa_otp')
 
@@ -348,7 +359,10 @@ def password_reset_request(request):
             'otp': otp,
         }
         subject = "Reset your Password"
-        Thread(target=sendOTPToEmail, args=(email, subject, otp)).start()
+
+        # Celery task to send OTP email
+        send_otp_email_task.delay(email, subject, otp)
+
         messages.success(request, "We sent a 6-digit verification code to your email.")
 
         return redirect('verify_reset_otp')
@@ -410,7 +424,8 @@ def resend_reset_otp(request):
     subject = "New Password Reset Code"
     
     try:
-        Thread(target=sendOTPToEmail, args=(email, subject, otp)).start()
+        # Celery task to send OTP email
+        send_otp_email_task.delay(email, subject, otp)
         return JsonResponse({'message': 'A new verification code has been sent to your email.'})
     except Exception as e:
         logger.error(f"Failed to resend OTP to {email}: {str(e)}")

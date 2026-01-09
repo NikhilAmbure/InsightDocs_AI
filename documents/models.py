@@ -14,6 +14,8 @@ class Document(models.Model):
     )
     title = models.CharField(max_length=255)
     file = models.FileField(upload_to="documents/")
+
+    gemini_file_ref = models.CharField(max_length=255, blank=True, null=True, help_text="Stores the unique file reference from Gemini API.")
     file_content = models.BinaryField(null=True)
     original_name = models.CharField(max_length=255)
     uploaded_at = models.DateTimeField(auto_now_add=True)
