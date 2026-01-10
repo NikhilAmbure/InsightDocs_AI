@@ -27,8 +27,8 @@
         .bg-modern-grid {
             background-color: #020617;
             background-image: 
-                radial-gradient(at 0% 0%, rgba(124, 58, 237, 0.08) 0px, transparent 50%), /* Violet */
-                radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.08) 0px, transparent 50%), /* Blue */
+                radial-gradient(at 0% 0%, rgba(124, 58, 237, 0.08) 0px, transparent 50%), 
+                radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.08) 0px, transparent 50%), 
                 linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px), 
                 linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
             background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
@@ -86,17 +86,17 @@
 
     <div class="flex h-full w-full">
 
-        <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 flex w-72 -translate-x-full flex-col border-r border-white/5 bg-gray-950 whitespace-nowrap lg:relative lg:translate-x-0">
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 flex w-72 transform -translate-x-full transition-transform duration-300 flex-col border-r border-white/5 bg-gray-950 whitespace-nowrap lg:relative lg:translate-x-0">
             
-            <div class="flex h-20 shrink-0 items-center justify-between border-b border-white/5 px-6">
+            <div class="flex h-16 shrink-0 items-center justify-between border-b border-white/5 px-6">
                 <a href="{% url 'upload' %}" class="flex items-center gap-3 group cursor-pointer">
-                    <div class="relative w-8 h-8 flex items-center justify-center">
+                    <div class="relative w-7 h-7 flex items-center justify-center">
                         <div class="absolute inset-0 bg-violet-500 rounded-lg blur-sm opacity-50 group-hover:opacity-75 transition-opacity"></div>
                         <div class="relative w-full h-full bg-gradient-to-br from-violet-600 to-indigo-600 rounded-lg flex items-center justify-center border border-white/10">
-                            <i class="fa-solid fa-cube text-white text-xs"></i>
+                            <i class="fa-solid fa-cube text-white text-[10px]"></i>
                         </div>
                     </div>
-                    <span class="font-display font-bold text-lg tracking-tight text-white">InsightDocs<span class="text-violet-400">.ai</span></span>
+                    <span class="font-display font-bold text-base tracking-tight text-white">InsightDocs<span class="text-violet-400">.ai</span></span>
                 </a>
                 <button onclick="toggleMobileSidebar()" class="rounded-lg p-1 text-zinc-400 hover:bg-white/5 hover:text-white lg:hidden">
                     <i class="fa-solid fa-xmark text-lg"></i>
@@ -113,13 +113,13 @@
                         </span>
                         System Ready
                     </div>
-                    <p class="truncate font-semibold text-white">Workspace Upload</p>
-                    <p class="text-xs text-zinc-400">Drag & drop ready</p>
+                    <p class="truncate font-semibold text-sm text-white">Workspace Upload</p>
+                    <p class="text-[10px] text-zinc-400">Drag & drop ready</p>
                 </div>
 
-                <a href="{% url 'upload' %}" class="group mb-8 flex w-full items-center justify-center gap-2 rounded-xl bg-white py-3 text-sm font-semibold text-black transition-all hover:bg-zinc-200 hover:shadow-lg hover:shadow-white/5">
+                <a href="{% url 'upload' %}" class="group mb-8 flex w-full items-center justify-center gap-2 rounded-xl bg-white py-2.5 text-xs font-semibold text-black transition-all hover:bg-zinc-200 hover:shadow-lg hover:shadow-white/5">
                     <span>Start new chat</span>
-                    <i class="fa-solid fa-plus text-xs transition-transform group-hover:rotate-90"></i>
+                    <i class="fa-solid fa-plus text-[10px] transition-transform group-hover:rotate-90"></i>
                 </a>
 
                 <div class="space-y-1">
@@ -129,25 +129,25 @@
                     {% if recent_documents %}
                         {% for doc in recent_documents %}
                         <div class="group relative flex items-center rounded-xl border border-transparent hover:bg-white/5 transition-colors">
-                            <a href="{% url 'chat' doc.id %}" class="flex-1 min-w-0 p-3 text-left">
+                            <a href="{% url 'chat' doc.id %}" class="flex-1 min-w-0 p-2.5 text-left">
                                 <div class="flex items-center justify-between">
-                                    <span class="truncate text-sm text-zinc-300 group-hover:text-white">{{ doc.title }}</span>
-                                    <span class="ml-2 text-[10px] text-zinc-500">{{ doc.extension|upper }}</span>
+                                    <span class="truncate text-xs text-zinc-300 group-hover:text-white font-medium">{{ doc.title }}</span>
+                                    <span class="ml-2 text-[9px] text-zinc-500">{{ doc.extension|upper }}</span>
                                 </div>
-                                <p class="mt-1 text-xs text-zinc-500">{{ doc.uploaded_at|timesince }} ago</p>
+                                <p class="mt-0.5 text-[10px] text-zinc-500">{{ doc.uploaded_at|timesince }} ago</p>
                             </a>
                             
                             <div class="relative px-2">
                                 <button onclick="toggleDocMenu(event, 'menu-{{ doc.id }}')" 
                                     class="p-1.5 text-zinc-500 hover:text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity rounded-lg hover:bg-white/10"
                                     title="Options">
-                                    <i class="fa-solid fa-ellipsis-vertical"></i>
+                                    <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                                 </button>
                                 
                                 <div id="menu-{{ doc.id }}" class="hidden absolute right-0 top-8 w-32 bg-zinc-900 border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden">
                                     <form action="{% url 'delete_document' doc.id %}" method="POST" onsubmit="return confirm('Are you sure? This will delete the document and all chat history permanently.');">
                                         {% csrf_token %}
-                                        <button type="submit" class="w-full text-left px-4 py-2.5 text-xs text-red-400 hover:bg-white/5 hover:text-red-300 flex items-center gap-2 transition-colors">
+                                        <button type="submit" class="w-full text-left px-4 py-2.5 text-[10px] text-red-400 hover:bg-white/5 hover:text-red-300 flex items-center gap-2 transition-colors">
                                             <i class="fa-solid fa-trash-can"></i> Delete
                                         </button>
                                     </form>
@@ -156,29 +156,29 @@
                         </div>
                         {% endfor %}
                     {% else %}
-                        <p class="rounded-xl border border-dashed border-white/5 p-3 text-xs text-zinc-500">Upload another file to see it here.</p>
+                        <p class="rounded-xl border border-dashed border-white/5 p-3 text-[10px] text-zinc-500">Upload another file to see it here.</p>
                     {% endif %}
                 </div>
             </div>
 
             <div class="border-t border-white/5 p-4">
-                <div class="flex items-center gap-2 rounded-xl border border-white/5 bg-white/5 p-3">
-                    <div class="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-violet-500 to-fuchsia-500 text-xs font-bold text-white">
+                <div class="flex items-center gap-2 rounded-xl border border-white/5 bg-white/5 p-2.5">
+                    <div class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-tr from-violet-500 to-fuchsia-500 text-[10px] font-bold text-white">
                         {{ request.user.get_full_name|default:request.user.username|slice:":2"|upper }}
                     </div>
                     <div class="flex-1 overflow-hidden px-1">
-                        <p class="truncate text-sm font-medium text-white">{{ request.user.get_full_name|default:request.user.username }}</p>
-                        <p class="truncate text-xs text-zinc-400">{{ request.user.email }}</p>
+                        <p class="truncate text-xs font-medium text-white">{{ request.user.get_full_name|default:request.user.username }}</p>
+                        <p class="truncate text-[10px] text-zinc-400">{{ request.user.email }}</p>
                     </div>
                     
                     <a href="{% url 'profile' %}" class="rounded-lg p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white transition-colors" title="Profile Settings">
-                        <i class="fa-solid fa-user-gear"></i>
+                        <i class="fa-solid fa-user-gear text-xs"></i>
                     </a>
                     
                     <form action="{% url 'logout' %}" method="post">
                         {% csrf_token %}
                         <button type="submit" class="rounded-lg p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400 transition-colors" title="Log out">
-                            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                            <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
                         </button>
                     </form>
                 </div>
@@ -187,27 +187,27 @@
 
         <main class="relative flex flex-1 flex-col overflow-hidden bg-modern-grid">
             
-            <header class="glass-header z-20 flex h-16 min-h-[4rem] items-center justify-between px-4 sm:px-6">
+            <header class="glass-header z-20 flex h-16 shrink-0 items-center justify-between px-4 sm:px-6">
                 <div class="flex items-center gap-3">
                     <button onclick="toggleMobileSidebar()" class="mr-1 rounded-lg p-2 text-zinc-400 hover:bg-white/10 lg:hidden">
-                        <i class="fa-solid fa-bars text-lg"></i>
+                        <i class="fa-solid fa-bars text-base"></i>
                     </button>
                     
                     <button onclick="toggleDesktopSidebar()" class="hidden rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white lg:block" title="Toggle Sidebar">
-                        <i id="toggle-icon" class="fa-solid fa-bars-staggered text-lg"></i>
+                        <i id="toggle-icon" class="fa-solid fa-bars-staggered text-sm"></i>
                     </button>
 
                     <div class="flex flex-col border-l border-white/10 pl-4">
-                        <h1 class="text-sm font-semibold text-white sm:text-base">Upload Documents</h1>
-                        <p class="text-[10px] text-zinc-400 sm:text-xs">Workspace · Import Files</p>
+                        <h1 class="text-xs font-semibold text-white sm:text-sm">Upload Documents</h1>
+                        <p class="text-[10px] text-zinc-400">Workspace · Import Files</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
-                     <a href="{% url 'coming_soon' %}" class="hidden sm:block rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-white/10 transition-colors">
+                     <a href="{% url 'coming_soon' %}" class="hidden sm:block rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-medium text-zinc-300 hover:bg-white/10 transition-colors">
                         <i class="fa-brands fa-google-drive mr-1.5"></i>Import Drive
                      </a>
-                     <a href="{% url 'subscription' %}" class="flex items-center gap-2 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-1.5 text-xs font-bold text-white shadow-lg shadow-violet-500/20 hover:scale-105 hover:shadow-violet-500/30 transition-all">
-                        <i class="fa-solid fa-crown text-[10px]"></i>
+                     <a href="{% url 'subscription' %}" class="flex items-center gap-2 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-1.5 text-[10px] font-bold text-white shadow-lg shadow-violet-500/20 hover:scale-105 hover:shadow-violet-500/30 transition-all">
+                        <i class="fa-solid fa-crown text-[9px]"></i>
                         Upgrade Pro
                     </a>
                 </div>
@@ -216,7 +216,7 @@
             {% if messages %}
             <div class="px-4 pt-4 sm:px-8 max-w-5xl mx-auto">
                 {% for message in messages %}
-                <div class="rounded-xl p-4 text-sm mb-2 {% if message.tags == 'error' %}bg-red-500/20 text-red-300 border border-red-500/30{% else %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/30{% endif %}">
+                <div class="rounded-xl p-3 text-xs mb-2 {% if message.tags == 'error' %}bg-red-500/20 text-red-300 border border-red-500/30{% else %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/30{% endif %}">
                     <p class="font-medium">{{ message }}</p>
                 </div>
                 {% endfor %}
@@ -234,13 +234,13 @@
                             <div id="upload-content" class="flex flex-col items-center w-full">
                                 <input id="document-upload-input" type="file" name="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg" class="hidden" required>
                                 
-                                <div class="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600/20 to-indigo-600/20 shadow-lg shadow-violet-500/5 group-hover:scale-110 transition-transform duration-300">
-                                    <i class="fa-solid fa-cloud-arrow-up text-3xl text-violet-400"></i>
+                                <div class="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600/20 to-indigo-600/20 shadow-lg shadow-violet-500/5 group-hover:scale-110 transition-transform duration-300">
+                                    <i class="fa-solid fa-cloud-arrow-up text-2xl text-violet-400"></i>
                                 </div>
-                                <h2 class="text-2xl font-bold text-white font-display">Drop your files here</h2>
-                                <p class="mt-2 max-w-sm text-sm text-zinc-400">Support for PDF, DOCX, PPT, and Images. Max 50MB per file.</p>
+                                <h2 class="text-xl font-bold text-white font-display">Drop your files here</h2>
+                                <p class="mt-2 max-w-sm text-xs text-zinc-400">Support for PDF, DOCX, PPT, and Images. Max 50MB per file.</p>
                                 <br>
-                                <div class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs">
+                                <div class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px]">
                                     <span>Max size:</span>
                                     {% if request.user.is_premium %}
                                         <span class="font-bold text-emerald-400">50MB (Premium)</span>
@@ -253,18 +253,18 @@
                                 </div>
 
                                 <label for="document-upload-input" class="group mt-8 cursor-pointer">
-                                    <span class="relative inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-600/20 transition-all hover:shadow-violet-600/40 hover:-translate-y-0.5">
+                                    <span class="relative inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-2.5 text-xs font-semibold text-white shadow-lg shadow-violet-600/20 transition-all hover:shadow-violet-600/40 hover:-translate-y-0.5">
                                         Browse Files
                                         <i class="fa-solid fa-folder-open"></i>
                                     </span>
                                 </label>
 
-                                <button type="submit" class="mt-6 w-full max-w-xs rounded-xl bg-white/5 border border-white/5 px-4 py-2 text-xs font-semibold text-zinc-300 backdrop-blur hover:bg-white/10 hover:text-white transition-colors">
+                                <button type="submit" class="mt-6 w-full max-w-xs rounded-xl bg-white/5 border border-white/5 px-4 py-2 text-[10px] font-semibold text-zinc-300 backdrop-blur hover:bg-white/10 hover:text-white transition-colors">
                                     Upload &amp; open chat
                                 </button>
                                 
                                 {% if form.errors %}
-                                <p class="mt-3 text-xs text-red-300 bg-red-500/10 px-2 py-1 rounded">Please choose a file before submitting.</p>
+                                <p class="mt-3 text-[10px] text-red-300 bg-red-500/10 px-2 py-1 rounded">Please choose a file before submitting.</p>
                                 {% endif %}
                                 
                                 <p class="mt-4 text-[10px] font-bold uppercase tracking-widest text-zinc-600 flex items-center gap-1">
@@ -274,42 +274,42 @@
 
                             <div id="loading-state" class="hidden flex-col items-center justify-center w-full animate-in fade-in duration-300">
                                 <div class="relative mb-6">
-                                    <div class="h-20 w-20 rounded-full border-4 border-white/10"></div>
-                                    <div class="absolute inset-0 h-20 w-20 animate-spin rounded-full border-4 border-t-violet-500 border-r-transparent border-b-transparent border-l-transparent"></div>
+                                    <div class="h-16 w-16 rounded-full border-4 border-white/10"></div>
+                                    <div class="absolute inset-0 h-16 w-16 animate-spin rounded-full border-4 border-t-violet-500 border-r-transparent border-b-transparent border-l-transparent"></div>
                                     <div class="absolute inset-0 flex items-center justify-center">
-                                        <div class="h-10 w-10 rounded-full bg-violet-500/20 animate-ring"></div>
+                                        <div class="h-8 w-8 rounded-full bg-violet-500/20 animate-ring"></div>
                                     </div>
                                 </div>
-                                <h3 class="text-xl font-bold text-white font-display">Uploading...</h3>
-                                <p class="text-sm text-zinc-400 mt-2">Processing your document and preparing the AI.</p>
+                                <h3 class="text-lg font-bold text-white font-display">Uploading...</h3>
+                                <p class="text-xs text-zinc-400 mt-2">Processing your document and preparing the AI.</p>
                             </div>
                         </form>
 
                         <div class="glass-card flex flex-col justify-between rounded-3xl p-6">
                             <div>
-                                <div class="mb-5 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500">
+                                <div class="mb-5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
                                     <i class="fa-solid fa-lightbulb text-yellow-500"></i>
                                     Pro Tips
                                 </div>
                                 <ul class="space-y-4">
-                                    <li class="flex gap-3 text-sm text-zinc-300">
-                                        <span class="h-1.5 w-1.5 shrink-0 translate-y-2 rounded-full bg-violet-500"></span>
+                                    <li class="flex gap-3 text-xs text-zinc-300">
+                                        <span class="h-1.5 w-1.5 shrink-0 translate-y-1.5 rounded-full bg-violet-500"></span>
                                         Group related pages to preserve narrative context.
                                     </li>
-                                    <li class="flex gap-3 text-sm text-zinc-300">
-                                        <span class="h-1.5 w-1.5 shrink-0 translate-y-2 rounded-full bg-violet-500"></span>
+                                    <li class="flex gap-3 text-xs text-zinc-300">
+                                        <span class="h-1.5 w-1.5 shrink-0 translate-y-1.5 rounded-full bg-violet-500"></span>
                                         Prefer 300dpi scans for OCR-perfect answers.
                                     </li>
-                                    <li class="flex gap-3 text-sm text-zinc-300">
-                                        <span class="h-1.5 w-1.5 shrink-0 translate-y-2 rounded-full bg-violet-500"></span>
+                                    <li class="flex gap-3 text-xs text-zinc-300">
+                                        <span class="h-1.5 w-1.5 shrink-0 translate-y-1.5 rounded-full bg-violet-500"></span>
                                         Rename files before upload for instant search.
                                     </li>
                                 </ul>
                             </div>
                             <div class="mt-6 rounded-xl bg-white/5 p-4 border border-white/5">
-                                <p class="text-sm font-semibold text-white">Need samples?</p>
-                                <p class="mt-1 text-xs text-zinc-400">Try our template pack.</p>
-                                <a href="{% url 'coming_soon' %}" class="mt-3 text-xs font-medium text-violet-400 hover:text-violet-300 hover:underline flex items-center gap-1">
+                                <p class="text-xs font-semibold text-white">Need samples?</p>
+                                <p class="mt-1 text-[10px] text-zinc-400">Try our template pack.</p>
+                                <a href="{% url 'coming_soon' %}" class="mt-3 text-[10px] font-medium text-violet-400 hover:text-violet-300 hover:underline flex items-center gap-1">
                                     Download samples <i class="fa-solid fa-arrow-right"></i>
                                 </a>
                             </div>
@@ -319,7 +319,7 @@
                     <div class="pb-10 max-w-2xl mx-auto">
                         <div class="glass-card rounded-3xl p-6">
                             <div class="mb-6 flex items-center justify-between">
-                                <p class="text-xs font-bold uppercase tracking-widest text-zinc-500">Active Automations</p>
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Active Automations</p>
                                 <span class="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-500">
                                     <span class="relative flex h-1.5 w-1.5">
                                       <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
@@ -329,23 +329,23 @@
                                 </span>
                             </div>
                             <div class="space-y-3">
-                                <div class="flex items-center gap-3 rounded-xl border border-white/5 bg-white/5 p-3">
-                                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-400">
-                                        <i class="fa-solid fa-tags text-xs"></i>
+                                <div class="flex items-center gap-3 rounded-xl border border-white/5 bg-white/5 p-2.5">
+                                    <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-400">
+                                        <i class="fa-solid fa-tags text-[10px]"></i>
                                     </div>
-                                    <p class="text-sm text-zinc-300">Auto-tagging enabled for finance</p>
+                                    <p class="text-xs text-zinc-300">Auto-tagging enabled for finance</p>
                                 </div>
-                                <div class="flex items-center gap-3 rounded-xl border border-white/5 bg-white/5 p-3">
-                                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-fuchsia-500/20 text-fuchsia-400">
-                                        <i class="fa-solid fa-magnifying-glass-chart text-xs"></i>
+                                <div class="flex items-center gap-3 rounded-xl border border-white/5 bg-white/5 p-2.5">
+                                    <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-fuchsia-500/20 text-fuchsia-400">
+                                        <i class="fa-solid fa-magnifying-glass-chart text-[10px]"></i>
                                     </div>
-                                    <p class="text-sm text-zinc-300">Retrieval indexing active</p>
+                                    <p class="text-xs text-zinc-300">Retrieval indexing active</p>
                                 </div>
-                                <div class="flex items-center gap-3 rounded-xl border border-white/5 bg-white/5 p-3">
-                                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-500/20 text-orange-400">
-                                        <i class="fa-solid fa-share-nodes text-xs"></i>
+                                <div class="flex items-center gap-3 rounded-xl border border-white/5 bg-white/5 p-2.5">
+                                    <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-orange-500/20 text-orange-400">
+                                        <i class="fa-solid fa-share-nodes text-[10px]"></i>
                                     </div>
-                                    <p class="text-sm text-zinc-300">Collaborator links sent</p>
+                                    <p class="text-xs text-zinc-300">Collaborator links sent</p>
                                 </div>
                             </div>
                         </div>
@@ -375,21 +375,16 @@
             document.getElementById('sidebar').classList.toggle('sidebar-collapsed');
         }
 
-        // Toggle Document Menu
         function toggleDocMenu(event, menuId) {
             event.preventDefault();
             event.stopPropagation();
-            
-            // Close all other menus first
             document.querySelectorAll('[id^="menu-"]').forEach(el => {
                 if (el.id !== menuId) el.classList.add('hidden');
             });
-
             const menu = document.getElementById(menuId);
             menu.classList.toggle('hidden');
         }
 
-        // Close menu when clicking elsewhere
         document.addEventListener('click', function(event) {
             const isButton = event.target.closest('button');
             const isMenu = event.target.closest('[id^="menu-"]');
@@ -401,7 +396,6 @@
             }
         });
 
-        // Auto-submit logic
         document.getElementById('document-upload-input').addEventListener('change', function() {
             if (this.files.length > 0) {
                 document.getElementById('upload-content').classList.add('hidden');

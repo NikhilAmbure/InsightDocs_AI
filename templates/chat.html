@@ -23,7 +23,7 @@
         ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
         
-        /* Modern Grid Background (RESTORED PURPLE THEME) */
+        /* Modern Grid Background */
         .bg-modern-grid {
             background-color: #020617; 
             background-image: 
@@ -76,8 +76,8 @@
         }
 
         /* Markdown Styles */
-        .markdown-body { font-size: 15px; line-height: 1.7; color: #e4e4e7; }
-        .markdown-body p { margin-bottom: 1rem; }
+        .markdown-body { font-size: 14px; line-height: 1.6; color: #e4e4e7; } /* Reduced from 15px */
+        .markdown-body p { margin-bottom: 0.8rem; }
         .markdown-body p:last-child { margin-bottom: 0; }
         .markdown-body ul { list-style-type: disc; margin-left: 1.5rem; margin-bottom: 1rem; }
         .markdown-body ol { list-style-type: decimal; margin-left: 1.5rem; margin-bottom: 1rem; }
@@ -101,7 +101,6 @@
             transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
         }
         
-        /* Ensure sidebar-collapsed only affects desktop */
         @media (min-width: 1024px) {
             .sidebar-collapsed { width: 0 !important; overflow: hidden; border-right: 0 !important; }
         }
@@ -123,7 +122,6 @@
         .tab-active { border-bottom: 2px solid #8b5cf6; color: white; }
         .tab-inactive { border-bottom: 2px solid transparent; color: #71717a; }
 
-        /* Resizer specific styles */
         #drag-handle:hover > div { background-color: #8b5cf6; }
         body.resizing { cursor: col-resize; user-select: none; }
         body.resizing iframe { pointer-events: none; }
@@ -151,15 +149,14 @@
 
         <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 flex w-72 transform -translate-x-full transition-transform duration-300 flex-col border-r border-white/5 bg-gray-950 whitespace-nowrap lg:relative lg:translate-x-0">
             
-            <div class="flex h-20 shrink-0 items-center justify-between border-b border-white/5 px-6">
+            <div class="flex h-16 shrink-0 items-center justify-between border-b border-white/5 px-6">
                 <a href="{% url 'upload' %}" class="flex items-center gap-3 group cursor-pointer">
-                    <div class="relative w-8 h-8 flex items-center justify-center">
-                        <div class="absolute inset-0 bg-violet-500 rounded-lg blur-sm opacity-50 group-hover:opacity-75 transition-opacity"></div>
+                    <div class="relative w-7 h-7 flex items-center justify-center"> <div class="absolute inset-0 bg-violet-500 rounded-lg blur-sm opacity-50 group-hover:opacity-75 transition-opacity"></div>
                         <div class="relative w-full h-full bg-gradient-to-br from-violet-600 to-indigo-600 rounded-lg flex items-center justify-center border border-white/10">
-                            <i class="fa-solid fa-cube text-white text-xs"></i>
+                            <i class="fa-solid fa-cube text-white text-[10px]"></i>
                         </div>
                     </div>
-                    <span class="font-display font-bold text-lg tracking-tight text-white">InsightDocs<span class="text-violet-400">.ai</span></span>
+                    <span class="font-display font-bold text-base tracking-tight text-white">InsightDocs<span class="text-violet-400">.ai</span></span>
                 </a>
                 <button onclick="toggleMobileSidebar()" class="rounded-lg p-1 text-zinc-400 hover:bg-white/5 hover:text-white lg:hidden">
                     <i class="fa-solid fa-xmark text-lg"></i>
@@ -175,13 +172,13 @@
                         </span>
                         Active Session
                     </div>
-                    <p class="truncate font-semibold text-white">{{ document.title }}</p>
-                    <p class="text-xs text-zinc-400">Updated {{ document.uploaded_at|timesince }} ago</p>
+                    <p class="truncate font-semibold text-sm text-white">{{ document.title }}</p>
+                    <p class="text-[10px] text-zinc-400">Updated {{ document.uploaded_at|timesince }} ago</p>
                 </div>
 
-                <a href="{% url 'upload' %}" class="group mb-8 flex w-full items-center justify-center gap-2 rounded-xl bg-white py-3 text-sm font-semibold text-black transition-all hover:bg-zinc-200 hover:shadow-lg hover:shadow-white/5">
+                <a href="{% url 'upload' %}" class="group mb-8 flex w-full items-center justify-center gap-2 rounded-xl bg-white py-2.5 text-xs font-semibold text-black transition-all hover:bg-zinc-200 hover:shadow-lg hover:shadow-white/5">
                     <span>Start new chat</span>
-                    <i class="fa-solid fa-plus text-xs transition-transform group-hover:rotate-90"></i>
+                    <i class="fa-solid fa-plus text-[10px] transition-transform group-hover:rotate-90"></i>
                 </a>
 
                 <div class="space-y-1">
@@ -191,25 +188,25 @@
                     {% if recent_documents %}
                         {% for doc in recent_documents %}
                         <div class="group relative flex items-center rounded-xl border border-transparent hover:bg-white/5 transition-colors">
-                            <a href="{% url 'chat' doc.id %}" class="flex-1 min-w-0 p-3 text-left">
+                            <a href="{% url 'chat' doc.id %}" class="flex-1 min-w-0 p-2.5 text-left">
                                 <div class="flex items-center justify-between">
-                                    <span class="truncate text-sm text-zinc-300 group-hover:text-white">{{ doc.title }}</span>
-                                    <span class="ml-2 text-[10px] text-zinc-500">{{ doc.extension|upper }}</span>
+                                    <span class="truncate text-xs text-zinc-300 group-hover:text-white font-medium">{{ doc.title }}</span>
+                                    <span class="ml-2 text-[9px] text-zinc-500">{{ doc.extension|upper }}</span>
                                 </div>
-                                <p class="mt-1 text-xs text-zinc-500">{{ doc.uploaded_at|timesince }} ago</p>
+                                <p class="mt-0.5 text-[10px] text-zinc-500">{{ doc.uploaded_at|timesince }} ago</p>
                             </a>
                             
                             <div class="relative px-2">
                                 <button onclick="toggleDocMenu(event, 'menu-{{ doc.id }}')" 
                                     class="p-1.5 text-zinc-500 hover:text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity rounded-lg hover:bg-white/10"
                                     title="Options">
-                                    <i class="fa-solid fa-ellipsis-vertical"></i>
+                                    <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                                 </button>
                                 
                                 <div id="menu-{{ doc.id }}" class="hidden absolute right-0 top-8 w-32 bg-zinc-900 border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden">
                                     <form action="{% url 'delete_document' doc.id %}" method="POST" onsubmit="return confirm('Are you sure? This will delete the document and all chat history permanently.');">
                                         {% csrf_token %}
-                                        <button type="submit" class="w-full text-left px-4 py-2.5 text-xs text-red-400 hover:bg-white/5 hover:text-red-300 flex items-center gap-2 transition-colors">
+                                        <button type="submit" class="w-full text-left px-4 py-2.5 text-[10px] text-red-400 hover:bg-white/5 hover:text-red-300 flex items-center gap-2 transition-colors">
                                             <i class="fa-solid fa-trash-can"></i> Delete
                                         </button>
                                     </form>
@@ -218,29 +215,29 @@
                         </div>
                         {% endfor %}
                     {% else %}
-                        <p class="rounded-xl border border-dashed border-white/5 p-3 text-xs text-zinc-500">Upload another file to see it here.</p>
+                        <p class="rounded-xl border border-dashed border-white/5 p-3 text-[10px] text-zinc-500">Upload another file to see it here.</p>
                     {% endif %}
                 </div>
             </div>
 
             <div class="border-t border-white/5 p-4">
-                <div class="flex items-center gap-2 rounded-xl border border-white/5 bg-white/5 p-3">
-                    <div class="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-violet-500 to-fuchsia-500 text-xs font-bold text-white">
+                <div class="flex items-center gap-2 rounded-xl border border-white/5 bg-white/5 p-2.5">
+                    <div class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-tr from-violet-500 to-fuchsia-500 text-[10px] font-bold text-white">
                         {{ request.user.get_full_name|default:request.user.username|slice:":2"|upper }}
                     </div>
                     <div class="flex-1 overflow-hidden px-1">
-                        <p class="truncate text-sm font-medium text-white">{{ request.user.get_full_name|default:request.user.username }}</p>
-                        <p class="truncate text-xs text-zinc-400">{{ request.user.email }}</p>
+                        <p class="truncate text-xs font-medium text-white">{{ request.user.get_full_name|default:request.user.username }}</p>
+                        <p class="truncate text-[10px] text-zinc-400">{{ request.user.email }}</p>
                     </div>
                     
                     <a href="{% url 'profile' %}" class="rounded-lg p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white transition-colors" title="Profile Settings">
-                        <i class="fa-solid fa-user-gear"></i>
+                        <i class="fa-solid fa-user-gear text-xs"></i>
                     </a>
                     
                     <form action="{% url 'logout' %}" method="post">
                         {% csrf_token %}
                         <button type="submit" class="rounded-lg p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400 transition-colors" title="Log out">
-                            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                            <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
                         </button>
                     </form>
                 </div>
@@ -252,15 +249,15 @@
             <header class="glass-header z-20 flex h-16 shrink-0 items-center justify-between px-4 sm:px-6">
                 <div class="flex items-center gap-3">
                     <button onclick="toggleMobileSidebar()" class="mr-1 rounded-lg p-2 text-zinc-400 hover:bg-white/10 lg:hidden">
-                        <i class="fa-solid fa-bars text-lg"></i>
+                        <i class="fa-solid fa-bars text-base"></i>
                     </button>
                     
                     <button onclick="toggleDesktopSidebar()" class="hidden rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white lg:block" title="Toggle Sidebar">
-                        <i id="toggle-icon" class="fa-solid fa-bars-staggered text-lg"></i>
+                        <i id="toggle-icon" class="fa-solid fa-bars-staggered text-sm"></i>
                     </button>
 
                     <div class="flex flex-col border-l border-white/10 pl-4">
-                        <h1 class="flex items-center gap-2 text-sm font-semibold text-white sm:text-base">
+                        <h1 class="flex items-center gap-2 text-xs font-semibold text-white sm:text-sm">
                             {{ document.title }}
                             <span class="hidden rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-zinc-300 sm:inline-block">{{ document.extension|upper }}</span>
                         </h1>
@@ -268,21 +265,21 @@
                 </div>
 
                 <div class="flex items-center gap-3">
-                    <div id="ws-status" class="flex items-center gap-2 rounded-full border border-white/5 bg-black/20 px-3 py-1 text-xs text-zinc-400 backdrop-blur-md">
+                    <div id="ws-status" class="flex items-center gap-2 rounded-full border border-white/5 bg-black/20 px-3 py-1 text-[10px] text-zinc-400 backdrop-blur-md">
                         <span class="status-dot connecting"></span>
                         <span class="hidden sm:inline">Connecting...</span>
                     </div>
 
-                    <a href="{% url 'subscription' %}" class="flex items-center gap-1.5 sm:gap-2 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-1 sm:px-4 sm:py-1.5 text-[10px] sm:text-xs font-bold text-white shadow-lg shadow-violet-500/20 hover:scale-105 hover:shadow-violet-500/30 transition-all">
-                        <i class="fa-solid fa-crown text-[10px]"></i>
+                    <a href="{% url 'subscription' %}" class="flex items-center gap-1.5 sm:gap-2 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-1 sm:px-4 sm:py-1.5 text-[10px] font-bold text-white shadow-lg shadow-violet-500/20 hover:scale-105 hover:shadow-violet-500/30 transition-all">
+                        <i class="fa-solid fa-crown text-[9px]"></i>
                         <span><span class="hidden sm:inline">Upgrade</span> Pro</span>
                     </a>
                 </div>
             </header>
 
-            <div class="flex h-12 w-full shrink-0 items-center justify-center border-b border-white/5 bg-gray-950/50 lg:hidden">
-                <button onclick="switchMobileTab('chat')" id="tab-btn-chat" class="tab-active flex h-full flex-1 items-center justify-center text-xs font-medium transition-colors">Chat</button>
-                <button onclick="switchMobileTab('doc')" id="tab-btn-doc" class="tab-inactive flex h-full flex-1 items-center justify-center text-xs font-medium transition-colors">Document</button>
+            <div class="flex h-10 w-full shrink-0 items-center justify-center border-b border-white/5 bg-gray-950/50 lg:hidden">
+                <button onclick="switchMobileTab('chat')" id="tab-btn-chat" class="tab-active flex h-full flex-1 items-center justify-center text-[10px] font-medium transition-colors">Chat</button>
+                <button onclick="switchMobileTab('doc')" id="tab-btn-doc" class="tab-inactive flex h-full flex-1 items-center justify-center text-[10px] font-medium transition-colors">Document</button>
             </div>
 
             <div class="flex flex-1 overflow-hidden relative">
@@ -293,7 +290,7 @@
                         <div class="mx-auto max-w-3xl space-y-8 pb-32">
                             
                             <div class="flex items-center justify-center pb-2 opacity-80">
-                                <div class="flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-xs text-violet-300 backdrop-blur">
+                                <div class="flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-[10px] text-violet-300 backdrop-blur">
                                     <i class="fa-solid fa-sparkles animate-pulse"></i>
                                     AI is ready to chat
                                 </div>
@@ -315,15 +312,15 @@
 
                                         <div class="max-w-[85%] sm:max-w-[75%] min-w-0">
                                             {% if msg.role == 'user' %}
-                                                <div class="bg-violet-600 text-white rounded-2xl rounded-tr-sm px-5 py-3 text-[15px] leading-relaxed shadow-md">
+                                                <div class="bg-violet-600 text-white rounded-2xl rounded-tr-sm px-5 py-3 text-sm leading-relaxed shadow-md">
                                                     {{ msg.content|linebreaksbr }}
                                                 </div>
                                             {% else %}
-                                                <div class="bg-transparent text-[15px] text-zinc-200 markdown-body">
+                                                <div class="bg-transparent text-sm text-zinc-200 markdown-body">
                                                     <div class="markdown-content">{{ msg.content }}</div>
                                                     
                                                     <div class="flex items-center gap-3 mt-3">
-                                                        <button onclick="copyMessage(this)" class="group/btn flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+                                                        <button onclick="copyMessage(this)" class="group/btn flex items-center gap-1.5 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors">
                                                             <i class="fa-regular fa-copy group-hover/btn:scale-110 transition-transform"></i> 
                                                             <span class="opacity-0 group-hover/btn:opacity-100 transition-opacity">Copy</span>
                                                         </button>
@@ -346,7 +343,7 @@
                                 <div id="chat-input-container" class="flex-1 py-2 pl-4 min-h-[44px] max-h-32 overflow-y-auto">
                                     <textarea name="content" id="message-input" rows="1" 
                                         placeholder="Ask a question about your document..." required 
-                                        class="w-full bg-transparent text-white outline-none border-none text-[15px] resize-none focus:ring-0 placeholder-zinc-500 leading-relaxed custom-textarea"></textarea>
+                                        class="w-full bg-transparent text-white outline-none border-none text-sm resize-none focus:ring-0 placeholder-zinc-500 leading-relaxed custom-textarea"></textarea>
                                 </div>
                                 
                                 <button type="submit" id="send-btn" class="mb-1 mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-600 text-white shadow-lg shadow-violet-600/30 transition-all hover:bg-violet-500 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -364,14 +361,14 @@
 
                 <aside id="doc-view-wrapper" style="width: 450px;" class="hidden relative h-full flex-col bg-gray-950/70 backdrop-blur lg:flex shrink-0 border-l border-white/5">
                     <div class="flex h-10 shrink-0 items-center justify-between border-b border-white/5 px-4 lg:h-12">
-                        <h3 class="text-xs font-semibold text-white lg:text-sm">Document Preview</h3>
+                        <h3 class="text-[10px] font-semibold text-white lg:text-xs">Document Preview</h3>
                         <div class="flex items-center gap-2">
-                            <a href="{{ document.file.url }}" target="_blank" class="text-[10px] text-violet-400 hover:text-violet-300 lg:text-xs">
+                            <a href="{{ document.file.url }}" target="_blank" class="text-[10px] text-violet-400 hover:text-violet-300">
                                 Open in New Tab <i class="fa-solid fa-arrow-up-right-from-square ml-1"></i>
                             </a>
                             <button type="button" onclick="switchMobileTab('chat')" class="lg:hidden rounded-full border border-white/10 px-2 py-0.5 text-[10px] font-medium text-zinc-200 hover:bg-white/10">Close</button>
                              <button type="button" onclick="toggleDesktopDocPanel()" class="hidden lg:block rounded-md p-1 text-zinc-400 hover:text-white hover:bg-white/10" title="Collapse Panel">
-                                <i class="fa-solid fa-angles-right"></i>
+                                <i class="fa-solid fa-angles-right text-xs"></i>
                              </button>
                         </div>
                     </div>
@@ -388,7 +385,7 @@
                             <div class="h-16 w-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
                                 <i class="fa-regular fa-file-lines text-2xl text-zinc-500"></i>
                             </div>
-                            <p class="text-sm text-zinc-400 mb-2">Preview not available for this file type.</p>
+                            <p class="text-xs text-zinc-400 mb-2">Preview not available for this file type.</p>
                             <a href="{{ document.file.url }}" target="_blank" class="px-4 py-2 bg-violet-600 rounded-lg text-xs font-bold text-white hover:bg-violet-500 transition">
                                 Download to View
                             </a>
@@ -411,7 +408,6 @@
         let chatSocket = null;
         let isConnecting = false;
 
-        // --- Copy Logic ---
         function copyMessage(btn) {
             const wrapper = btn.closest('.markdown-body');
             const contentDiv = wrapper.querySelector('.markdown-content');
@@ -432,7 +428,6 @@
             }).catch(err => { console.error('Failed to copy: ', err); });
         }
 
-        // --- Resizing Logic ---
         const dragHandle = document.getElementById('drag-handle');
         const docWrapper = document.getElementById('doc-view-wrapper');
         const showDocBtn = document.getElementById('show-doc-btn');
@@ -450,13 +445,15 @@
             }
         }
 
-        dragHandle.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            isResizing = true;
-            document.body.classList.add('resizing'); 
-            document.addEventListener('mousemove', handleMouseMove);
-            document.addEventListener('mouseup', stopResize);
-        });
+        if (dragHandle) {
+            dragHandle.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                isResizing = true;
+                document.body.classList.add('resizing'); 
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', stopResize);
+            });
+        }
 
         function handleMouseMove(e) {
             if (!isResizing) return;
@@ -495,7 +492,6 @@
             }
         }
 
-        // --- WebSocket Logic ---
         function initWebSocket() {
             if (isConnecting || chatSocket) return;
             isConnecting = true;
@@ -520,13 +516,13 @@
             const textEl = statusEl.querySelector('span:last-child');
             dotEl.className = `status-dot ${status}`;
             if (status === 'connected') {
-                statusEl.className = 'flex items-center gap-2 rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1 text-xs text-green-400 backdrop-blur-md transition-colors';
+                statusEl.className = 'flex items-center gap-2 rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1 text-[10px] text-green-400 backdrop-blur-md transition-colors';
                 textEl.textContent = 'Connected';
             } else if (status === 'disconnected') {
-                statusEl.className = 'flex items-center gap-2 rounded-full border border-red-500/20 bg-red-500/10 px-3 py-1 text-xs text-red-400 backdrop-blur-md transition-colors';
+                statusEl.className = 'flex items-center gap-2 rounded-full border border-red-500/20 bg-red-500/10 px-3 py-1 text-[10px] text-red-400 backdrop-blur-md transition-colors';
                 textEl.textContent = 'Reconnecting...';
             } else {
-                statusEl.className = 'flex items-center gap-2 rounded-full border border-white/5 bg-black/20 px-3 py-1 text-xs text-zinc-400 backdrop-blur-md transition-colors';
+                statusEl.className = 'flex items-center gap-2 rounded-full border border-white/5 bg-black/20 px-3 py-1 text-[10px] text-zinc-400 backdrop-blur-md transition-colors';
                 textEl.textContent = 'Connecting...';
             }
         }
@@ -538,26 +534,22 @@
             else if (data.type === 'error') { removeLoadingIndicator(); showError(data.message); }
         }
 
-        // --- LEFT-RIGHT CHAT UI GENERATOR
         function addMessageToUI(content, role, id) {
             const messagesDiv = document.getElementById('chat-messages');
             const msgWrapper = document.createElement('div');
             
-            // Align based on role
             msgWrapper.className = `w-full msg-animate flex gap-4 ${role === 'user' ? 'justify-end' : 'justify-start'}`;
             msgWrapper.id = `msg-${id}`;
 
             if (role === 'user') {
-                // USER MESSAGE: BRIGHT PURPLE
                 msgWrapper.innerHTML = `
                     <div class="max-w-[85%] sm:max-w-[75%] min-w-0">
-                        <div class="bg-violet-600 text-white rounded-2xl rounded-tr-sm px-5 py-3 text-[15px] leading-relaxed shadow-md">
+                        <div class="bg-violet-600 text-white rounded-2xl rounded-tr-sm px-5 py-3 text-sm leading-relaxed shadow-md">
                             ${content.replace(/\n/g, '<br>')}
                         </div>
                     </div>
                 `;
             } else {
-                // AI MESSAGE: Left Side, Avatar, Clean Text
                 msgWrapper.innerHTML = `
                     <div class="flex-shrink-0 mt-1">
                         <div class="h-8 w-8 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-600 p-[1px]">
@@ -567,10 +559,10 @@
                         </div>
                     </div>
                     <div class="max-w-[85%] sm:max-w-[75%] min-w-0">
-                        <div class="bg-transparent text-[15px] text-zinc-200 markdown-body">
+                        <div class="bg-transparent text-sm text-zinc-200 markdown-body">
                             <div class="markdown-content">${marked.parse(content)}</div>
                             <div class="flex items-center gap-3 mt-3">
-                                <button onclick="copyMessage(this)" class="group/btn flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+                                <button onclick="copyMessage(this)" class="group/btn flex items-center gap-1.5 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors">
                                     <i class="fa-regular fa-copy group-hover/btn:scale-110 transition-transform"></i> 
                                     <span class="opacity-0 group-hover/btn:opacity-100 transition-opacity">Copy</span>
                                 </button>
@@ -583,7 +575,6 @@
             scrollToBottom();
         }
 
-        // --- STYLE LOADING ---
         function addLoadingIndicator() {
             const messagesDiv = document.getElementById('chat-messages');
             const loaderDiv = document.createElement('div');
@@ -600,7 +591,7 @@
                 </div>
                 <div class="max-w-[85%] pt-2">
                     <div class="flex items-center gap-2">
-                        <span class="text-sm font-medium animate-shimmer">Thinking...</span>
+                        <span class="text-xs font-medium animate-shimmer">Thinking...</span>
                     </div>
                 </div>`;
                 
@@ -632,7 +623,7 @@
         function showError(message) {
             const messagesDiv = document.getElementById('chat-messages');
             const errorDiv = document.createElement('div');
-            errorDiv.className = 'mx-auto max-w-3xl mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-sm text-center';
+            errorDiv.className = 'mx-auto max-w-3xl mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-xs text-center';
             errorDiv.textContent = message;
             messagesDiv.appendChild(errorDiv);
             scrollToBottom();
@@ -670,7 +661,6 @@
             }
         });
 
-        // --- Layout Functions ---
         function toggleMobileSidebar() {
             const sidebar = document.getElementById('sidebar');
             const backdrop = document.getElementById('mobile-backdrop');
@@ -715,7 +705,6 @@
             }
         }
 
-        // Auto-Reset Layout on Desktop Resize
         window.addEventListener('resize', function() {
             if (window.innerWidth >= 1024) {
                 const chatView = document.getElementById('chat-view-wrapper');

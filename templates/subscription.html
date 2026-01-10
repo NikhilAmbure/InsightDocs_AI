@@ -81,17 +81,17 @@
 
     <div class="flex h-full w-full">
 
-        <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 flex w-72 -translate-x-full flex-col border-r border-white/5 bg-gray-950 whitespace-nowrap lg:relative lg:translate-x-0">
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 flex w-72 transform -translate-x-full transition-transform duration-300 flex-col border-r border-white/5 bg-gray-950 whitespace-nowrap lg:relative lg:translate-x-0">
             
-            <div class="flex h-20 shrink-0 items-center justify-between border-b border-white/5 px-6">
+            <div class="flex h-16 shrink-0 items-center justify-between border-b border-white/5 px-6">
                 <a href="{% url 'upload' %}" class="flex items-center gap-3 group cursor-pointer">
-                    <div class="relative w-8 h-8 flex items-center justify-center">
+                    <div class="relative w-7 h-7 flex items-center justify-center">
                         <div class="absolute inset-0 bg-violet-500 rounded-lg blur-sm opacity-50 group-hover:opacity-75 transition-opacity"></div>
                         <div class="relative w-full h-full bg-gradient-to-br from-violet-600 to-indigo-600 rounded-lg flex items-center justify-center border border-white/10">
-                            <i class="fa-solid fa-cube text-white text-xs"></i>
+                            <i class="fa-solid fa-cube text-white text-[10px]"></i>
                         </div>
                     </div>
-                    <span class="font-display font-bold text-lg tracking-tight text-white">InsightDocs<span class="text-violet-400">.ai</span></span>
+                    <span class="font-display font-bold text-base tracking-tight text-white">InsightDocs<span class="text-violet-400">.ai</span></span>
                 </a>
                 <button onclick="toggleMobileSidebar()" class="rounded-lg p-1 text-zinc-400 hover:bg-white/5 hover:text-white lg:hidden">
                     <i class="fa-solid fa-xmark text-lg"></i>
@@ -100,45 +100,43 @@
 
             <div class="flex flex-1 flex-col overflow-y-auto px-4 py-6 scrollbar-thin">
                 
-                <a href="{% url 'upload' %}" class="group mb-8 flex w-full items-center justify-center gap-2 rounded-xl bg-white py-3 text-sm font-semibold text-black transition-all hover:bg-zinc-200 hover:shadow-lg hover:shadow-white/5">
+                <a href="{% url 'upload' %}" class="group mb-8 flex w-full items-center justify-center gap-2 rounded-xl bg-white py-2.5 text-xs font-semibold text-black transition-all hover:bg-zinc-200 hover:shadow-lg hover:shadow-white/5">
                     <span>Start new chat</span>
-                    <i class="fa-solid fa-plus text-xs transition-transform group-hover:rotate-90"></i>
+                    <i class="fa-solid fa-plus text-[10px] transition-transform group-hover:rotate-90"></i>
                 </a>
 
                 <div class="space-y-1 mb-8">
                     <div class="mb-2 px-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">Menu</div>
-                    <a href="{% url 'upload' %}" class="block rounded-xl px-3 py-2 text-sm font-medium text-zinc-400 hover:bg-white/5 hover:text-white">
+                    <a href="{% url 'upload' %}" class="block rounded-xl px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-white/5 hover:text-white">
                         <i class="fa-solid fa-folder-open w-5 text-center mr-2"></i> Documents
                     </a>
-                    <a href="{% url 'subscription' %}" class="block rounded-xl bg-violet-500/10 border border-violet-500/20 px-3 py-2 text-sm font-medium text-white">
+                    <a href="{% url 'subscription' %}" class="block rounded-xl bg-violet-500/10 border border-violet-500/20 px-3 py-2 text-xs font-medium text-white">
                         <i class="fa-solid fa-credit-card w-5 text-center mr-2"></i> Subscription
                     </a>
-                    <a href="{% url 'profile' %}" class="block rounded-xl px-3 py-2 text-sm font-medium text-zinc-400 hover:bg-white/5 hover:text-white">
+                    <a href="{% url 'profile' %}" class="block rounded-xl px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-white/5 hover:text-white">
                         <i class="fa-solid fa-gear w-5 text-center mr-2"></i> Settings
                     </a>
                 </div>
-
-                
             </div>
 
             <div class="border-t border-white/5 p-4">
-                <div class="flex items-center gap-2 rounded-xl border border-white/5 bg-white/5 p-3">
-                    <div class="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-violet-500 to-fuchsia-500 text-xs font-bold text-white">
+                <div class="flex items-center gap-2 rounded-xl border border-white/5 bg-white/5 p-2.5">
+                    <div class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-tr from-violet-500 to-fuchsia-500 text-[10px] font-bold text-white">
                         {{ request.user.get_full_name|default:request.user.username|slice:":2"|upper }}
                     </div>
                     <div class="flex-1 overflow-hidden px-1">
-                        <p class="truncate text-sm font-medium text-white">{{ request.user.get_full_name|default:request.user.username }}</p>
-                        <p class="truncate text-xs text-zinc-400">{{ request.user.email }}</p>
+                        <p class="truncate text-xs font-medium text-white">{{ request.user.get_full_name|default:request.user.username }}</p>
+                        <p class="truncate text-[10px] text-zinc-400">{{ request.user.email }}</p>
                     </div>
                     
                     <a href="{% url 'profile' %}" class="rounded-lg p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white transition-colors" title="Profile Settings">
-                        <i class="fa-solid fa-user-gear"></i>
+                        <i class="fa-solid fa-user-gear text-xs"></i>
                     </a>
                     
                     <form action="{% url 'logout' %}" method="post">
                         {% csrf_token %}
                         <button type="submit" class="rounded-lg p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400 transition-colors" title="Log out">
-                            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                            <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
                         </button>
                     </form>
                 </div>
@@ -150,20 +148,20 @@
             <header class="glass-header z-20 flex h-16 shrink-0 items-center justify-between px-4 sm:px-6">
                 <div class="flex items-center gap-3">
                     <button onclick="toggleMobileSidebar()" class="mr-1 rounded-lg p-2 text-zinc-400 hover:bg-white/10 lg:hidden">
-                        <i class="fa-solid fa-bars text-lg"></i>
+                        <i class="fa-solid fa-bars text-base"></i>
                     </button>
                     
                     <button onclick="toggleDesktopSidebar()" class="hidden rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white lg:block" title="Toggle Sidebar">
-                        <i id="toggle-icon" class="fa-solid fa-bars-staggered text-lg"></i>
+                        <i id="toggle-icon" class="fa-solid fa-bars-staggered text-sm"></i>
                     </button>
 
                     <div class="flex flex-col border-l border-white/10 pl-4">
-                        <h1 class="text-sm font-semibold text-white sm:text-base">Subscription & Plans</h1>
+                        <h1 class="text-xs font-semibold text-white sm:text-sm">Subscription & Plans</h1>
                     </div>
                 </div>
 
                 <div class="flex items-center gap-3">
-                    <a href="{% url 'coming_soon' %}" class="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/10">
+                    <a href="{% url 'coming_soon' %}" class="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-medium text-white hover:bg-white/10">
                         <i class="fa-solid fa-file-invoice-dollar mr-1.5"></i> Billing History
                     </a>
                 </div>
@@ -173,66 +171,66 @@
                 <div class="mx-auto max-w-5xl space-y-10">
     
                     <div class="text-center pt-8">
-                        <div class="inline-flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-xs font-medium text-violet-300 mb-4">
-                            <span class="relative flex h-2 w-2">
+                        <div class="inline-flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-[10px] font-medium text-violet-300 mb-4">
+                            <span class="relative flex h-1.5 w-1.5">
                               <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75"></span>
-                              <span class="relative inline-flex rounded-full h-2 w-2 bg-violet-500"></span>
+                              <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-violet-500"></span>
                             </span>
                             Early Access: Currently Free
                         </div>
-                        <h2 class="text-3xl font-display font-bold text-white">Upgrade your workspace</h2>
-                        <p class="mt-2 text-sm text-zinc-400">Paid plans will be available soon. Enjoy free access during the beta.</p>
+                        <h2 class="text-2xl font-display font-bold text-white">Upgrade your workspace</h2>
+                        <p class="mt-2 text-xs text-zinc-400">Paid plans will be available soon. Enjoy free access during the beta.</p>
                     </div>
                 
                     <div class="grid gap-6 lg:grid-cols-3 pb-12">
     
                         <div class="pricing-card flex flex-col rounded-3xl border border-white/10 bg-white/5 p-6 sm:p-8">
                             <div class="mb-4">
-                                <h3 class="text-lg font-semibold text-white">Free</h3>
+                                <h3 class="text-base font-semibold text-white">Free</h3>
                                 <div class="mt-2 flex items-baseline gap-1">
-                                    <span class="text-3xl font-bold text-white">$0</span>
-                                    <span class="text-sm text-zinc-400">/month</span>
+                                    <span class="text-2xl font-bold text-white">$0</span>
+                                    <span class="text-xs text-zinc-400">/month</span>
                                 </div>
-                                <p class="mt-2 text-xs text-zinc-400">Perfect for trying out InsightDocs.</p>
+                                <p class="mt-2 text-[10px] text-zinc-400">Perfect for trying out InsightDocs.</p>
                             </div>
-                            <ul class="mb-8 space-y-3 text-sm text-zinc-300 flex-1">
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-emerald-400 mt-1"></i> 10 active documents</li>
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-emerald-400 mt-1"></i> 500 AI chats</li>
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-emerald-400 mt-1"></i> 10 MB max file size</li>
-                                <li class="flex gap-3 text-zinc-500"><i class="fa-solid fa-xmark mt-1"></i> Basic Support</li>
+                            <ul class="mb-8 space-y-3 text-xs text-zinc-300 flex-1">
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-emerald-400 mt-0.5"></i> 10 active documents</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-emerald-400 mt-0.5"></i> 500 AI chats</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-emerald-400 mt-0.5"></i> 10 MB max file size</li>
+                                <li class="flex gap-3 text-zinc-500"><i class="fa-solid fa-xmark mt-0.5"></i> Basic Support</li>
                             </ul>
                             
                             {% if not request.user.is_premium %}
-                                <button class="w-full rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-zinc-400 cursor-not-allowed">Current Plan</button>
+                                <button class="w-full rounded-xl border border-white/10 bg-white/5 py-2.5 text-xs font-semibold text-zinc-400 cursor-not-allowed">Current Plan</button>
                             {% else %}
-                                <button class="w-full rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-white hover:bg-white/10">Downgrade</button>
+                                <button class="w-full rounded-xl border border-white/10 bg-white/5 py-2.5 text-xs font-semibold text-white hover:bg-white/10">Downgrade</button>
                             {% endif %}
                         </div>
 
                         <div class="relative flex flex-col rounded-3xl border border-violet-500/30 bg-violet-500/5 p-6 sm:p-8 transition-all hover:border-violet-500/50 hover:bg-violet-500/10">
-                            <div class="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full border border-violet-500 bg-violet-900 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-lg shadow-violet-500/20">
+                            <div class="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full border border-violet-500 bg-violet-900 px-3 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-lg shadow-violet-500/20">
                                 Recommended
                             </div>
 
                             <div class="mb-4">
-                                <h3 class="text-lg font-semibold text-white">Pro</h3>
+                                <h3 class="text-base font-semibold text-white">Pro</h3>
                                 <div class="mt-2 flex items-baseline gap-1">
-                                    <span class="text-3xl font-bold text-white">$29</span>
-                                    <span class="text-sm text-zinc-400">/month</span>
+                                    <span class="text-2xl font-bold text-white">$9.99</span>
+                                    <span class="text-xs text-zinc-400">/month</span>
                                 </div>
-                                <p class="mt-2 text-xs text-zinc-400">For power users needing more capacity.</p>
+                                <p class="mt-2 text-[10px] text-zinc-400">For power users needing more capacity.</p>
                             </div>
-                            <ul class="mb-8 space-y-3 text-sm text-zinc-300 flex-1">
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-violet-400 mt-1"></i> 50 active documents</li>
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-violet-400 mt-1"></i> 5,000 AI chats</li>
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-violet-400 mt-1"></i> 50 MB max file size</li>
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-violet-400 mt-1"></i> Priority Support</li>
+                            <ul class="mb-8 space-y-3 text-xs text-zinc-300 flex-1">
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-violet-400 mt-0.5"></i> 50 active documents</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-violet-400 mt-0.5"></i> 5,000 AI chats</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-violet-400 mt-0.5"></i> 50 MB max file size</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-violet-400 mt-0.5"></i> Priority Support</li>
                             </ul>
 
                             {% if request.user.is_premium %}
-                                <button class="w-full rounded-xl border border-violet-500 bg-violet-600 py-3 text-sm font-semibold text-white cursor-default">Active Plan</button>
+                                <button class="w-full rounded-xl border border-violet-500 bg-violet-600 py-2.5 text-xs font-semibold text-white cursor-default">Active Plan</button>
                             {% else %}
-                                <button class="w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 py-3 text-sm font-bold text-white shadow-lg shadow-violet-600/20 hover:shadow-violet-600/40 hover:scale-[1.02] transition-all">
+                                <button class="w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 py-2.5 text-xs font-bold text-white shadow-lg shadow-violet-600/20 hover:shadow-violet-600/40 hover:scale-[1.02] transition-all">
                                     Upgrade to Pro
                                 </button>
                             {% endif %}
@@ -240,20 +238,20 @@
 
                         <div class="flex flex-col rounded-3xl border border-white/10 bg-white/5 opacity-60 grayscale-[0.8] p-6 sm:p-8 hover:opacity-100 hover:grayscale-0 transition-all">
                             <div class="mb-4">
-                                <h3 class="text-lg font-semibold text-white">Enterprise</h3>
+                                <h3 class="text-base font-semibold text-white">Enterprise</h3>
                                 <div class="mt-2 flex items-baseline gap-1">
-                                    <span class="text-3xl font-bold text-white">$99</span>
-                                    <span class="text-sm text-zinc-400">/month</span>
+                                    <span class="text-2xl font-bold text-white">$99</span>
+                                    <span class="text-xs text-zinc-400">/month</span>
                                 </div>
-                                <p class="mt-2 text-xs text-zinc-400">For teams and high-volume needs.</p>
+                                <p class="mt-2 text-[10px] text-zinc-400">For teams and high-volume needs.</p>
                             </div>
-                            <ul class="mb-8 space-y-3 text-sm text-zinc-300 flex-1">
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-zinc-500 mt-1"></i> Unlimited uploads</li>
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-zinc-500 mt-1"></i> Unlimited chats</li>
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-zinc-500 mt-1"></i> 500 MB max file size</li>
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-zinc-500 mt-1"></i> API Access</li>
+                            <ul class="mb-8 space-y-3 text-xs text-zinc-300 flex-1">
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-zinc-500 mt-0.5"></i> Unlimited uploads</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-zinc-500 mt-0.5"></i> Unlimited chats</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-zinc-500 mt-0.5"></i> 500 MB max file size</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-zinc-500 mt-0.5"></i> API Access</li>
                             </ul>
-                            <button disabled class="w-full rounded-xl border border-white/5 bg-white/5 py-3 text-sm font-semibold text-zinc-500 cursor-not-allowed">Coming Soon</button>
+                            <button disabled class="w-full rounded-xl border border-white/5 bg-white/5 py-2.5 text-xs font-semibold text-zinc-500 cursor-not-allowed">Coming Soon</button>
                         </div>
 
                     </div>
@@ -268,9 +266,11 @@
             const backdrop = document.getElementById('mobile-backdrop');
             if (sidebar.classList.contains('-translate-x-full')) {
                 sidebar.classList.remove('-translate-x-full');
+                sidebar.classList.add('translate-x-0'); 
                 backdrop.classList.remove('hidden');
                 requestAnimationFrame(() => backdrop.classList.remove('opacity-0'));
             } else {
+                sidebar.classList.remove('translate-x-0');
                 sidebar.classList.add('-translate-x-full');
                 backdrop.classList.add('opacity-0');
                 setTimeout(() => backdrop.classList.add('hidden'), 300);
