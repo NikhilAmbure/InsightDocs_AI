@@ -10,9 +10,18 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
-from pathlib import Path
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 import os
+import dj_database_url
+import resend
+
+
+from pathlib import Path
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
+
 
 load_dotenv()
 
@@ -52,8 +61,10 @@ INSTALLED_APPS = [
     'crispy_bootstrap5',
     'channels',
     'corsheaders',
-    # 'cloudinary',
-    # 'cloudinary_storage',
+
+    'cloudinary',
+    'cloudinary_storage',
+
     'accounts',
     'documents'
 ]
@@ -141,8 +152,6 @@ CSRF_TRUSTED_ORIGINS = [
 
 
 # Database
-import dj_database_url
-from django.core.exceptions import ImproperlyConfigured
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
@@ -171,7 +180,6 @@ else:
 #     }
 
 
-    
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -235,7 +243,6 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
 
-import resend
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
@@ -283,3 +290,13 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_SSL_REDIRECT = False
+
+
+# Cloudinary Configuration
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': os.environ.get('CLOUDINARY_CLOUD_NAME'),
+    'API_KEY': os.environ.get('CLOUDINARY_API_KEY'),
+    'API_SECRET': os.environ.get('CLOUDINARY_API_SECRET'),
+}
+
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'

@@ -23,7 +23,7 @@
         ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
         
-        /* Modern Grid Background */
+        /* Modern Grid Background (RESTORED PURPLE THEME) */
         .bg-modern-grid {
             background-color: #020617; 
             background-image: 
@@ -53,35 +53,45 @@
         }
         .msg-animate { animation: slideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
-        /* Typing Dots Animation */
-        .typing-indicator { display: flex; gap: 4px; padding: 4px; }
-        .typing-indicator span {
-            width: 4px; height: 4px; border-radius: 50%;
-            background: rgba(255, 255, 255, 0.6);
-            animation: typing 1.4s infinite;
+        /* --- GEMINI STYLE LOADING ANIMATIONS --- */
+        @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
-        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
-        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes typing {
-            0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
-            30% { opacity: 1; transform: translateY(-3px); }
+        .animate-spin-slow {
+            animation: spin-slow 3s linear infinite;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .animate-shimmer {
+            background: linear-gradient(to right, #a78bfa 20%, #e879f9 40%, #a78bfa 60%);
+            background-size: 200% auto;
+            color: transparent;
+            -webkit-background-clip: text;
+            background-clip: text;
+            animation: shimmer 2s linear infinite;
         }
 
         /* Markdown Styles */
-        .markdown-body p { margin-bottom: 0.75rem; }
+        .markdown-body { font-size: 15px; line-height: 1.7; color: #e4e4e7; }
+        .markdown-body p { margin-bottom: 1rem; }
         .markdown-body p:last-child { margin-bottom: 0; }
-        .markdown-body ul { list-style-type: disc; margin-left: 1.5rem; margin-bottom: 0.75rem; }
-        .markdown-body ol { list-style-type: decimal; margin-left: 1.5rem; margin-bottom: 0.75rem; }
-        .markdown-body strong { font-weight: 700; color: #fff; }
+        .markdown-body ul { list-style-type: disc; margin-left: 1.5rem; margin-bottom: 1rem; }
+        .markdown-body ol { list-style-type: decimal; margin-left: 1.5rem; margin-bottom: 1rem; }
+        .markdown-body strong { font-weight: 600; color: #fff; }
         .markdown-body pre { 
-            background: #18181b; padding: 0.75rem; border-radius: 0.5rem; overflow-x: auto; 
-            margin-bottom: 0.75rem; border: 1px solid rgba(255,255,255,0.1);
+            background: #18181b; padding: 1rem; border-radius: 0.75rem; overflow-x: auto; 
+            margin-bottom: 1rem; border: 1px solid rgba(255,255,255,0.08);
         }
         .markdown-body code { 
-            font-family: monospace; background: rgba(255,255,255,0.1); 
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace; 
+            background: rgba(255,255,255,0.1); 
             padding: 0.1rem 0.3rem; border-radius: 0.25rem; font-size: 0.85em;
         }
-        .markdown-body pre code { background: transparent; padding: 0; color: #e2e8f0; }
+        .markdown-body pre code { background: transparent; padding: 0; color: #e2e8f0; font-size: 0.9em; }
         .markdown-body a { color: #a78bfa; text-decoration: underline; }
 
         /* Sidebar Transition */
@@ -91,12 +101,12 @@
             transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
         }
         
-        /* IMPORTANT FIX: Ensure sidebar-collapsed only affects desktop */
+        /* Ensure sidebar-collapsed only affects desktop */
         @media (min-width: 1024px) {
             .sidebar-collapsed { width: 0 !important; overflow: hidden; border-right: 0 !important; }
         }
 
-        /* Status Dot Pulse */
+        /* Status Dot */
         @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         .status-dot.connecting { animation: pulse-dot 1.5s infinite; background-color: #3b82f6; }
         .status-dot.connected { background-color: #22c55e; }
@@ -263,9 +273,9 @@
                         <span class="hidden sm:inline">Connecting...</span>
                     </div>
 
-                    <a href="{% url 'subscription' %}" class="flex items-center gap-2 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-1.5 text-xs font-bold text-white shadow-lg shadow-violet-500/20 hover:scale-105 hover:shadow-violet-500/30 transition-all">
+                    <a href="{% url 'subscription' %}" class="flex items-center gap-1.5 sm:gap-2 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-1 sm:px-4 sm:py-1.5 text-[10px] sm:text-xs font-bold text-white shadow-lg shadow-violet-500/20 hover:scale-105 hover:shadow-violet-500/30 transition-all">
                         <i class="fa-solid fa-crown text-[10px]"></i>
-                        Upgrade Pro
+                        <span><span class="hidden sm:inline">Upgrade</span> Pro</span>
                     </a>
                 </div>
             </header>
@@ -289,25 +299,39 @@
                                 </div>
                             </div>
 
-                            <div id="chat-messages" class="space-y-6 flex flex-col">
+                            <div id="chat-messages" class="space-y-6 flex flex-col pb-4">
                                 {% for msg in chat_history %}
-                                    <div class="w-full flex msg-animate {% if msg.role == 'user' %}justify-end{% else %}justify-start{% endif %}">
-                                        <div class="relative group px-5 py-3.5 rounded-2xl max-w-[85%] sm:max-w-[75%] text-sm leading-relaxed shadow-lg
+                                    <div class="w-full msg-animate flex gap-4 {% if msg.role == 'user' %}justify-end{% else %}justify-start{% endif %}">
+                                        
+                                        {% if msg.role == 'assistant' %}
+                                            <div class="flex-shrink-0 mt-1">
+                                                <div class="h-8 w-8 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-600 p-[1px]">
+                                                    <div class="h-full w-full rounded-full bg-black flex items-center justify-center">
+                                                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23a78bfa;stop-opacity:1'/%3E%3Cstop offset='100%25' style='stop-color:%237c3aed;stop-opacity:1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='0' y='0' width='64' height='64' rx='16' fill='%23020617'/%3E%3Cpath d='M32 14L50 23V41L32 50L14 41V23Z' fill='url(%23g)' stroke='%23ddd6fe' stroke-width='2'/%3E%3Cpath d='M32 50V32M32 32L50 23M32 32L14 23' stroke='%23ddd6fe' stroke-width='2'/%3E%3C/svg%3E" class="h-5 w-5" alt="AI">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+
+                                        <div class="max-w-[85%] sm:max-w-[75%] min-w-0">
                                             {% if msg.role == 'user' %}
-                                                bg-gradient-to-br from-violet-600 to-indigo-600 text-white rounded-br-none
+                                                <div class="bg-violet-600 text-white rounded-2xl rounded-tr-sm px-5 py-3 text-[15px] leading-relaxed shadow-md">
+                                                    {{ msg.content|linebreaksbr }}
+                                                </div>
                                             {% else %}
-                                                bg-zinc-900/70 backdrop-blur-md border border-white/10 text-zinc-100 markdown-body rounded-bl-none
-                                            {% endif %}
-                                        ">
-                                            {% if msg.role == 'user' %}
-                                                {{ msg.content|linebreaksbr }}
-                                            {% else %}
-                                                <div class="markdown-content pr-6">{{ msg.content }}</div>
-                                                <button onclick="copyMessage(this)" class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-zinc-400 hover:text-white bg-black/20 hover:bg-black/40 rounded-lg backdrop-blur-sm" title="Copy">
-                                                    <i class="fa-regular fa-copy text-xs"></i>
-                                                </button>
+                                                <div class="bg-transparent text-[15px] text-zinc-200 markdown-body">
+                                                    <div class="markdown-content">{{ msg.content }}</div>
+                                                    
+                                                    <div class="flex items-center gap-3 mt-3">
+                                                        <button onclick="copyMessage(this)" class="group/btn flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+                                                            <i class="fa-regular fa-copy group-hover/btn:scale-110 transition-transform"></i> 
+                                                            <span class="opacity-0 group-hover/btn:opacity-100 transition-opacity">Copy</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             {% endif %}
                                         </div>
+
                                     </div>
                                 {% endfor %}
                             </div>
@@ -382,22 +406,30 @@
 
     <script>
         const DOCUMENT_ID = {{ document.id }};
+        const AI_LOGO_URL = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23a78bfa;stop-opacity:1'/%3E%3Cstop offset='100%25' style='stop-color:%237c3aed;stop-opacity:1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='0' y='0' width='64' height='64' rx='16' fill='%23020617'/%3E%3Cpath d='M32 14L50 23V41L32 50L14 41V23Z' fill='url(%23g)' stroke='%23ddd6fe' stroke-width='2'/%3E%3Cpath d='M32 50V32M32 32L50 23M32 32L14 23' stroke='%23ddd6fe' stroke-width='2'/%3E%3C/svg%3E";
+
         let chatSocket = null;
         let isConnecting = false;
 
-        // --- Copy to Clipboard Logic ---
+        // --- Copy Logic ---
         function copyMessage(btn) {
-            const contentDiv = btn.parentElement.querySelector('.markdown-content');
+            const wrapper = btn.closest('.markdown-body');
+            const contentDiv = wrapper.querySelector('.markdown-content');
             if (!contentDiv) return;
             const text = contentDiv.innerText;
-            
             navigator.clipboard.writeText(text).then(() => {
                 const icon = btn.querySelector('i');
-                icon.className = 'fa-solid fa-check text-green-400 text-xs';
-                setTimeout(() => { icon.className = 'fa-regular fa-copy text-xs'; }, 2000);
-            }).catch(err => {
-                console.error('Failed to copy: ', err);
-            });
+                const span = btn.querySelector('span');
+                const originalClass = icon.className;
+                
+                icon.className = 'fa-solid fa-check text-green-400';
+                if(span) span.innerText = 'Copied';
+                
+                setTimeout(() => { 
+                    icon.className = originalClass; 
+                    if(span) span.innerText = 'Copy';
+                }, 2000);
+            }).catch(err => { console.error('Failed to copy: ', err); });
         }
 
         // --- Resizing Logic ---
@@ -429,15 +461,11 @@
         function handleMouseMove(e) {
             if (!isResizing) return;
             const containerRight = mainContainer.getBoundingClientRect().right;
-            const newWidth = containerRight - e.clientX;
-
-            if (newWidth > 200 && newWidth < 800) {
-                docWrapper.style.width = `${newWidth}px`;
-                docWrapper.style.display = 'flex'; 
-            } else if (newWidth <= 150) {
-                 toggleDesktopDocPanel(true); 
-                 stopResize();
-            }
+            let newWidth = containerRight - e.clientX;
+            if (newWidth < 300) newWidth = 300; 
+            else if (newWidth > 850) newWidth = 850; 
+            docWrapper.style.width = `${newWidth}px`;
+            docWrapper.style.display = 'flex'; 
         }
 
         function stopResize() {
@@ -445,17 +473,13 @@
             document.body.classList.remove('resizing');
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', stopResize);
-            
-            if (docWrapper.style.display !== 'none') {
-                const currentWidth = parseInt(docWrapper.style.width);
-                localStorage.setItem('insightDocs_panelWidth', currentWidth);
-                lastWidth = currentWidth;
-            }
+            const currentWidth = parseInt(docWrapper.style.width);
+            localStorage.setItem('insightDocs_panelWidth', currentWidth);
+            lastWidth = currentWidth;
         }
 
         function toggleDesktopDocPanel(forceClose = false) {
             const isHidden = docWrapper.style.display === 'none' || docWrapper.classList.contains('hidden');
-            
             if (!isHidden || forceClose === true) {
                 docWrapper.style.display = 'none';
                 dragHandle.style.display = 'none';
@@ -477,38 +501,16 @@
             isConnecting = true;
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}/ws/chat/${DOCUMENT_ID}/`;
-            
-            console.log('Connecting to WebSocket:', wsUrl);
             updateStatus('connecting');
-
             chatSocket = new WebSocket(wsUrl);
-
-            chatSocket.onopen = function(e) {
-                console.log('WebSocket connection established');
-                updateStatus('connected');
-                isConnecting = false;
-            };
-
-            chatSocket.onmessage = function(e) {
-                const data = JSON.parse(e.data);
-                handleWebSocketMessage(data);
-            };
-
-            chatSocket.onerror = function(error) {
-                console.error('WebSocket error:', error);
-                updateStatus('disconnected');
-            };
-
-            chatSocket.onclose = function(e) {
-                console.log('WebSocket closed:', e.code);
-                updateStatus('disconnected');
-                isConnecting = false;
-                chatSocket = null;
-                setTimeout(() => {
-                    if (!chatSocket || chatSocket.readyState === WebSocket.CLOSED) {
-                        initWebSocket();
-                    }
-                }, 3000);
+            chatSocket.onopen = function(e) { updateStatus('connected'); isConnecting = false; };
+            chatSocket.onmessage = function(e) { handleWebSocketMessage(JSON.parse(e.data)); };
+            chatSocket.onerror = function(error) { updateStatus('disconnected'); };
+            chatSocket.onclose = function(e) { 
+                updateStatus('disconnected'); 
+                isConnecting = false; 
+                chatSocket = null; 
+                setTimeout(() => { if (!chatSocket || chatSocket.readyState === WebSocket.CLOSED) initWebSocket(); }, 3000); 
             };
         }
 
@@ -517,7 +519,6 @@
             const dotEl = statusEl.querySelector('.status-dot');
             const textEl = statusEl.querySelector('span:last-child');
             dotEl.className = `status-dot ${status}`;
-            
             if (status === 'connected') {
                 statusEl.className = 'flex items-center gap-2 rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1 text-xs text-green-400 backdrop-blur-md transition-colors';
                 textEl.textContent = 'Connected';
@@ -531,59 +532,78 @@
         }
 
         function handleWebSocketMessage(data) {
-            const type = data.type;
-            if (type === 'user_message') {
-                addMessageToUI(data.content, 'user', data.id);
-            } else if (type === 'ai_thinking') {
-                addLoadingIndicator();
-            } else if (type === 'ai_message') {
-                removeLoadingIndicator();
-                addMessageToUI(data.content, 'assistant', data.id);
-            } else if (type === 'error') {
-                removeLoadingIndicator();
-                showError(data.message);
-            }
+            if (data.type === 'user_message') addMessageToUI(data.content, 'user', data.id);
+            else if (data.type === 'ai_thinking') addLoadingIndicator();
+            else if (data.type === 'ai_message') { removeLoadingIndicator(); addMessageToUI(data.content, 'assistant', data.id); }
+            else if (data.type === 'error') { removeLoadingIndicator(); showError(data.message); }
         }
 
+        // --- LEFT-RIGHT CHAT UI GENERATOR
         function addMessageToUI(content, role, id) {
             const messagesDiv = document.getElementById('chat-messages');
-            const msgDiv = document.createElement('div');
-            msgDiv.className = 'w-full flex msg-animate ' + (role === 'user' ? 'justify-end' : 'justify-start');
-            msgDiv.id = `msg-${id}`;
-
-            const contentDiv = document.createElement('div');
-            contentDiv.className = `relative group px-5 py-3.5 rounded-2xl max-w-[85%] sm:max-w-[75%] text-sm leading-relaxed shadow-lg ${
-                role === 'user' 
-                    ? 'bg-gradient-to-br from-violet-600 to-indigo-600 text-white rounded-br-none' 
-                    : 'bg-zinc-900/70 backdrop-blur-md border border-white/10 text-zinc-100 markdown-body rounded-bl-none'
-            }`;
+            const msgWrapper = document.createElement('div');
+            
+            // Align based on role
+            msgWrapper.className = `w-full msg-animate flex gap-4 ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+            msgWrapper.id = `msg-${id}`;
 
             if (role === 'user') {
-                contentDiv.textContent = content;
+                // USER MESSAGE: BRIGHT PURPLE
+                msgWrapper.innerHTML = `
+                    <div class="max-w-[85%] sm:max-w-[75%] min-w-0">
+                        <div class="bg-violet-600 text-white rounded-2xl rounded-tr-sm px-5 py-3 text-[15px] leading-relaxed shadow-md">
+                            ${content.replace(/\n/g, '<br>')}
+                        </div>
+                    </div>
+                `;
             } else {
-                contentDiv.innerHTML = `<div class="markdown-content pr-6">${marked.parse(content)}</div>`;
-                const copyBtn = document.createElement('button');
-                copyBtn.className = 'absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-zinc-400 hover:text-white bg-black/20 hover:bg-black/40 rounded-lg backdrop-blur-sm';
-                copyBtn.title = 'Copy';
-                copyBtn.innerHTML = '<i class="fa-regular fa-copy text-xs"></i>';
-                copyBtn.onclick = function() { copyMessage(this); };
-                contentDiv.appendChild(copyBtn);
+                // AI MESSAGE: Left Side, Avatar, Clean Text
+                msgWrapper.innerHTML = `
+                    <div class="flex-shrink-0 mt-1">
+                        <div class="h-8 w-8 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-600 p-[1px]">
+                            <div class="h-full w-full rounded-full bg-black flex items-center justify-center">
+                                <img src="${AI_LOGO_URL}" class="h-5 w-5" alt="AI">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="max-w-[85%] sm:max-w-[75%] min-w-0">
+                        <div class="bg-transparent text-[15px] text-zinc-200 markdown-body">
+                            <div class="markdown-content">${marked.parse(content)}</div>
+                            <div class="flex items-center gap-3 mt-3">
+                                <button onclick="copyMessage(this)" class="group/btn flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+                                    <i class="fa-regular fa-copy group-hover/btn:scale-110 transition-transform"></i> 
+                                    <span class="opacity-0 group-hover/btn:opacity-100 transition-opacity">Copy</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
             }
-
-            msgDiv.appendChild(contentDiv);
-            messagesDiv.appendChild(msgDiv);
+            messagesDiv.appendChild(msgWrapper);
             scrollToBottom();
         }
 
+        // --- STYLE LOADING ---
         function addLoadingIndicator() {
             const messagesDiv = document.getElementById('chat-messages');
             const loaderDiv = document.createElement('div');
             loaderDiv.id = 'loading-indicator';
-            loaderDiv.className = 'w-full flex justify-start msg-animate';
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'px-4 py-3 rounded-2xl bg-zinc-900/50 backdrop-blur-sm border border-white/5 text-gray-200 rounded-bl-none';
-            contentDiv.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
-            loaderDiv.appendChild(contentDiv);
+            loaderDiv.className = 'w-full msg-animate flex gap-4 justify-start'; 
+            
+            loaderDiv.innerHTML = `
+                <div class="flex-shrink-0 mt-1">
+                    <div class="h-8 w-8 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-600 p-[1px]">
+                        <div class="h-full w-full rounded-full bg-black flex items-center justify-center">
+                            <img src="${AI_LOGO_URL}" class="h-5 w-5" alt="AI">
+                        </div>
+                    </div>
+                </div>
+                <div class="max-w-[85%] pt-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-medium animate-shimmer">Thinking...</span>
+                    </div>
+                </div>`;
+                
             messagesDiv.appendChild(loaderDiv);
             scrollToBottom();
         }
@@ -598,18 +618,14 @@
             const textarea = document.getElementById('message-input');
             const sendBtn = document.getElementById('send-btn');
             const content = textarea.value.trim();
-
             if (!content || !chatSocket || chatSocket.readyState !== WebSocket.OPEN) {
-                if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN) {
-                    showError('Connection lost. Please wait...');
-                }
+                if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN) showError('Connection lost. Please wait...');
                 return;
             }
-
             sendBtn.disabled = true;
             chatSocket.send(JSON.stringify({ 'type': 'chat_message', 'content': content }));
             textarea.value = '';
-            textarea.style.height = 'auto';
+            textarea.style.height = 'auto'; 
             sendBtn.disabled = false;
         }
 
@@ -624,16 +640,14 @@
 
         function scrollToBottom() {
             const container = document.getElementById('chat-container');
-            if (container) {
-                setTimeout(() => { container.scrollTop = container.scrollHeight; }, 0);
-            }
+            if (container) setTimeout(() => { container.scrollTop = container.scrollHeight; }, 0);
         }
 
         const textarea = document.getElementById('message-input');
         if (textarea) {
             textarea.addEventListener('input', function () {
-                this.style.height = 'auto';
-                this.style.height = Math.min(this.scrollHeight, 150) + 'px';
+                this.style.height = 'auto'; 
+                this.style.height = Math.min(this.scrollHeight, 120) + 'px';
             });
             textarea.addEventListener('keydown', function (e) {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -646,39 +660,28 @@
         function toggleDocMenu(event, menuId) {
             event.preventDefault();
             event.stopPropagation();
-            document.querySelectorAll('[id^="menu-"]').forEach(el => {
-                if (el.id !== menuId) el.classList.add('hidden');
-            });
-            const menu = document.getElementById(menuId);
-            menu.classList.toggle('hidden');
+            document.querySelectorAll('[id^="menu-"]').forEach(el => { if (el.id !== menuId) el.classList.add('hidden'); });
+            document.getElementById(menuId).classList.toggle('hidden');
         }
 
         document.addEventListener('click', function(event) {
-            const isButton = event.target.closest('button');
-            const isMenu = event.target.closest('[id^="menu-"]');
-            if (!isButton && !isMenu) {
-                document.querySelectorAll('[id^="menu-"]').forEach(el => {
-                    el.classList.add('hidden');
-                });
+            if (!event.target.closest('button') && !event.target.closest('[id^="menu-"]')) {
+                document.querySelectorAll('[id^="menu-"]').forEach(el => { el.classList.add('hidden'); });
             }
         });
 
-        // --- Sidebar Functions (Mobile Fix) ---
+        // --- Layout Functions ---
         function toggleMobileSidebar() {
             const sidebar = document.getElementById('sidebar');
             const backdrop = document.getElementById('mobile-backdrop');
-            
-            // Check if it has negative translation (hidden state)
             if (sidebar.classList.contains('-translate-x-full')) {
                 sidebar.classList.remove('-translate-x-full');
-                sidebar.classList.add('translate-x-0'); // Explicitly add visible state
-                
+                sidebar.classList.add('translate-x-0'); 
                 backdrop.classList.remove('hidden');
                 requestAnimationFrame(() => backdrop.classList.remove('opacity-0'));
             } else {
                 sidebar.classList.remove('translate-x-0');
                 sidebar.classList.add('-translate-x-full');
-                
                 backdrop.classList.add('opacity-0');
                 setTimeout(() => backdrop.classList.add('hidden'), 300);
             }
@@ -700,23 +703,41 @@
                 docView.style.display = 'none'; 
                 docView.classList.remove('mobile-active');
                 if(dragHandle) dragHandle.style.display = 'none'; 
-                
-                btnChat.classList.add('tab-active');
-                btnChat.classList.remove('tab-inactive');
-                btnDoc.classList.remove('tab-active');
-                btnDoc.classList.add('tab-inactive');
+                btnChat.classList.add('tab-active'); btnChat.classList.remove('tab-inactive');
+                btnDoc.classList.remove('tab-active'); btnDoc.classList.add('tab-inactive');
             } else {
                 chatView.classList.add('hidden');
                 docView.style.display = 'flex'; 
                 docView.classList.add('mobile-active');
                 docView.style.width = '100%'; 
-                
-                btnDoc.classList.add('tab-active');
-                btnDoc.classList.remove('tab-inactive');
-                btnChat.classList.remove('tab-active');
-                btnChat.classList.add('tab-inactive');
+                btnDoc.classList.add('tab-active'); btnDoc.classList.remove('tab-inactive');
+                btnChat.classList.remove('tab-active'); btnChat.classList.add('tab-inactive');
             }
         }
+
+        // Auto-Reset Layout on Desktop Resize
+        window.addEventListener('resize', function() {
+            if (window.innerWidth >= 1024) {
+                const chatView = document.getElementById('chat-view-wrapper');
+                const docView = document.getElementById('doc-view-wrapper');
+                const dragHandle = document.getElementById('drag-handle');
+                chatView.classList.remove('hidden');
+
+                let width = localStorage.getItem('insightDocs_panelWidth');
+                if (!width || parseInt(width) > 50) {
+                    docView.style.display = 'flex';
+                    docView.classList.remove('hidden');
+                    docView.classList.remove('mobile-active'); 
+                    if (docView.style.width === '100%') {
+                        docView.style.width = (width && parseInt(width) > 200 ? width : '450') + 'px';
+                    }
+                    if (dragHandle) dragHandle.style.display = 'flex';
+                } else {
+                    docView.style.display = 'none';
+                    if (dragHandle) dragHandle.style.display = 'none';
+                }
+            }
+        });
 
         document.addEventListener('DOMContentLoaded', function() {
             initWebSocket();
@@ -734,9 +755,7 @@
         }
 
         window.addEventListener('beforeunload', function() {
-            if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
-                chatSocket.close();
-            }
+            if (chatSocket && chatSocket.readyState === WebSocket.OPEN) chatSocket.close();
         });
     </script>
 </body>

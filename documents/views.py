@@ -76,7 +76,6 @@ def upload_view(request):
             return redirect("chat", document_id=document.id)
         else:
             # If the file is too big, the error will be in form.errors
-
             messages.error(request, "Upload failed. Please check the file requirements.")
 
     documents = Document.objects.filter(owner=request.user).order_by('-uploaded_at')
@@ -120,30 +119,17 @@ def chat_view(request, document_id):
 @login_required(login_url='login')
 def serve_document_view(request, document_id):
     """
-    Serve the document file directly from the DB content
+    Redirects to the cloudinary URL to serve the document file. 
+    Since files are hosted externally, we don't serve bytes; we just point the browser to the file.
     """
     document = get_object_or_404(Document, id=document_id, owner=request.user)
 
-    # Serve from DB BinaryField
-    if document.file_content:
-        response = HttpResponse(document.file_content, content_type='application/pdf')
-        response['Content-Disposition'] = f'inline; filename="{document.original_name}"'
-        return response
-    
-    # Fallback to file system if present
-    try:
-        if document.file and os.path.exists(document.file.path):
-            with open(document.file.path, 'rb') as f:
-                response = HttpResponse(f.read(), content_type='application/pdf')
-                response['Content-Disposition'] = f'inline; filename="{document.original_name}"'
-                return response
-    except Exception:
-        pass
+    return redirect(document.file.url)
 
-    raise Http404("Document content not found.")
 
 def coming_soon(request):
     return render(request, 'coming-soon.html')
+
 
 @login_required(login_url='login')
 def delete_document_view(request, document_id):
@@ -153,7 +139,7 @@ def delete_document_view(request, document_id):
     if request.method == "POST":
         document = get_object_or_404(Document, id=document_id, owner=request.user)
         
-        # Delete the actual file from storage
+        # Delete the actual file from storage (CLoudinary)
         if document.file:
             try:
                 document.file.delete(save=False)
