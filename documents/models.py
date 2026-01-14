@@ -4,6 +4,8 @@ from django.conf import settings
 from django.db import models
 from django.utils.text import slugify
 import uuid
+from pgvector.django import VectorField
+
 
 
 class Document(models.Model):
@@ -18,6 +20,11 @@ class Document(models.Model):
     gemini_file_ref = models.CharField(max_length=255, blank=True, null=True, help_text="Stores the unique file reference from Gemini API.")
     original_name = models.CharField(max_length=255)
     uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    # Added a flag to track if RAG processing is done
+    is_processed = models.BooleanField(default=False)
+    # Optional editable plain-text version of the document for in-app editing
+    editable_text = models.TextField(blank=True, null=True, help_text="Editable plain-text representation of the document.")
     
 
     class Meta:
@@ -34,6 +41,24 @@ class Document(models.Model):
     @property
     def is_pdf(self) -> bool:
         return self.extension == "pdf"
+    
+
+class DocumentChunk(models.Model):
+    document = models.ForeignKey(
+        Document,
+        on_delete=models.CASCADE,
+        related_name="chunks",
+    )
+    content = models.TextField()
+    # gemini-embedding-001 and text-embedding-004 use 768 dimensions
+    embedding = VectorField(dimensions=768) 
+    chunk_index = models.IntegerField()
+
+    class Meta:
+        ordering = ("chunk_index",)
+
+    def __str__(self):
+        return f"Chunk {self.chunk_index} for {self.document.title}"
 
 
 class ChatSession(models.Model):

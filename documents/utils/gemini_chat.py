@@ -1,227 +1,120 @@
 import google.generativeai as genai
-import time
 import logging
+import asyncio
+
 from django.conf import settings
+from pgvector.django import L2Distance
+from ..models import DocumentChunk
 
 logger = logging.getLogger(__name__)
 
 # Configure Gemini API
 genai.configure(api_key=settings.GOOGLE_API_KEY)
 
-# Constants
-FILE_UPLOAD_TIMEOUT = 30  # seconds
-API_RESPONSE_TIMEOUT = 60  # seconds 
-MAX_RETRIES = 3
-
-
-def get_gemini_response(user_message, document, file_path, chat_history):
+async def get_gemini_response(user_message, document, chat_history):
     """
-    Get response from Gemini with document context.
-    
-    Args:
-        user_message (str): User's current message
-        file_path (str): Path to the document file
-        chat_history (list): List of previous messages in format:
-                            [{"role": "user"/"assistant", "content": "..."}]
-    
-    Returns:
-        str: AI response text
+    Async Generator that streams response using RAG -> Fallback -> File Upload.
     """
     try:
-        logger.info(f"Starting Gemini response generation for: {user_message[:50]}")
+        logger.info(f"Starting Gemini generation for doc {document.id}...")
         
-        # 1. Initialize Gemini model
+        # Initialize Gemini Model (Async)
         model = genai.GenerativeModel("gemini-2.5-flash")
-
+        
+        context_text = ""
         gemini_file = None
 
-        if document.gemini_file_ref:
-            try:
-                logger.info(f"Found existing Gemini file reference: {document.gemini_file_ref}")
-                gemini_file = genai.get_file(document.gemini_file_ref)
+        # --- STRATEGY 1: RAG (Run in Thread) ---
+        # wrap DB calls in to_thread so they don't block the WebSocket
+        def perform_rag_search():
+            if not document.is_processed:
+                return None
+            
+            # 1. Embed Query
+            result = genai.embed_content(
+                model="models/text-embedding-004",
+                content=user_message,
+                task_type="retrieval_query"
+            )
+            query_embedding = result['embedding']
 
-                if gemini_file.state.name != "ACTIVE":
-                    logger.warning(f"Existing Gemini file failed. Re-uploading...")
-                    gemini_file = None
-            except Exception as e:
-                logger.error(f"Could not retrieve existing Gemini file (might be expired): {str(e)}")
-                gemini_file = None
+            # 2. Vector Search (L2 Distance)
+            chunks = DocumentChunk.objects.filter(document=document) \
+                .annotate(distance=L2Distance('embedding', query_embedding)) \
+                .order_by('distance')[:5]
+            
+            if chunks.exists():
+                return "\n\n".join([c.content for c in chunks])
+            return None
+
+        # Execute RAG Search
+        context_text = await asyncio.to_thread(perform_rag_search)
         
-        if not gemini_file:
-            logger.info(f"Uploading new file to Gemini : {file_path}")
-            gemini_file = upload_file_with_retry(file_path)
+        if context_text:
+            logger.info("✅ RAG Context found.")
+        else:
+            logger.info("⚠️ No RAG context. Using Fallback strategy.")
 
-            document.gemini_file_ref = gemini_file.name if gemini_file else None
-            document.save()
-            logger.info(f"Saved Gemini file reference to document: {gemini_file.name}")
-
-
-        # 3. Build conversation history
-        history = []
+        # --- STRATEGY 2: CONTEXT PREPARATION ---
+        system_parts = []
         
-        # Add system context with uploaded file
-        system_message = {
-            "role": "user",
-            "parts": [
-                gemini_file,
-               (
-                "You are a helpful AI assistant. "
-                "First check if the user's question can be answered from the document. "
-                "If yes — use the document and reference it directly. "
-                "If no — intelligently use external knowledge to help. "
-                "If the document has questions/exercises, solve them logically using both the document and your knowledge. "
-                "Make answers clear, structured, and accurate."
-                )
+        base_instruction = (
+            "You are InsightDocs AI, an intelligent document assistant.\n\n"
 
+            "You may use THREE sources of knowledge in priority order:\n"
+            "1. The provided document context (highest priority)\n"
+            "2. General knowledge (if the document does not contain the answer)\n"
+            "3. Logical reasoning based on the user's question\n\n"
+
+            "Rules:\n"
+            "- If the answer is found in the document context, answer strictly from it.\n"
+            "- If the document does NOT contain the answer, answer using general knowledge.\n"
+            "- If answering from general knowledge, explicitly say: "
+            "'This answer is based on general knowledge, not the document.'\n"
+            "- If you truly do not know the answer, say so honestly.\n"
+            "- Do NOT hallucinate document-specific facts.\n"
+            "- Be concise, clear, and helpful.\n"
+        )
+
+
+        if context_text:
+            # RAG Prompt
+            system_parts = [
+                f"{base_instruction}\n\nCONTEXT:\n{context_text}",
             ]
-        }
-        history.append(system_message)
-        
-        # AI acknowledgment
-        history.append({
-            "role": "model",
-            "parts": ["I've read the document and I'm ready to help. What would you like to know?"]
-        })
-        
-        # 4. Add previous chat history (skip empty messages)
+        else:
+            # Fallback: Just general knowledge (File upload removed for speed/simplicity in async)
+            # If you really need file upload here, it will slow down response time significantly.
+            system_parts = [
+                base_instruction,
+                "Note: No specific document context was found for this query."
+            ]
+
+        # --- STRATEGY 3: BUILD HISTORY ---
+        history = []
+        # System prompt injected as first user turn
+        history.append({"role": "user", "parts": system_parts})
+        history.append({"role": "model", "parts": ["Understood."]})
+
         for msg in chat_history:
             role = "user" if msg.get("role") == "user" else "model"
             content = msg.get("content", "").strip()
-            if content and content != "[Generating response...]":
-                history.append({
-                    "role": role,
-                    "parts": [content]
-                })
-        
-        # 5. Start chat and send current message
+            if content:
+                history.append({"role": role, "parts": [content]})
+
+        # --- STRATEGY 4: STREAMING RESPONSE ---
         chat = model.start_chat(history=history)
-        response = chat.send_message(user_message)
         
-        if not response or not response.text:
-            error_msg = "No response from AI. Please try again."
-            logger.error(error_msg)
-            return error_msg
-        
-        logger.info(f"Response received successfully: {response.text[:50]}")
-        return response.text
+        # Async stream
+        response_stream = await chat.send_message_async(
+            user_message, 
+            stream=True
+        )
+
+        async for chunk in response_stream:
+            if chunk.text:
+                yield chunk.text
 
     except Exception as e:
-        error_type = type(e).__name__
-        
-        # Handle specific known exceptions
-        if "BlockedPromptException" in error_type or "blocked" in str(e).lower():
-            error_msg = "Your message was blocked by safety filters. Please rephrase your question."
-            logger.warning(f"Blocked prompt: {str(e)}")
-            return error_msg
-        
-        elif "APIError" in error_type or "api" in error_type.lower():
-            error_msg = f"Gemini API Error: {str(e)}"
-            logger.error(error_msg)
-            return error_msg
-        
-        elif isinstance(e, TimeoutError):
-            error_msg = "Request timed out. The document might be too large. Please try again."
-            logger.error(f"Timeout: {error_msg}")
-            return error_msg
-        
-        else:
-            error_msg = f"An error occurred. Please try again."
-            logger.error(f"Unexpected error in get_gemini_response: {str(e)}", exc_info=True)
-            return error_msg
-
-
-def upload_file_with_retry(file_path, max_retries=MAX_RETRIES):
-    """
-    Upload file to Gemini with retry logic and polling.
-    
-    Args:
-        file_path (str): Path to the file
-        max_retries (int): Number of retry attempts
-    
-    Returns:
-        genai.types.File or None: Uploaded file object or None if failed
-    """
-    for attempt in range(max_retries):
-        try:
-            logger.info(f"Upload attempt {attempt + 1}/{max_retries} for {file_path}")
-            
-            # Determine MIME type
-            mime_type = get_mime_type(file_path)
-            logger.info(f"Detected MIME type: {mime_type}")
-            
-            # Upload file
-            uploaded_file = genai.upload_file(
-                path=file_path,
-                mime_type=mime_type
-            )
-            
-            logger.info(f"File uploaded, waiting for processing. State: {uploaded_file.state.name}")
-            
-            # Poll until processing is complete with timeout
-            start_time = time.time()
-            while uploaded_file.state.name == "PROCESSING":
-                elapsed = time.time() - start_time
-                if elapsed > FILE_UPLOAD_TIMEOUT:
-                    logger.error(f"File processing timeout after {elapsed:.1f}s")
-                    return None
-                
-                logger.info(f"File processing... (elapsed: {elapsed:.1f}s)")
-                time.sleep(1)
-                uploaded_file = genai.get_file(uploaded_file.name)
-            
-            # Check final state
-            if uploaded_file.state.name == "ACTIVE":
-                logger.info("File uploaded and processed successfully")
-                return uploaded_file
-            
-            elif uploaded_file.state.name == "FAILED":
-                logger.error(f"File upload failed. State: {uploaded_file.state}")
-                if attempt < max_retries - 1:
-                    wait_time = (attempt + 1) * 2
-                    logger.info(f"Retrying in {wait_time} seconds...")
-                    time.sleep(wait_time)
-                    continue
-                return None
-        
-        except Exception as e:
-            error_type = type(e).__name__
-            logger.error(f"Upload attempt {attempt + 1} failed ({error_type}): {str(e)}")
-            
-            if attempt < max_retries - 1:
-                wait_time = (attempt + 1) * 2
-                logger.info(f"Retrying in {wait_time} seconds...")
-                time.sleep(wait_time)
-                continue
-            return None
-    
-    logger.error("All upload attempts failed")
-    return None
-
-
-def get_mime_type(file_path):
-    """
-    Determine MIME type based on file extension.
-    
-    Args:
-        file_path (str): Path to the file
-    
-    Returns:
-        str: MIME type
-    """
-    file_lower = file_path.lower()
-    
-    mime_map = {
-        '.pdf': 'application/pdf',
-        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        '.doc': 'application/msword',
-        '.txt': 'text/plain',
-        '.png': 'image/png',
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-    }
-    
-    for ext, mime_type in mime_map.items():
-        if file_lower.endswith(ext):
-            return mime_type
-    
-    return 'application/octet-stream'
+        logger.error(f"Gemini Error: {e}", exc_info=True)
+        yield f"Error: {str(e)}"
