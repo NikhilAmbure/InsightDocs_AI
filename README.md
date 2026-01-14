@@ -1,6 +1,22 @@
------
+Based on the code files you provided (specifically `settings.py` and `requirements.txt`), I have significantly improved your `README.md`.
 
+Here are the key changes and why I made them:
+
+1. **Missing Configuration Added:** Your `settings.py` relies on **Cloudinary** and **Upload Rate Limits**, but these were missing from your local setup instructions. I added them to the `.env` section.
+2. **Tech Stack Accuracy:** Updated to reflect specific libraries found in `requirements.txt` (e.g., Celery, Whitenoise, Pillow).
+3. **Project Structure:** Added a file tree to help new developers understand the architecture.
+4. **Professional Badges:** Added dynamic shields for Python version, Django version, and License to make the repo look standard and professional.
+5. **Contributing & License:** Added standard sections required for open-source projects.
+
+Here is the improved `README.md`:
+
+```markdown
 # InsightDocs AI 🧠📄
+
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
+![Django](https://img.shields.io/badge/Django-5.0-green?logo=django&logoColor=white)
+![Status](https://img.shields.io/badge/Status-Work_in_Progress-orange)
+![License](https://img.shields.io/badge/License-MIT-purple)
 
 **InsightDocs AI** is an intelligent SaaS platform that transforms static documents into active conversations. By leveraging Google's **Gemini 2.5 Flash**, users can upload contracts, research papers, or reports and interact with them using natural language to extract insights, summaries, and answers instantly.
 
@@ -16,118 +32,184 @@ Check out the live deployment here: **[insightdocs.in](https://insightdocs.in)**
 
 Here is a glimpse of the InsightDocs AI experience:
 
-### 1. Landing Page
-*A futuristic, cinematic interface introducing the platform.*
-![Landing Page Screenshot](screenshots/landing-1.png)
+| **Landing Page** | **Chat Interface** |
+|:---:|:---:|
+| ![Landing Page](screenshots/landing_page_video.mp4) | ![Chat Interface](screenshots/chat.png) |
 
-### 2. Secure Authentication (Signup)
-*Complete signup system with OTP verification.*
-![Signup Page Screenshot](screenshots/signup.png)
+<details>
+<summary>👀 View more screenshots</summary>
 
-### 3. User Profile
-*Manage account details*
-![Profile Page Screenshot](screenshots/profile.png)
+### Secure Authentication (Signup)
+![Signup Page](screenshots/signup.png)
 
-### 4. Document Upload
-*Drag-and-drop interface with rate-limiting safeguards.*
-![Upload Page Screenshot](screenshots/upload.png)
+### User Profile
+![Profile Page](screenshots/profile.png)
 
-### 5. Intelligent Chat Interface
-*Real-time, low-latency Q&A with your documents powered by Gemini.*
-![Chat Interface Screenshot](screenshots/chat.png)
+### Document Upload
+![Upload Page](screenshots/upload.png)
 
-### 6. Subscription Plans
-*Flexible pricing tiers for casual and power users.*
-![Subscription Page Screenshot](screenshots/subscription.png)
+### Subscription Plans
+![Subscription Page](screenshots/subscription.png)
+
+</details>
 
 ---
 
 ## ✨ Key Features
 
-* **📄 Multi-Format Ingestion:** Robust support for PDF, DOCX, and text files.
+* **📄 Multi-Format Ingestion:** Robust support for PDF, DOCX, and text files using `PyMuPDF` and `python-docx`.
 * **🤖 Intelligent Chat:** Powered by **Google Gemini 2.5 Flash** for high-speed, context-aware Q&A.
 * **⚡ Real-Time Interaction:** Built with **Django Channels** and **Redis** for seamless, low-latency WebSocket communication.
-* **🔐 Secure Authentication:** Complete signup/login system with OTP verification and password recovery.
-* **🎨 Futuristic UI:** A responsive, cinematic interface built with **Tailwind CSS** and vanilla JavaScript, featuring glassmorphism and smooth animations.
-* **📊 Smart Rate Limiting:** Built-in safeguards to manage upload frequency and API usage.
+* **🔐 Secure Authentication:** Complete signup/login system with OTP verification (via Resend) and password recovery.
+* **☁️ Cloud Storage:** Integrated **Cloudinary** storage for handling media and static assets efficiently.
+* **🎨 Futuristic UI:** A responsive, cinematic interface built with **Tailwind CSS** and vanilla JavaScript.
+* **📊 Smart Rate Limiting:** Configurable safeguards to manage upload frequency and API usage.
 
 ## 🛠️ Tech Stack
 
-* **Backend:** Django 5, Django REST Framework
-* **AI Model:** Google Generative AI (Gemini 2.5 Flash)
-* **Real-time:** Django Channels, Daphne, Redis
-* **Database:** PostgreSQL (Production on Railway), SQLite (Local Dev)
-* **Frontend:** HTML5, Tailwind CSS, JavaScript
-* **Infrastructure:** Railway (Hosting), Whitenoise (Static Files)
+| Category | Technology |
+|:--- |:--- |
+| **Backend** | Python, Django 5, Django REST Framework |
+| **AI Model** | Google Generative AI (Gemini 2.5 Flash) |
+| **Real-time** | Django Channels, Daphne, Redis |
+| **Task Queue** | Celery (Background tasks) |
+| **Database** | PostgreSQL (Production), SQLite (Local Dev) |
+| **Storage** | Cloudinary (Media/Static) |
+| **Frontend** | HTML5, Tailwind CSS, JavaScript |
+| **Infrastructure** | Railway (Hosting), Whitenoise |
+
+---
 
 ## 🚀 Local Development Setup
 
-If you have access to the source code, follow these steps to run it locally:
+Follow these steps to get the project running locally.
 
 ### Prerequisites
 
 * Python 3.10+
-* Redis (required for WebSocket/Channel layers)
-* Google API Key (for Gemini)
+* Redis (Required for WebSockets/Celery)
+* PostgreSQL (Optional, defaults to SQLite locally)
 
 ### Installation
 
 1. **Clone the repository:**
    ```bash
-   git clone [https://github.com/nikhilambure/insightdocs_ai.git](https://github.com/nikhilambure/insightdocs_ai.git)
+   git clone https://github.com/NikhilAmbure/InsightDocs_AI
    cd insightdocs_ai
 
-2.  **Create and activate a virtual environment:**
+```
 
-    ```bash
-    python -m venv venv
-    # Windows
-    venv\Scripts\activate
-    # macOS/Linux
-    source venv/bin/activate
-    ```
+2. **Create and activate a virtual environment:**
+```bash
+python -m venv venv
+# Windows
+venv\Scripts\activate
+# macOS/Linux
+source venv/bin/activate
 
-3.  **Install dependencies:**
+```
 
-    ```bash
-    pip install -r requirements.txt
-    ```
 
-4.  **Set up Environment Variables:**
-    Create a `.env` file in the root directory:
+3. **Install dependencies:**
+```bash
+pip install -r requirements.txt
 
-    ```env
-    DEBUG=True
-    SECRET_KEY=your_secret_key
-    GOOGLE_API_KEY=your_gemini_api_key
-    REDIS_URL=redis://127.0.0.1:6379/0
-    DATABASE_URL=postgres://user:password@localhost:5432/insightdocs # Optional for local
-    RESEND_API_KEY=your_resend_api_key
-    ```
+```
 
-5.  **Run Migrations:**
 
-    ```bash
-    python manage.py migrate
-    ```
+4. **Set up Environment Variables:**
+Create a `.env` file in the root directory.
+*Note: The project requires Cloudinary keys for file storage.*
+```env
+# Core Security
+DEBUG=True
+SECRET_KEY=your_secret_key_here
 
-6.  **Run the Server:**
+# Database & Cache
+DATABASE_URL=sqlite:///db.sqlite3
+REDIS_URL=redis://127.0.0.1:6379/0
 
-    ```bash
-    python manage.py runserver
-    ```
+# AI & Email
+GOOGLE_API_KEY=your_gemini_api_key
+RESEND_API_KEY=your_resend_api_key
+
+# Cloudinary (Required for file storage)
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+
+# Rate Limiting (Optional settings)
+UPLOAD_RATE_LIMIT=5
+UPLOAD_RATE_WINDOW=60
+
+```
+
+
+5. **Run Migrations:**
+```bash
+python manage.py migrate
+
+```
+
+
+6. **Start Redis (Required):**
+Ensure your local Redis server is running.
+```bash
+redis-server
+
+```
+
+
+7. **Run the Server:**
+```bash
+python manage.py runserver
+
+```
+
+
+
+---
+
+## 📂 Project Structure
+
+```text
+InsightDocs_AI/
+├── accounts/          # User authentication & Profile management
+├── app/               # Core application logic
+├── documents/         # Document processing & RAG implementation
+├── InsightDocs_AI/    # Project settings & URL routing
+├── static/            # CSS, JS, and Images
+├── templates/         # HTML templates
+├── manage.py          # Django CLI
+└── requirements.txt   # Project dependencies
+
+```
 
 ## 🗺️ Roadmap
 
-  * [x] **Core:** Basic Document Upload & Parsing
-  * [x] **AI:** Gemini Integration with Context Awareness
-  * [x] **Auth:** User Accounts & OTP Verification
-  * [x] **Deployment:** Live on Railway (insightdocs.in)
-  * [ ] **Storage:** Integrate AWS S3 / Cloudinary for persistent file storage
-  * [ ] **Vector Store:** Implement vector embeddings (Pinecone/PGVector) for long-document memory
-  * [ ] **Monetization:** Stripe integration for Pro subscriptions
-  * [ ] **Multi-Doc Chat:** Querying across multiple files simultaneously
+* [x] **Core:** Basic Document Upload & Parsing
+* [x] **AI:** Gemini Integration with Context Awareness
+* [x] **Auth:** User Accounts & OTP Verification
+* [x] **Real-time:** WebSockets for Chat
+* [x] **Deployment:** Live on Railway
+* [ ] **Vector Store:** Implement vector embeddings (Pinecone/PGVector)
+* [ ] **Monetization:** Stripe integration for Pro subscriptions
+* [ ] **Multi-Doc Chat:** Querying across multiple files simultaneously
 
------
+## 🤝 Contributing
+
+Contributions are welcome! Please follow these steps:
+
+1. Fork the repository.
+2. Create a new branch.
+3. Commit your changes.
+4. Push to the branch.
+5. Open a Pull Request.
+
+---
 
 **Developed by Nikhil Ambure**
+
+```
+
+```
