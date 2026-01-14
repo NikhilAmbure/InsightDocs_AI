@@ -1,13 +1,7 @@
 
-```markdown
 # InsightDocs AI 🧠📄
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
-![Django](https://img.shields.io/badge/Django-5.0-green?logo=django&logoColor=white)
-![Status](https://img.shields.io/badge/Status-Work_in_Progress-orange)
-![License](https://img.shields.io/badge/License-MIT-purple)
-
-**InsightDocs AI** is an intelligent SaaS platform that transforms static documents into active conversations. By leveraging Google's **Gemini 2.5 Flash**, users can upload contracts, research papers, or reports and interact with them using natural language to extract insights, summaries, and answers instantly.
+**InsightDocs AI** is an intelligent SaaS platform that transforms static documents into active conversations. By leveraging Google's **Gemini 2.5 Flash** and advanced RAG (Retrieval-Augmented Generation) with vector embeddings, users can upload contracts, research papers, presentations, or reports and interact with them using natural language to extract insights, summaries, and answers instantly.
 
 > 🚧 **Work in Progress:** This project is currently live but under active construction. Features, UI, and database schemas are being refined daily.
 
@@ -46,23 +40,28 @@ Here is a glimpse of the InsightDocs AI experience:
 
 ## ✨ Key Features
 
-* **📄 Multi-Format Ingestion:** Robust support for PDF, DOCX, and text files using `PyMuPDF` and `python-docx`.
-* **🤖 Intelligent Chat:** Powered by **Google Gemini 2.5 Flash** for high-speed, context-aware Q&A.
+* **📄 Multi-Format Ingestion:** Robust support for PDF, DOCX, TXT, PPTX, PPT files, and images (with OCR) using `PyMuPDF`, `python-docx`, `python-pptx`, and `pytesseract`.
+* **🔍 Advanced RAG System:** Vector-based semantic search using **pgvector** with Gemini embeddings (`text-embedding-004`) for precise document retrieval.
+* **🤖 Intelligent Chat:** Powered by **Google Gemini 2.5 Flash** for high-speed, context-aware Q&A with intelligent fallback strategies.
 * **⚡ Real-Time Interaction:** Built with **Django Channels** and **Redis** for seamless, low-latency WebSocket communication.
-* **🔐 Secure Authentication:** Complete signup/login system with OTP verification (via Resend) and password recovery.
+* **🔐 Secure Authentication:** Complete signup/login system with OTP verification (via Resend), password recovery, and 2FA support.
 * **☁️ Cloud Storage:** Integrated **Cloudinary** storage for handling media and static assets efficiently.
 * **🎨 Futuristic UI:** A responsive, cinematic interface built with **Tailwind CSS** and vanilla JavaScript.
 * **📊 Smart Rate Limiting:** Configurable safeguards to manage upload frequency and API usage.
+* **⚙️ Background Processing:** Celery-powered async document processing and embedding generation.
 
 ## 🛠️ Tech Stack
 
 | Category | Technology |
 |:--- |:--- |
-| **Backend** | Python, Django 5, Django REST Framework |
+| **Backend** | Python, Django 5.2, Django REST Framework |
 | **AI Model** | Google Generative AI (Gemini 2.5 Flash) |
+| **Embeddings** | Gemini text-embedding-004 (768 dimensions) |
+| **Vector Database** | pgvector (PostgreSQL extension) |
+| **RAG Framework** | LangChain (Text Splitting) |
 | **Real-time** | Django Channels, Daphne, Redis |
 | **Task Queue** | Celery (Background tasks) |
-| **Database** | PostgreSQL (Production), SQLite (Local Dev) |
+| **Database** | PostgreSQL with pgvector (Production), SQLite (Local Dev) |
 | **Storage** | Cloudinary (Media/Static) |
 | **Frontend** | HTML5, Tailwind CSS, JavaScript |
 | **Infrastructure** | Railway (Hosting), Whitenoise |
@@ -77,14 +76,15 @@ Follow these steps to get the project running locally.
 
 * Python 3.10+
 * Redis (Required for WebSockets/Celery)
-* PostgreSQL (Optional, defaults to SQLite locally)
+* PostgreSQL with pgvector extension (Recommended for production; SQLite for local dev)
+  * **Note:** Vector search features require PostgreSQL with pgvector. For local development, you can use SQLite, but RAG functionality will be limited.
 
 ### Installation
 
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/NikhilAmbure/InsightDocs_AI
-   cd insightdocs_ai
+   cd InsightDocs_AI
 
 ```
 
@@ -148,12 +148,20 @@ redis-server
 
 ```
 
+7. **Start Celery Worker (Optional but Recommended):**
+For background document processing, start a Celery worker:
+```bash
+celery -A InsightDocs_AI worker --loglevel=info
 
-7. **Run the Server:**
+```
+
+8. **Run the Server:**
 ```bash
 python manage.py runserver
 
 ```
+
+**Note:** For production or full RAG functionality, ensure PostgreSQL with pgvector extension is set up. The vector search features require pgvector for optimal performance.
 
 
 
@@ -163,16 +171,60 @@ python manage.py runserver
 
 ```text
 InsightDocs_AI/
-├── accounts/          # User authentication & Profile management
-├── app/               # Core application logic
-├── documents/         # Document processing & RAG implementation
-├── InsightDocs_AI/    # Project settings & URL routing
-├── static/            # CSS, JS, and Images
-├── templates/         # HTML templates
-├── manage.py          # Django CLI
-└── requirements.txt   # Project dependencies
+├── accounts/              # User authentication & Profile management
+│   ├── models.py         # Custom User model with 2FA & Premium flags
+│   ├── views.py          # Auth views (signup, login, OTP)
+│   ├── tasks.py          # Celery tasks for email sending
+│   └── emailer.py        # Email utilities (Resend integration)
+├── documents/            # Document processing & RAG implementation
+│   ├── models.py         # Document, DocumentChunk, ChatSession models
+│   ├── views.py          # Document upload & management views
+│   ├── consumers.py      # WebSocket consumers for real-time chat
+│   ├── tasks.py          # Celery tasks for document processing
+│   └── utils/
+│       ├── rag.py        # RAG processing (chunking & embeddings)
+│       ├── gemini_chat.py # Gemini chat with vector search
+│       └── storage.py    # File storage utilities
+├── InsightDocs_AI/       # Project settings & URL routing
+│   ├── settings.py       # Django configuration
+│   ├── asgi.py          # ASGI config for Channels
+│   ├── celery.py        # Celery configuration
+│   └── urls.py          # URL routing
+├── static/               # CSS, JS, and Images
+├── templates/            # HTML templates
+├── manage.py             # Django CLI
+└── requirements.txt      # Project dependencies
 
 ```
+
+## 🧠 How It Works
+
+### RAG (Retrieval-Augmented Generation) Architecture
+
+1. **Document Upload & Processing:**
+   - User uploads a document (PDF, DOCX, PPTX, etc.)
+   - Text is extracted using format-specific parsers
+   - Document is chunked using LangChain's `RecursiveCharacterTextSplitter`
+   - Each chunk is embedded using Gemini's `text-embedding-004` model (768 dimensions)
+   - Embeddings are stored in PostgreSQL with pgvector extension
+
+2. **Query Processing:**
+   - User asks a question via WebSocket
+   - Query is embedded using the same embedding model
+   - Vector similarity search (L2 distance) retrieves top 5 most relevant chunks
+   - Retrieved context is passed to Gemini 2.5 Flash along with chat history
+   - Response is streamed back in real-time
+
+3. **Fallback Strategy:**
+   - If RAG processing isn't complete or no relevant chunks found, the system falls back to general knowledge mode
+   - Gemini still provides helpful responses using its training data
+
+### Technology Highlights
+
+- **Vector Search:** Fast semantic search using pgvector's L2 distance metric
+- **Async Processing:** Celery handles document processing in the background
+- **Real-time Streaming:** WebSocket connections for instant, streaming responses
+- **Multi-format Support:** Handles documents, presentations, and images with OCR
 
 ## 🗺️ Roadmap
 
@@ -181,9 +233,12 @@ InsightDocs_AI/
 * [x] **Auth:** User Accounts & OTP Verification
 * [x] **Real-time:** WebSockets for Chat
 * [x] **Deployment:** Live on Railway
-* [ ] **Vector Store:** Implement vector embeddings (Pinecone/PGVector)
+* [x] **Vector Store:** Vector embeddings with pgvector and Gemini embeddings
+* [x] **RAG System:** Semantic search and retrieval-augmented generation
+* [x] **Multi-Format Support:** PDF, DOCX, TXT, PPTX, PPT, and image OCR
 * [ ] **Monetization:** Stripe integration for Pro subscriptions
 * [ ] **Multi-Doc Chat:** Querying across multiple files simultaneously
+* [ ] **2FA Enhancement:** Complete two-factor authentication UI/UX
 
 ## 🤝 Contributing
 
