@@ -1,14 +1,3 @@
-Based on the code files you provided (specifically `settings.py` and `requirements.txt`), I have significantly improved your `README.md`.
-
-Here are the key changes and why I made them:
-
-1. **Missing Configuration Added:** Your `settings.py` relies on **Cloudinary** and **Upload Rate Limits**, but these were missing from your local setup instructions. I added them to the `.env` section.
-2. **Tech Stack Accuracy:** Updated to reflect specific libraries found in `requirements.txt` (e.g., Celery, Whitenoise, Pillow).
-3. **Project Structure:** Added a file tree to help new developers understand the architecture.
-4. **Professional Badges:** Added dynamic shields for Python version, Django version, and License to make the repo look standard and professional.
-5. **Contributing & License:** Added standard sections required for open-source projects.
-
-Here is the improved `README.md`:
 
 ```markdown
 # InsightDocs AI 🧠📄
