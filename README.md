@@ -17,7 +17,7 @@ Here is a glimpse of the InsightDocs AI experience:
 
 | **Landing Page** | **Chat Interface** |
 |:---:|:---:|
-| ![Landing Page](screenshots/landing_page_video.mp4) | ![Chat Interface](screenshots/chat.png) |
+| ![Landing Page](screenshots/landing-1.png) | ![Chat Interface](screenshots/chat.png) |
 
 <details>
 <summary>👀 View more screenshots</summary>
