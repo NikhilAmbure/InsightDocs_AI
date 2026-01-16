@@ -8,6 +8,7 @@ certifi==2025.11.12
 cffi==2.0.0
 channels==4.0.0
 charset-normalizer==3.4.4
+channels_redis==4.2.0
 cloudinary==1.44.1
 colorama==0.4.6
 constantly==23.10.4
