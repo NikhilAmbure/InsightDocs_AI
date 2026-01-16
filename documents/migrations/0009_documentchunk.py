@@ -5,6 +5,43 @@ import pgvector.django.vector
 from django.db import migrations, models
 
 
+def enable_vector_extension(apps, schema_editor):
+    """
+    Enable pgvector extension. This requires pgvector to be installed on the PostgreSQL server.
+    If you're using Railway, Supabase, or another managed service, ensure pgvector is available.
+    """
+    with schema_editor.connection.cursor() as cursor:
+        try:
+            cursor.execute('CREATE EXTENSION IF NOT EXISTS vector;')
+        except Exception as e:
+            error_msg = str(e)
+            if 'not available' in error_msg or 'vector.control' in error_msg:
+                raise Exception(
+                    "\n\n" + "="*70 + "\n"
+                    "ERROR: pgvector extension is not installed on your PostgreSQL server.\n\n"
+                    "To fix this:\n"
+                    "1. If using Railway: Use Railway's PostgreSQL template with pgvector, or contact support.\n"
+                    "2. If using local PostgreSQL:\n"
+                    "   - On Windows: Install pgvector manually or use Docker with pgvector image\n"
+                    "   - On Linux: sudo apt-get install postgresql-17-pgvector (adjust version)\n"
+                    "   - On macOS: brew install pgvector\n"
+                    "3. After installing, connect to your database and run:\n"
+                    "   CREATE EXTENSION vector;\n"
+                    "4. Alternative: Use a PostgreSQL provider that includes pgvector:\n"
+                    "   - Supabase (has pgvector pre-installed)\n"
+                    "   - Neon (supports pgvector)\n"
+                    "   - AWS RDS with pgvector\n"
+                    "\n" + "="*70 + "\n"
+                ) from e
+            raise
+
+
+def disable_vector_extension(apps, schema_editor):
+    """Disable pgvector extension (reverse migration)"""
+    with schema_editor.connection.cursor() as cursor:
+        cursor.execute('DROP EXTENSION IF EXISTS vector;')
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -12,6 +49,11 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # Enable pgvector extension before creating models with vector fields
+        migrations.RunPython(
+            enable_vector_extension,
+            reverse_code=disable_vector_extension,
+        ),
         migrations.CreateModel(
             name='DocumentChunk',
             fields=[
