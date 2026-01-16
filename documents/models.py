@@ -35,7 +35,14 @@ class Document(models.Model):
 
     @property
     def extension(self) -> str:
-        _, ext = os.path.splitext(self.file.name)
+        # Try getting extension from the file name first
+        name = self.file.name
+        _, ext = os.path.splitext(name)
+        
+        # If missing, fall back to the original filename
+        if not ext and self.original_name:
+            _, ext = os.path.splitext(self.original_name)
+            
         return ext.lower().lstrip(".")
 
     @property
