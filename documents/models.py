@@ -61,6 +61,9 @@ class DocumentChunk(models.Model):
     embedding = VectorField(dimensions=768) 
     chunk_index = models.IntegerField()
 
+    page_number = models.IntegerField(null=True, blank=True)
+    coordinates = models.JSONField(null=True, blank=True)
+
     class Meta:
         ordering = ("chunk_index",)
 

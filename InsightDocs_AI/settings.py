@@ -66,7 +66,8 @@ INSTALLED_APPS = [
     # 'cloudinary_storage',
 
     'accounts',
-    'documents'
+    'documents',
+    'payments',
 ]
 
 MIDDLEWARE = [
@@ -314,3 +315,9 @@ SECURE_SSL_REDIRECT = False
 # }
 
 # DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+
+# Razorpay Payment Gateway
+RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '')
+RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '')
+RAZORPAY_WEBHOOK_SECRET = os.environ.get('RAZORPAY_WEBHOOK_SECRET', '')

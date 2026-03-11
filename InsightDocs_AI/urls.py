@@ -27,6 +27,8 @@ urlpatterns = [
     path('', include('app.urls')),
     # Document-related pages (upload workspace, subscription, etc.)
     path('', include('documents.urls')),
+    # Razorpay Payment Gateway
+    path('payments/', include('payments.urls')),
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
 ]
 

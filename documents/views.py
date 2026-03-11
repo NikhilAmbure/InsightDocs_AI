@@ -12,6 +12,7 @@ from django.http import HttpResponse, Http404, JsonResponse
 from .forms import DocumentUploadForm
 from .models import Document, ChatSession, ChatMessage
 from .utils.rate_limit import check_rate_limit
+from .tasks import process_document_task
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,8 @@ def upload_view(request):
             if not document.title:
                 document.title = document.original_name
             document.save()
+
+            process_document_task.delay(document.id)
             
             # Create a chat session
             ChatSession.objects.create(document=document, user=request.user)
@@ -87,7 +90,9 @@ def upload_view(request):
 @login_required(login_url='login')
 def subscription_view(request):
     """Subscription / billing page view."""
-    return render(request, 'subscription.html')
+    from payments.models import SubscriptionPlan
+    pro_plan = SubscriptionPlan.objects.filter(slug="pro", is_active=True).first()
+    return render(request, 'subscription.html', {'pro_plan': pro_plan})
 
 
 @login_required(login_url='login')

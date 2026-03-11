@@ -274,7 +274,15 @@ def profile_view(request):
         
     documents = Document.objects.filter(owner=request.user).order_by('-uploaded_at')
 
-    return render(request, 'profile.html', {'form': form, 'recent_documents': documents})
+    # Fetch subscription info for the profile page
+    from payments.models import Subscription
+    subscription = Subscription.objects.filter(user=request.user).select_related('plan').first()
+
+    return render(request, 'profile.html', {
+        'form': form,
+        'recent_documents': documents,
+        'subscription': subscription,
+    })
 
 
 # ----------------- OTP Verification (registration) -----------------

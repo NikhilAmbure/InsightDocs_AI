@@ -102,7 +102,7 @@ def process_document_for_rag(document, file_path):
             # Call Gemini Embedding API
             # model="models/text-embedding-004" is standard efficient model (768 dim)
             result = genai.embed_content(
-                model="models/text-embedding-004",
+                model="models/embedding-001",
                 content=chunk_text,
                 task_type="retrieval_document",
             )
