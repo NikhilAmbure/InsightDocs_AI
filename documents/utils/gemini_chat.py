@@ -8,37 +8,32 @@ from ..models import DocumentChunk
 
 logger = logging.getLogger(__name__)
 
-# Configure Gemini API
 genai.configure(api_key=settings.GOOGLE_API_KEY)
 
 async def get_gemini_response(user_message, document, chat_history):
     """
-    Async Generator that streams response using RAG -> Fallback -> File Upload.
+    Async Generator that streams response using RAG -> Fallback with chunk text.
     """
     try:
         logger.info(f"Starting Gemini generation for doc {document.id}...")
         
-        # Initialize Gemini Model (Async)
         model = genai.GenerativeModel("gemini-2.5-flash")
         
         context_text = ""
-        gemini_file = None
 
-        # --- STRATEGY 1: RAG (Run in Thread) ---
-        # wrap DB calls in to_thread so they don't block the WebSocket
+        # --- STRATEGY 1: RAG Vector Search ---
         def perform_rag_search():
             if not document.is_processed:
+                logger.warning(f"Doc {document.id} not yet processed for RAG.")
                 return None
             
-            # 1. Embed Query
             result = genai.embed_content(
-                model="models/text-embedding-004",
+                model="models/gemini-embedding-001",  # ✅ Same model as indexing
                 content=user_message,
                 task_type="retrieval_query"
             )
             query_embedding = result['embedding']
 
-            # 2. Vector Search (L2 Distance)
             chunks = DocumentChunk.objects.filter(document=document) \
                 .annotate(distance=L2Distance('embedding', query_embedding)) \
                 .order_by('distance')[:5]
@@ -47,25 +42,34 @@ async def get_gemini_response(user_message, document, chat_history):
                 return "\n\n".join([c.content for c in chunks])
             return None
 
-        # Execute RAG Search
         context_text = await asyncio.to_thread(perform_rag_search)
-        
-        if context_text:
-            logger.info("✅ RAG Context found.")
-        else:
-            logger.info("⚠️ No RAG context. Using Fallback strategy.")
 
-        # --- STRATEGY 2: CONTEXT PREPARATION ---
-        system_parts = []
-        
+        # --- STRATEGY 2: Fallback — use ALL chunks if RAG returned nothing ---
+        # This handles cases where the document is processed but query embedding
+        # doesn't match well (e.g. very short docs, first-time queries).
+        if not context_text:
+            logger.info("⚠️ RAG returned no context. Falling back to full chunk text.")
+
+            def get_all_chunks():
+                chunks = DocumentChunk.objects.filter(document=document).order_by('chunk_index')[:20]
+                if chunks.exists():
+                    return "\n\n".join([c.content for c in chunks])
+                return None
+
+            context_text = await asyncio.to_thread(get_all_chunks)
+
+        if context_text:
+            logger.info("✅ Context found (RAG or fallback).")
+        else:
+            logger.warning("⚠️ No context available. Document may not be processed yet.")
+
+        # --- BUILD SYSTEM PROMPT ---
         base_instruction = (
             "You are InsightDocs AI, an intelligent document assistant.\n\n"
-
             "You may use THREE sources of knowledge in priority order:\n"
             "1. The provided document context (highest priority)\n"
             "2. General knowledge (if the document does not contain the answer)\n"
             "3. Logical reasoning based on the user's question\n\n"
-
             "Rules:\n"
             "- If the answer is found in the document context, answer strictly from it.\n"
             "- If the document does NOT contain the answer, answer using general knowledge.\n"
@@ -76,25 +80,25 @@ async def get_gemini_response(user_message, document, chat_history):
             "- Be concise, clear, and helpful.\n"
         )
 
-
         if context_text:
-            # RAG Prompt
             system_parts = [
-                f"{base_instruction}\n\nCONTEXT:\n{context_text}",
+                f"{base_instruction}\n\nDOCUMENT CONTEXT:\n{context_text}",
             ]
         else:
-            # Fallback: Just general knowledge (File upload removed for speed/simplicity in async)
-            # If you really need file upload here, it will slow down response time significantly.
+            # No chunks at all — document still processing
             system_parts = [
                 base_instruction,
-                "Note: No specific document context was found for this query."
+                (
+                    "Note: The document has not finished processing yet or could not be read. "
+                    "Let the user know their document may still be indexing and to try again shortly. "
+                    "Do NOT say you need content provided — the document was already uploaded."
+                )
             ]
 
-        # --- STRATEGY 3: BUILD HISTORY ---
+        # --- BUILD CHAT HISTORY ---
         history = []
-        # System prompt injected as first user turn
         history.append({"role": "user", "parts": system_parts})
-        history.append({"role": "model", "parts": ["Understood."]})
+        history.append({"role": "model", "parts": ["Understood. I'll answer based on the document context provided."]})
 
         for msg in chat_history:
             role = "user" if msg.get("role") == "user" else "model"
@@ -102,10 +106,9 @@ async def get_gemini_response(user_message, document, chat_history):
             if content:
                 history.append({"role": role, "parts": [content]})
 
-        # --- STRATEGY 4: STREAMING RESPONSE ---
+        # --- STREAM RESPONSE ---
         chat = model.start_chat(history=history)
         
-        # Async stream
         response_stream = await chat.send_message_async(
             user_message, 
             stream=True

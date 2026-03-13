@@ -58,7 +58,7 @@ class DocumentChunk(models.Model):
     )
     content = models.TextField()
     # gemini-embedding-001 and text-embedding-004 use 768 dimensions
-    embedding = VectorField(dimensions=768) 
+    embedding = VectorField(dimensions=3072) 
     chunk_index = models.IntegerField()
 
     page_number = models.IntegerField(null=True, blank=True)

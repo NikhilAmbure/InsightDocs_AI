@@ -33,7 +33,6 @@ def extract_text_from_file(file_path, mime_type):
             with open(file_path, 'r', encoding='utf-8') as f:
                 text = f.read()
 
-        # PowerPoint presentations (ppt / pptx)
         elif 'presentation' in mime_type or mime_type == 'application/vnd.ms-powerpoint':
             prs = Presentation(file_path)
             slide_texts = []
@@ -43,7 +42,6 @@ def extract_text_from_file(file_path, mime_type):
                         slide_texts.append(shape.text)
             text = "\n\n".join(slide_texts)
 
-        # Common image types -> OCR via Tesseract
         elif mime_type.startswith('image/'):
             image = Image.open(file_path)
             text = pytesseract.image_to_string(image)
@@ -57,18 +55,12 @@ def extract_text_from_file(file_path, mime_type):
 def process_document_for_rag(document, file_path):
     """Chunk document and save embeddings."""
     try:
-        # 1. Extract Text
-        mime_type = document.extension
-        
         ext_map = {
-            # Text-like docs
             'pdf': 'application/pdf',
             'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'txt': 'text/plain',
-            # Presentations
             'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
             'ppt': 'application/vnd.ms-powerpoint',
-            # Images
             'jpg': 'image/jpeg',
             'jpeg': 'image/jpeg',
             'png': 'image/png',
@@ -82,7 +74,6 @@ def process_document_for_rag(document, file_path):
             logger.warning(f"No text extracted for doc {document.id}")
             return
 
-        # 2. Split Text
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200,
@@ -91,23 +82,18 @@ def process_document_for_rag(document, file_path):
         chunks = text_splitter.split_text(text)
         logger.info(f"Generated {len(chunks)} chunks for doc {document.id}")
 
-        # 3. Generate Embeddings & Save
-        # NOTE:
-        # - calling the embedding API per chunk for correctness and simplicity.
         objs = []
         for idx, chunk_text in enumerate(chunks):
             if not chunk_text.strip():
                 continue
 
-            # Call Gemini Embedding API
-            # model="models/text-embedding-004" is standard efficient model (768 dim)
+            # ✅ FIX: Use text-embedding-004 consistently (same model used at query time)
             result = genai.embed_content(
-                model="models/embedding-001",
+                model="models/gemini-embedding-001",
                 content=chunk_text,
                 task_type="retrieval_document",
             )
 
-            # Support both dict-like and object-like responses and the ".values" attribute
             if isinstance(result, dict):
                 embedding_obj = result.get("embedding")
             else:
@@ -116,7 +102,6 @@ def process_document_for_rag(document, file_path):
             if embedding_obj is None:
                 raise ValueError("No embedding returned from Gemini for a document chunk.")
 
-            # Some client versions return an object with a `.values` attribute
             embedding = list(getattr(embedding_obj, "values", embedding_obj))
 
             objs.append(

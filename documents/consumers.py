@@ -2,8 +2,11 @@ import asyncio
 import json
 import logging
 
+import google.generativeai as genai
+
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
+from django.conf import settings
 from .models import Document, ChatSession, ChatMessage
 from .utils.gemini_chat import get_gemini_response
 
@@ -40,12 +43,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def disconnect(self, close_code):
         """Handle WebSocket disconnection"""
-        if self.channel_layer is not None:
+        if hasattr(self, "room_group_name") and self.channel_layer is not None:
             await self.channel_layer.group_discard(
                 self.room_group_name,
                 self.channel_name
             )
-        logger.info(f"WebSocket disconnected: {self.user.username} - Code {close_code}")
+
+        logger.info(f"WebSocket disconnected: {self.user} - Code {close_code}")
 
     async def receive(self, text_data):
         """Receive message from WebSocket"""
@@ -201,3 +205,106 @@ class ChatConsumer(AsyncWebsocketConsumer):
         ).count()
         limit = 5000 if self.user.is_premium else 500
         return user_msg_count >= limit
+
+
+# ─────────────────────────────────────────────────────────────────────
+#  Feature 4: AI Document Editor Consumer
+# ─────────────────────────────────────────────────────────────────────
+
+class EditorConsumer(AsyncWebsocketConsumer):
+    """
+    Handles real-time AI editing actions (rewrite, summarize, expand, tone adjust)
+    for the rich text editor. Streams results back to the client.
+    """
+    async def connect(self):
+        self.user = self.scope["user"]
+        self.document_id = self.scope['url_route']['kwargs']['document_id']
+        
+        if not self.user.is_authenticated:
+            await self.close()
+            return
+            
+        has_permission = await self.check_document_permission()
+        if not has_permission:
+            await self.close()
+            return
+
+        await self.accept()
+        logger.info(f"Editor WS connected: {self.user.username} - Doc {self.document_id}")
+
+    async def disconnect(self, close_code):
+        pass
+
+    async def receive(self, text_data):
+        try:
+            data = json.loads(text_data)
+            action = data.get("action")
+            text = data.get("text", "").strip()
+            
+            if not text:
+                return
+                
+            await self.process_editor_action(action, text, data)
+                
+        except json.JSONDecodeError:
+            await self.send_error("Invalid JSON format")
+        except Exception as e:
+            logger.error(f"Editor error: {e}", exc_info=True)
+            await self.send_error("Editor error occurred.")
+
+    async def process_editor_action(self, action, text, data):
+        """Builds prompt based on action and streams Gemini response."""
+        prompt = ""
+        if action == "rewrite":
+            prompt = f"Rewrite the following text to make it clearer and more professional. Return ONLY the rewritten text:\n\n{text}"
+        elif action == "summarize":
+            prompt = f"Summarize the following text concisely. Return ONLY the summary:\n\n{text}"
+        elif action == "expand":
+            prompt = f"Expand the following text with more detail and context while maintaining the original meaning. Return ONLY the expanded text:\n\n{text}"
+        elif action == "adjust_tone":
+            tone = data.get("tone", "professional")
+            prompt = f"Rewrite the following text in a {tone} tone. Return ONLY the rewritten text:\n\n{text}"
+        else:
+            await self.send_error("Unknown editor action.")
+            return
+
+        try:
+            await self.send(text_data=json.dumps({"type": "ai_thinking"}))
+            
+            # Simple wrapper to async query Gemini stream
+            genai.configure(api_key=settings.GOOGLE_API_KEY)
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            
+            # We run the blocking IO in a thread
+            response_stream = await asyncio.to_thread(
+                model.generate_content, 
+                prompt, 
+                stream=True
+            )
+            
+            full_response = ""
+            for chunk in response_stream:
+                if chunk.text:
+                    full_response += chunk.text
+                    await self.send(text_data=json.dumps({
+                        "type": "ai_stream_chunk",
+                        "content": chunk.text,
+                        "action": action
+                    }))
+                    
+            await self.send(text_data=json.dumps({
+                "type": "ai_stream_end",
+                "content": full_response,
+                "action": action
+            }))
+            
+        except Exception as e:
+            logger.error(f"Editor AI Error: {e}", exc_info=True)
+            await self.send_error("Failed to process text with AI.")
+
+    async def send_error(self, message):
+        await self.send(text_data=json.dumps({"type": "error", "message": message}))
+
+    @database_sync_to_async
+    def check_document_permission(self):
+        return Document.objects.filter(id=self.document_id, owner=self.user).exists()
