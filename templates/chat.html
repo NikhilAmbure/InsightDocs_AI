@@ -8,6 +8,7 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -410,12 +411,29 @@
                     <div class="flex-1 overflow-hidden bg-zinc-900 relative group">
                         {# PDF: use built-in browser / Cloudinary PDF viewer #}
                         {% if document.extension == 'pdf' %}
-                            <iframe 
-                                src="{% url 'serve_document' document.id %}" 
-                                class="absolute inset-0 h-full w-full border-none bg-white" 
-                                title="PDF Preview"
-                                onerror="this.style.display='none'; document.getElementById('preview-error').style.display='flex';"
-                            ></iframe>
+                            <div class="absolute inset-0 flex flex-col bg-[#323639]">
+                                <!-- PDF Toolbar -->
+                                <div class="flex items-center justify-between bg-[#2a2e33] px-4 py-2 border-b border-black/20 shrink-0">
+                                    <div class="flex items-center gap-2">
+                                        <button onclick="prevPage()" class="p-1.5 rounded bg-white/5 hover:bg-white/10 text-white transition disabled:opacity-50" id="btn-prev-page"><i class="fa-solid fa-chevron-left text-xs"></i></button>
+                                        <span class="text-xs text-zinc-300 font-medium whitespace-nowrap"><span id="page-num">0</span> / <span id="page-count">0</span></span>
+                                        <button onclick="nextPage()" class="p-1.5 rounded bg-white/5 hover:bg-white/10 text-white transition disabled:opacity-50" id="btn-next-page"><i class="fa-solid fa-chevron-right text-xs"></i></button>
+                                    </div>
+                                    <div class="flex items-center gap-2 border-l border-white/10 pl-4 ml-2">
+                                        <button onclick="zoomOut()" class="p-1.5 rounded bg-white/5 hover:bg-white/10 text-white transition"><i class="fa-solid fa-minus text-xs"></i></button>
+                                        <span class="text-xs text-zinc-300 font-medium w-12 text-center" id="zoom-level">100%</span>
+                                        <button onclick="zoomIn()" class="p-1.5 rounded bg-white/5 hover:bg-white/10 text-white transition"><i class="fa-solid fa-plus text-xs"></i></button>
+                                    </div>
+                                </div>
+                                <div id="pdf-viewer-container" class="flex-1 overflow-auto p-4 flex flex-col items-center relative">
+                                    <!-- PDF Single Page Renders Here via JS -->
+                                    <canvas id="pdf-single-page" class="max-w-none bg-white shadow-xl shadow-black/50 transition-transform origin-top"></canvas>
+                                </div>
+                            </div>
+                            <div id="pdf-loading-indicator" class="absolute inset-0 flex flex-col items-center justify-center bg-[#323639] z-10 transition-opacity">
+                                <div class="w-8 h-8 rounded-full border-t-2 border-violet-500 animate-spin mb-4"></div>
+                                <p class="text-xs text-zinc-400">Loading document viewer...</p>
+                            </div>
 
                         {# Images: show contained image, not zoomed #}
                         {% elif document.extension == 'jpg' or document.extension == 'jpeg' or document.extension == 'png' or document.extension == 'gif' or document.extension == 'webp' %}
@@ -643,13 +661,17 @@
             return activeAssistantMsgEl;
         }
 
+        function formatCitations(text) {
+            return text.replace(/\[Page\s+(\d+)\]/gi, '<button onclick="scrollToPage($1)" class="text-[10px] ml-1 px-1.5 py-0.5 rounded-md bg-violet-500/20 text-violet-300 hover:bg-violet-500/40 hover:text-white transition-colors cursor-pointer border border-violet-500/30 font-medium align-middle inline-flex items-center gap-1"><i class="fa-solid fa-file-pdf text-[9px]"></i> Page $1</button>');
+        }
+
         function appendAiStreamChunk(chunk) {
             removeLoadingIndicator(); // hide loader as soon as text starts streaming
             const container = ensureAssistantStreamContainer();
             const contentDiv = container.querySelector('#ai-stream-content');
             activeAssistantContent += chunk;
             if (contentDiv) {
-                contentDiv.innerHTML = marked.parse(activeAssistantContent);
+                contentDiv.innerHTML = marked.parse(formatCitations(activeAssistantContent));
             }
             scrollToBottom();
         }
@@ -660,7 +682,7 @@
             const contentDiv = container.querySelector('#ai-stream-content');
             activeAssistantContent = data.content || activeAssistantContent;
             if (contentDiv) {
-                contentDiv.innerHTML = marked.parse(activeAssistantContent || '');
+                contentDiv.innerHTML = marked.parse(formatCitations(activeAssistantContent || ''));
             }
             if (data.id) {
                 container.id = `msg-${data.id}`;
@@ -829,7 +851,7 @@
                                 </div>
                             </div>
                             <div class="bg-transparent text-sm text-zinc-200 markdown-body">
-                                <div class="markdown-content">${marked.parse(content)}</div>
+                                <div class="markdown-content">${marked.parse(formatCitations(content))}</div>
                             </div>
                             <div class="flex items-center gap-3 mt-3">
                                 <button onclick="copyMessage(this)" class="group/btn flex items-center gap-1.5 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors">
@@ -1003,7 +1025,139 @@
             renderMarkdown();
             scrollToBottom();
             loadEditableDocument();
+            initPdfViewer();
         });
+
+        let thePdf = null;
+        let pdfCurrentPage = 1;
+        let pdfScale = 0.8;
+        let pdfCanvas = null;
+        let pdfCtx = null;
+        let isPdfRendering = false;
+        let pdfPagePending = null;
+
+        function initPdfViewer() {
+            {% if document.extension == 'pdf' %}
+            const pdfUrl = "{% url 'serve_document' document.id %}";
+            const pdfjsLib = window['pdfjs-dist/build/pdf'];
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+            const container = document.getElementById('pdf-viewer-container');
+            const loadingIndicator = document.getElementById('pdf-loading-indicator');
+            pdfCanvas = document.getElementById('pdf-single-page');
+            if (pdfCanvas) pdfCtx = pdfCanvas.getContext('2d');
+
+            pdfjsLib.getDocument(pdfUrl).promise.then(function(pdf) {
+                thePdf = pdf;
+                document.getElementById('page-count').textContent = pdf.numPages;
+                
+                if(loadingIndicator) loadingIndicator.style.opacity = '0';
+                setTimeout(() => { if(loadingIndicator) loadingIndicator.style.display = 'none'; }, 300);
+
+                renderPage(pdfCurrentPage);
+            }).catch(error => {
+                console.error('Error loading PDF:', error);
+                if(loadingIndicator) loadingIndicator.innerHTML = '<p class="text-xs text-red-400">Failed to load PDF viewer. Please download the document instead.</p>';
+            });
+            {% endif %}
+        }
+
+        function renderPage(num) {
+            if (!thePdf) return;
+            if (isPdfRendering) {
+                pdfPagePending = num;
+                return;
+            }
+            isPdfRendering = true;
+            
+            thePdf.getPage(num).then(function(page) {
+                let viewport = page.getViewport({ scale: pdfScale });
+                
+                // Fetch the resolution ratio for high-DPI (retina) screens
+                const outputScale = window.devicePixelRatio || 1;
+                
+                pdfCanvas.height = viewport.height * outputScale;
+                pdfCanvas.width = viewport.width * outputScale;
+                // Enforce strict CSS styling boundaries that map to 1x scale 
+                pdfCanvas.style.height = `${viewport.height}px`;
+                pdfCanvas.style.width = `${viewport.width}px`;
+                
+                pdfCtx.setTransform(outputScale, 0, 0, outputScale, 0, 0);
+
+                let renderContext = {
+                    canvasContext: pdfCtx,
+                    viewport: viewport
+                };
+                
+                let renderTask = page.render(renderContext);
+                renderTask.promise.then(function() {
+                    isPdfRendering = false;
+                    if (pdfPagePending !== null) {
+                        renderPage(pdfPagePending);
+                        pdfPagePending = null;
+                    }
+                });
+            });
+
+            const pageNumEl = document.getElementById('page-num');
+            if (pageNumEl) pageNumEl.textContent = num;
+            
+            const zoomLevelEl = document.getElementById('zoom-level');
+            if (zoomLevelEl) zoomLevelEl.textContent = Math.round(pdfScale * 100) + '%';
+            
+            const btnPrev = document.getElementById('btn-prev-page');
+            const btnNext = document.getElementById('btn-next-page');
+            if (btnPrev) btnPrev.disabled = num <= 1;
+            if (btnNext) btnNext.disabled = num >= thePdf.numPages;
+        }
+
+        function prevPage() {
+            if (pdfCurrentPage <= 1) return;
+            pdfCurrentPage--;
+            renderPage(pdfCurrentPage);
+        }
+
+        function nextPage() {
+            if (pdfCurrentPage >= thePdf.numPages) return;
+            pdfCurrentPage++;
+            renderPage(pdfCurrentPage);
+        }
+
+        function zoomIn() {
+            if (pdfScale >= 3.0) return;
+            pdfScale += 0.2;
+            renderPage(pdfCurrentPage);
+        }
+
+        function zoomOut() {
+            if (pdfScale <= 0.4) return;
+            pdfScale -= 0.2;
+            renderPage(pdfCurrentPage);
+        }
+
+        function scrollToPage(pageNum) {
+            if (window.innerWidth < 1024) {
+                switchMobileTab('doc');
+            } else {
+                const docWrapper = document.getElementById('doc-view-wrapper');
+                if (docWrapper.style.display === 'none' || docWrapper.classList.contains('hidden')) {
+                    toggleDesktopDocPanel();
+                }
+            }
+
+            if (thePdf && pageNum >= 1 && pageNum <= thePdf.numPages) {
+                pdfCurrentPage = parseInt(pageNum);
+                renderPage(pdfCurrentPage);
+                
+                const container = document.getElementById('pdf-viewer-container');
+                if (container) setTimeout(() => { container.scrollTop = 0; container.scrollLeft = 0; }, 100);
+                
+                if (pdfCanvas) {
+                    pdfCanvas.classList.add('ring-4', 'ring-violet-500');
+                    setTimeout(() => pdfCanvas.classList.remove('ring-4', 'ring-violet-500'), 2000);
+                }
+            }
+        }
 
         function renderMarkdown() {
             document.querySelectorAll('.markdown-content').forEach(el => {

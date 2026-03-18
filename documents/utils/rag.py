@@ -17,40 +17,40 @@ genai.configure(api_key=settings.GOOGLE_API_KEY)
 
 def extract_text_from_file(file_path, mime_type):
     """Extract text content based on file type."""
-    text = ""
+    pages = []
     try:
         if mime_type == 'application/pdf':
             with fitz.open(file_path) as doc:
-                for page in doc:
-                    text += page.get_text()
+                for idx, page in enumerate(doc):
+                    pages.append({"text": page.get_text(), "page_number": idx + 1})
         
         elif 'wordprocessing' in mime_type or mime_type == 'application/msword':
             doc = DocxDocument(file_path)
-            for para in doc.paragraphs:
-                text += para.text + "\n"
+            text = "\n".join([para.text for para in doc.paragraphs])
+            pages.append({"text": text, "page_number": 1})
         
         elif mime_type == 'text/plain':
             with open(file_path, 'r', encoding='utf-8') as f:
-                text = f.read()
+                pages.append({"text": f.read(), "page_number": 1})
 
         elif 'presentation' in mime_type or mime_type == 'application/vnd.ms-powerpoint':
             prs = Presentation(file_path)
-            slide_texts = []
-            for slide in prs.slides:
+            for idx, slide in enumerate(prs.slides):
+                slide_texts = []
                 for shape in slide.shapes:
                     if hasattr(shape, "text") and shape.text:
                         slide_texts.append(shape.text)
-            text = "\n\n".join(slide_texts)
+                pages.append({"text": "\n\n".join(slide_texts), "page_number": idx + 1})
 
         elif mime_type.startswith('image/'):
             image = Image.open(file_path)
-            text = pytesseract.image_to_string(image)
+            pages.append({"text": pytesseract.image_to_string(image), "page_number": 1})
                 
     except Exception as e:
         logger.error(f"Error extracting text: {e}")
         return None
         
-    return text
+    return pages
 
 def process_document_for_rag(document, file_path):
     """Chunk document and save embeddings."""
@@ -69,8 +69,8 @@ def process_document_for_rag(document, file_path):
         }
         mime_type = ext_map.get(document.extension, 'application/octet-stream')
         
-        text = extract_text_from_file(file_path, mime_type)
-        if not text:
+        pages_data = extract_text_from_file(file_path, mime_type)
+        if not pages_data:
             logger.warning(f"No text extracted for doc {document.id}")
             return
 
@@ -79,39 +79,49 @@ def process_document_for_rag(document, file_path):
             chunk_overlap=200,
             separators=["\n\n", "\n", ".", " ", ""]
         )
-        chunks = text_splitter.split_text(text)
-        logger.info(f"Generated {len(chunks)} chunks for doc {document.id}")
 
         objs = []
-        for idx, chunk_text in enumerate(chunks):
-            if not chunk_text.strip():
+        chunk_index = 0
+        for page_data in pages_data:
+            page_text = page_data["text"]
+            page_num = page_data["page_number"]
+            if not page_text.strip():
                 continue
 
-            # ✅ FIX: Use text-embedding-004 consistently (same model used at query time)
-            result = genai.embed_content(
-                model="models/gemini-embedding-001",
-                content=chunk_text,
-                task_type="retrieval_document",
-            )
+            chunks = text_splitter.split_text(page_text)
+            for chunk_text in chunks:
+                if not chunk_text.strip():
+                    continue
 
-            if isinstance(result, dict):
-                embedding_obj = result.get("embedding")
-            else:
-                embedding_obj = getattr(result, "embedding", None)
-
-            if embedding_obj is None:
-                raise ValueError("No embedding returned from Gemini for a document chunk.")
-
-            embedding = list(getattr(embedding_obj, "values", embedding_obj))
-
-            objs.append(
-                DocumentChunk(
-                    document=document,
+                # ✅ FIX: Use text-embedding-004 consistently (same model used at query time)
+                result = genai.embed_content(
+                    model="models/gemini-embedding-001",
                     content=chunk_text,
-                    embedding=embedding,
-                    chunk_index=idx,
+                    task_type="retrieval_document",
                 )
-            )
+
+                if isinstance(result, dict):
+                    embedding_obj = result.get("embedding")
+                else:
+                    embedding_obj = getattr(result, "embedding", None)
+
+                if embedding_obj is None:
+                    raise ValueError("No embedding returned from Gemini for a document chunk.")
+
+                embedding = list(getattr(embedding_obj, "values", embedding_obj))
+
+                objs.append(
+                    DocumentChunk(
+                        document=document,
+                        content=chunk_text,
+                        embedding=embedding,
+                        chunk_index=chunk_index,
+                        page_number=page_num,
+                    )
+                )
+                chunk_index += 1
+
+        logger.info(f"Generated {chunk_index} chunks for doc {document.id}")
 
         if objs:
             DocumentChunk.objects.bulk_create(objs)

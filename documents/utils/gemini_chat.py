@@ -2,6 +2,8 @@ import google.generativeai as genai
 import logging
 import asyncio
 
+from google.api_core.exceptions import ResourceExhausted
+
 from django.conf import settings
 from pgvector.django import L2Distance
 from ..models import DocumentChunk
@@ -39,7 +41,13 @@ async def get_gemini_response(user_message, document, chat_history):
                 .order_by('distance')[:5]
             
             if chunks.exists():
-                return "\n\n".join([c.content for c in chunks])
+                context_parts = []
+                for c in chunks:
+                    if c.page_number is not None:
+                        context_parts.append(f"[Page {c.page_number}]: {c.content}")
+                    else:
+                        context_parts.append(f"{c.content}")
+                return "\n\n".join(context_parts)
             return None
 
         context_text = await asyncio.to_thread(perform_rag_search)
@@ -53,7 +61,13 @@ async def get_gemini_response(user_message, document, chat_history):
             def get_all_chunks():
                 chunks = DocumentChunk.objects.filter(document=document).order_by('chunk_index')[:20]
                 if chunks.exists():
-                    return "\n\n".join([c.content for c in chunks])
+                    context_parts = []
+                    for c in chunks:
+                        if c.page_number is not None:
+                            context_parts.append(f"[Page {c.page_number}]: {c.content}")
+                        else:
+                            context_parts.append(f"{c.content}")
+                    return "\n\n".join(context_parts)
                 return None
 
             context_text = await asyncio.to_thread(get_all_chunks)
@@ -72,6 +86,7 @@ async def get_gemini_response(user_message, document, chat_history):
             "3. Logical reasoning based on the user's question\n\n"
             "Rules:\n"
             "- If the answer is found in the document context, answer strictly from it.\n"
+            "- Please include inline citations to the document pages when answering. If the context has [Page X]: ..., cite it as [Page X] at the end of the relevant sentence.\n"
             "- If the document does NOT contain the answer, answer using general knowledge.\n"
             "- If answering from general knowledge, explicitly say: "
             "'This answer is based on general knowledge, not the document.'\n"
@@ -118,6 +133,9 @@ async def get_gemini_response(user_message, document, chat_history):
             if chunk.text:
                 yield chunk.text
 
+    except ResourceExhausted:
+        logger.warning(f"Gemini API rate limit exceeded for doc {document.id}.")
+        yield "⚠️ **API Limit Reached.** The AI service is currently experiencing high demand. Please try asking your question again in a few moments."
     except Exception as e:
         logger.error(f"Gemini Error: {e}", exc_info=True)
-        yield f"Error: {str(e)}"
+        yield f"⚠️ **An error occurred.** We could not process your request at this time. Please try again later."

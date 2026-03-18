@@ -3,6 +3,7 @@ import json
 import logging
 
 import google.generativeai as genai
+from google.api_core.exceptions import ResourceExhausted
 
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
@@ -298,9 +299,12 @@ class EditorConsumer(AsyncWebsocketConsumer):
                 "action": action
             }))
             
+        except ResourceExhausted:
+            logger.warning(f"Gemini API rate limit exceeded in editor: {action}")
+            await self.send_error("API Limit Reached. The AI service is currently experiencing high demand. Please try again in a few moments.")
         except Exception as e:
             logger.error(f"Editor AI Error: {e}", exc_info=True)
-            await self.send_error("Failed to process text with AI.")
+            await self.send_error("Failed to process text with AI. Please try again later.")
 
     async def send_error(self, message):
         await self.send(text_data=json.dumps({"type": "error", "message": message}))
