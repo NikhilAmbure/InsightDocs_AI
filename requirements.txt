@@ -82,3 +82,13 @@ pgvector==0.3.6
 langchain-text-splitters==0.3.5
 razorpay==1.4.2
 pytesseract==0.3.10
+python-pptx==1.0.2
+Pillow==10.2.0
+
+# --- Missing Real-time & Vector Support ---
+channels-redis==4.2.0
+pgvector==0.3.6
+
+# --- Missing AI & RAG Utilities ---
+langchain-text-splitters==0.3.5
+google-generativeai==0.8.5
