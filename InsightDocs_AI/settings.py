@@ -154,35 +154,35 @@ CSRF_TRUSTED_ORIGINS = [
 
 # Database
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": "insightdocs_db",
-        "USER": "postgres",
-        "PASSWORD": "postgres",
-        "HOST": "localhost",
-        "PORT": "5433",
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.postgresql",
+#         "NAME": "insightdocs_db",
+#         "USER": "postgres",
+#         "PASSWORD": "postgres",
+#         "HOST": "localhost",
+#         "PORT": "5433",
+#     }
+# }
+
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+if DEBUG:
+    # dev: fallback to sqlite if DATABASE_URL missing
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=os.environ.get("DATABASE_URL", "sqlite:///db.sqlite3")
+        )
     }
-}
-
-# DATABASE_URL = os.environ.get("DATABASE_URL")
-
-# if DEBUG:
-#     # dev: fallback to sqlite if DATABASE_URL missing
-#     DATABASES = {
-#         "default": dj_database_url.config(
-#             default=os.environ.get("DATABASE_URL", "sqlite:///db.sqlite3")
-#         )
-#     }
-# else:
-#     # production: require DATABASE_URL explicitly
-#     if not DATABASE_URL:
-#         raise ImproperlyConfigured(
-#             "DATABASE_URL is required in production. Set it in environment variables."
-#         )
-#     DATABASES = {
-#         "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=False)
-#     }
+else:
+    # production: require DATABASE_URL explicitly
+    if not DATABASE_URL:
+        raise ImproperlyConfigured(
+            "DATABASE_URL is required in production. Set it in environment variables."
+        )
+    DATABASES = {
+        "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=False)
+    }
     
 STORAGES = {
     # Media files (Images, PDFs) -> Cloudinary
