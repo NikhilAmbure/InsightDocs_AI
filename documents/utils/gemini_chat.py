@@ -29,10 +29,11 @@ async def get_gemini_response(user_message, document, chat_history):
                 logger.warning(f"Doc {document.id} not yet processed for RAG.")
                 return None
             
-            result = genai.embed_content(
+            result = genai.embed_content( 
                 model="models/gemini-embedding-001",  # ✅ Same model as indexing
                 content=user_message,
-                task_type="retrieval_query"
+                task_type="retrieval_query",
+                output_dimensionality=3072
             )
             query_embedding = result['embedding']
 
@@ -130,8 +131,13 @@ async def get_gemini_response(user_message, document, chat_history):
         )
 
         async for chunk in response_stream:
-            if chunk.text:
-                yield chunk.text
+            try:
+                if chunk.text:
+                    yield chunk.text
+            except (ValueError, AttributeError):
+                # Last chunk may have finish_reason=STOP with no text parts;
+                # chunk.text raises ValueError in that case — safe to skip.
+                pass
 
     except ResourceExhausted:
         logger.warning(f"Gemini API rate limit exceeded for doc {document.id}.")

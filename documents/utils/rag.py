@@ -44,7 +44,33 @@ def extract_text_from_file(file_path, mime_type):
 
         elif mime_type.startswith('image/'):
             image = Image.open(file_path)
-            pages.append({"text": pytesseract.image_to_string(image), "page_number": 1})
+            text = ""
+            # Try Tesseract OCR first
+            try:
+                text = pytesseract.image_to_string(image)
+            except Exception as ocr_err:
+                logger.warning(f"Tesseract OCR failed: {ocr_err}")
+            
+            # Fallback: use Gemini Vision if OCR returned nothing useful
+            if not text or not text.strip():
+                try:
+                    logger.info("Using Gemini Vision to extract text from image...")
+                    vision_model = genai.GenerativeModel("gemini-2.5-flash")
+                    img_for_gemini = Image.open(file_path)
+                    vision_response = vision_model.generate_content(
+                        [
+                            "Extract ALL text visible in this image. If it's a diagram or chart, "
+                            "describe its contents in detail. Return only the extracted text/description.",
+                            img_for_gemini,
+                        ]
+                    )
+                    text = vision_response.text if vision_response.text else ""
+                except Exception as vision_err:
+                    logger.error(f"Gemini Vision fallback also failed: {vision_err}")
+                    text = ""
+            
+            if text.strip():
+                pages.append({"text": text, "page_number": 1})
                 
     except Exception as e:
         logger.error(f"Error extracting text: {e}")
@@ -98,6 +124,7 @@ def process_document_for_rag(document, file_path):
                     model="models/gemini-embedding-001",
                     content=chunk_text,
                     task_type="retrieval_document",
+                    output_dimensionality=3072
                 )
 
                 if isinstance(result, dict):

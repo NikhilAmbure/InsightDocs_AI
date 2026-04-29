@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InsightDocs AI | Intelligent Document Analysis</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23a78bfa;stop-opacity:1'/%3E%3Cstop offset='100%25' style='stop-color:%237c3aed;stop-opacity:1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='0' y='0' width='64' height='64' rx='16' fill='%23020617'/%3E%3Cpath d='M32 14L50 23V41L32 50L14 41V23Z' fill='url(%23g)' stroke='%23ddd6fe' stroke-width='2'/%3E%3Cpath d='M32 50V32M32 32L50 23M32 32L14 23' stroke='%23ddd6fe' stroke-width='2'/%3E%3C/svg%3E"
+        type="image/svg+xml">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        background: '#020617', // Deeper, darker blue/black
+                        surface: 'rgba(15, 23, 42, 0.6)',
+                        magic: '#8b5cf6',
+                    },
+                    animation: {
+                        'float-slow': 'float 8s ease-in-out infinite',
+                        'float-medium': 'float 6s ease-in-out infinite',
+                        'pulse-deep': 'pulse 6s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'gradient-x': 'gradient-x 5s ease infinite',
+                        'spin-slow': 'spin 4s linear infinite',
+                        'nebula-shift': 'nebula 20s ease infinite alternate',
+                        'cursor-blink': 'blink 1s step-end infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-15px)' },
+                        },
+                        'gradient-x': {
+                            '0%, 100%': {
+                                'background-size': '200% 200%',
+                                'background-position': 'left center'
+                            },
+                            '50%': {
+                                'background-size': '200% 200%',
+                                'background-position': 'right center'
+                            },
+                        },
+                        nebula: {
+                            '0%': { transform: 'translate(0, 0) scale(1)' },
+                            '100%': { transform: 'translate(10%, 10%) scale(1.1)' },
+                        },
+                        blink: {
+                            '0%, 100%': { opacity: '1' },
+                            '50%': { opacity: '0' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #020617;
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+
+        /* Cinematic Noise Overlay */
+        .bg-noise {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.04;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        /* Deep Magic Text Gradient */
+        .text-gradient-magic {
+            background: linear-gradient(to right, #a78bfa, #f472b6, #38bdf8, #a78bfa);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradient-x 5s linear infinite;
+            filter: drop-shadow(0 0 8px rgba(167, 139, 250, 0.3));
+        }
+
+        /* Magical Conic Button */
+        .btn-conic {
+            position: relative;
+            z-index: 0;
+            overflow: hidden;
+            padding: 2px;
+            border-radius: 9999px;
+        }
+
+        .btn-conic::before {
+            content: '';
+            position: absolute;
+            z-index: -2;
+            left: -50%;
+            top: -50%;
+            width: 200%;
+            height: 200%;
+            background-repeat: no-repeat;
+            background-size: 50% 50%, 50% 50%;
+            background-position: 0 0, 100% 0, 100% 100%, 0 100%;
+            background-image: conic-gradient(transparent, #8b5cf6, #f472b6, transparent 30%);
+            animation: spin-slow 4s linear infinite;
+        }
+
+        .btn-conic-inner {
+            background-color: #0f172a;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            width: 100%;
+            transition: background-color 0.3s;
+        }
+
+        .btn-conic:hover .btn-conic-inner {
+            background-color: #1e293b;
+        }
+
+        /* Enhanced Glass Spotlight */
+        .spotlight-card {
+            position: relative;
+            background: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            overflow: hidden;
+            transition: all 0.5s ease;
+        }
+
+        .spotlight-card:hover {
+            border-color: rgba(139, 92, 246, 0.3);
+            box-shadow: 0 0 30px -5px rgba(139, 92, 246, 0.2);
+        }
+
+        .spotlight-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(500px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+                    rgba(139, 92, 246, 0.15),
+                    rgba(56, 189, 248, 0.05),
+                    transparent 50%);
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .spotlight-card:hover::before {
+            opacity: 1;
+        }
+
+
+        /* Scroll Reveal */
+        .reveal-up {
+            opacity: 0;
+            transform: translateY(40px) scale(0.98);
+            filter: blur(12px);
+            transition: all 1s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .reveal-up.active {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            filter: blur(0);
+        }
+
+        /* Glowing Divider */
+        .glow-divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.5), transparent);
+        }
+
+        /* Animation Utilities for Product Demo */
+        .typing-cursor::after {
+            content: '|';
+            animation: blink 1s step-end infinite;
+            color: #a78bfa;
+        }
+
+        .shimmer-text {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .shimmer-text::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 50%;
+            height: 100%;
+            background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.1), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            100% {
+                left: 150%;
+            }
+        }
+    </style>
+</head>
+
+<body class="antialiased selection:bg-violet-500/30 selection:text-violet-200">
+
+    <div class="bg-noise"></div>
+
+    <div class="fixed inset-0 pointer-events-none -z-10 overflow-hidden bg-background">
+        <div
+            class="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] bg-violet-800/20 rounded-full blur-[120px] animate-nebula-shift opacity-60">
+        </div>
+        <div class="absolute bottom-[-20%] right-[-10%] w-[70%] h-[70%] bg-fuchsia-800/20 rounded-full blur-[120px] animate-nebula-shift opacity-60"
+            style="animation-delay: -5s;"></div>
+        <div
+            class="absolute top-[40%] left-[30%] w-[50%] h-[50%] bg-sky-800/20 rounded-full blur-[120px] animate-pulse-deep opacity-40">
+        </div>
+    </div>
+
+    <nav class="fixed w-full z-50 transition-all duration-500 border-b border-transparent py-2" id="navbar">
+        <div class="absolute inset-0 bg-background/20 backdrop-blur-xl -z-10 transition-all duration-500"
+            id="navbar-bg"></div>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center gap-2 cursor-pointer group">
+                    <div
+                        class="relative w-9 h-9 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                        <div
+                            class="absolute inset-0 bg-violet-500 rounded-xl blur-md opacity-50 group-hover:opacity-80 transition-opacity">
+                        </div>
+                        <div
+                            class="relative w-full h-full bg-gradient-to-br from-violet-600 to-indigo-600 rounded-xl flex items-center justify-center border border-white/10 shadow-lg shadow-violet-500/20">
+                            <i class="fa-solid fa-cube text-white text-sm"></i>
+                        </div>
+                    </div>
+                    <span
+                        class="font-display font-bold text-xl tracking-tight text-white drop-shadow-[0_0_10px_rgba(167,139,250,0.5)]">InsightDocs<span
+                            class="text-violet-400">.ai</span></span>
+                </div>
+
+                <div class="hidden md:flex items-center gap-8">
+                    <a href="#demo-workspace"
+                        class="text-sm font-medium text-slate-300/80 hover:text-violet-300 hover:drop-shadow-[0_0_6px_rgba(167,139,250,0.6)] transition-all">Demo</a>
+                    
+                    <a href="#features"
+                        class="text-sm font-medium text-slate-300/80 hover:text-violet-300 hover:drop-shadow-[0_0_6px_rgba(167,139,250,0.6)] transition-all">Features</a>
+                    <a href="#how-it-works"
+                        class="text-sm font-medium text-slate-300/80 hover:text-violet-300 hover:drop-shadow-[0_0_6px_rgba(167,139,250,0.6)] transition-all">Process</a>
+                </div>
+
+                <div class="hidden md:flex items-center gap-4">
+                    <a href="coming-soon.html" class="text-sm font-medium text-slate-300/80 hover:text-white transition-colors">Sign
+                        In</a>
+                    <a href="coming-soon.html"
+                        class="group relative inline-flex items-center justify-center overflow-hidden rounded-full p-0.5 font-bold text-white shadow-2xl hover:shadow-violet-500/50 transition-shadow duration-300">
+                        <span
+                            class="absolute inset-[-1000%] animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#E2CBFF_0%,#393BB2_50%,#E2CBFF_100%)]"></span>
+                        <span
+                            class="inline-flex h-full w-full cursor-pointer items-center justify-center rounded-full bg-slate-950/90 px-5 py-2 text-xs backdrop-blur-3xl transition-all group-hover:bg-slate-900/90">
+                            Get Started
+                        </span>
+                    </a>
+                </div>
+
+                <button id="mobile-toggle"
+                    class="md:hidden text-slate-300 p-2 focus:outline-none hover:text-white transition-colors">
+                    <i class="fa-solid fa-bars text-xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <div id="mobile-menu"
+            class="hidden md:hidden border-t border-white/5 bg-background/95 backdrop-blur-2xl absolute w-full left-0 top-20 transition-all duration-300">
+            <div class="p-4 space-y-4">
+                <a href="#demo-workspace" class="block text-slate-300 font-medium text-sm hover:text-violet-300">Demo</a>
+                <a href="#features" class="block text-slate-300 font-medium text-sm hover:text-violet-300">Features</a>
+                <a href="#how-it-works"
+                    class="block text-slate-300 font-medium text-sm hover:text-violet-300">Process</a>
+                <a href="coming-soon.html"
+                    class="block w-full text-center py-3 bg-violet-600/80 hover:bg-violet-500 rounded-xl text-white font-bold text-sm transition-colors shadow-lg shadow-violet-900/20">Get
+                    Started</a>
+            </div>
+        </div>
+    </nav>
+
+    <section class="pt-24 pb-20 lg:pt-32 lg:pb-32 relative overflow-hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center z-10 relative">
+
+            <div
+                class="reveal-up inline-flex items-center gap-3 px-4 py-1.5 rounded-full border border-amber-400/20 bg-amber-400/5 text-amber-200/90 text-[11px] md:text-xs font-medium mb-8 hover:border-amber-400/40 hover:bg-amber-400/10 transition-all duration-300 cursor-pointer group shadow-[0_0_20px_-5px_rgba(251,191,36,0.2)]">
+                <span class="relative flex h-2.5 w-2.5">
+                    <span
+                        class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span
+                        class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500 shadow-[0_0_10px_rgba(251,191,36,0.8)]"></span>
+                </span>
+                Now Available: Intelligent Document Chat
+            </div>
+
+            <h1
+                class="reveal-up delay-100 font-display text-5xl sm:text-6xl md:text-8xl font-extrabold tracking-tight mb-8 leading-[1.1] md:leading-[1.05] drop-shadow-2xl">
+                Chat with your data, <br class="hidden md:block" />
+                <span class="text-gradient-magic relative z-10">Instant answers.</span>
+            </h1>
+
+            <p
+                class="reveal-up delay-200 mt-4 text-lg md:text-xl text-slate-400/90 max-w-2xl mx-auto mb-12 leading-relaxed px-4 font-light">
+                Transform static documents into active conversations. Upload contracts, research, or reports and let our
+                AI extract knowledge in seconds.
+            </p>
+
+            <div class="reveal-up delay-300 flex justify-center mb-20 px-6 relative z-20">
+                <a href="coming-soon.html" class="btn-conic group w-full sm:w-auto">
+                    <span
+                        class="btn-conic-inner px-8 py-4 text-white font-bold text-base sm:text-lg shadow-2xl shadow-violet-500/20 group-hover:shadow-violet-500/40 transition-shadow gap-3">
+                        Start Analyzing Free <i
+                            class="fa-solid fa-sparkles text-violet-200 group-hover:rotate-12 transition-transform duration-500"></i>
+                    </span>
+                </a>
+            </div>
+
+            <div class="reveal-up delay-500 relative mx-auto max-w-5xl animate-float-medium px-2 z-10"
+                id="demo-container">
+                <div
+                    class="absolute -inset-4 bg-gradient-to-r from-violet-600/30 via-fuchsia-500/30 to-sky-500/30 rounded-[2rem] blur-3xl -z-10 opacity-60 animate-pulse-deep">
+                </div>
+                <div
+                    class="absolute -inset-1 bg-gradient-to-b from-white/10 to-transparent rounded-[2rem] blur-sm -z-10">
+                </div>
+
+                <div
+                    class="bg-slate-900/70 backdrop-blur-xl border border-white/10 rounded-2xl md:rounded-[2rem] overflow-hidden shadow-[0_0_50px_-10px_rgba(139,92,246,0.3)] ring-1 ring-white/5 relative z-10">
+
+                    <div class="h-9 md:h-11 bg-slate-950/50 border-b border-white/5 flex items-center px-4 gap-3">
+                        <div class="flex gap-2">
+                            <div
+                                class="w-2.5 h-2.5 rounded-full bg-red-500/30 border border-red-500/60 shadow-[0_0_5px_rgba(239,68,68,0.5)]">
+                            </div>
+                            <div
+                                class="w-2.5 h-2.5 rounded-full bg-amber-500/30 border border-amber-500/60 shadow-[0_0_5px_rgba(245,158,11,0.5)]">
+                            </div>
+                            <div
+                                class="w-2.5 h-2.5 rounded-full bg-emerald-500/30 border border-emerald-500/60 shadow-[0_0_5px_rgba(16,185,129,0.5)]">
+                            </div>
+                        </div>
+                        <div
+                            class="mx-auto text-[10px] md:text-xs text-slate-400/80 font-mono flex items-center gap-2 opacity-70">
+                            <i class="fa-solid fa-lock text-[8px]"></i> insightdocs.ai/app/workspace
+                        </div>
+                    </div>
+
+                    <div class="h-[400px] md:h-[550px] relative w-full overflow-hidden">
+                        <div id="upload-view" class="absolute inset-0 flex flex-col items-center justify-center p-8 transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] z-20">
+                           <div class="w-full max-w-md bg-slate-800/40 border border-white/10 border-dashed rounded-2xl p-8 md:p-12 flex flex-col items-center text-center backdrop-blur-sm group hover:border-violet-500/30 transition-colors">
+                                <div class="w-16 h-16 rounded-full bg-violet-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-500">
+                                    <i class="fa-solid fa-cloud-arrow-up text-2xl text-violet-300 drop-shadow-[0_0_10px_rgba(167,139,250,0.5)]"></i>
+                                </div>
+                                <h3 class="text-white font-display font-semibold text-lg mb-2">Upload your document</h3>
+                                <p class="text-slate-400 text-sm mb-6">PDF, DOCX, or TXT (Max 50MB)</p>
+                                <div id="file-upload-ui" class="w-full bg-slate-900/60 rounded-lg p-3 border border-white/5 relative overflow-hidden hidden">
+                                    <div class="flex items-center gap-3 relative z-10">
+                                        <i class="fa-regular fa-file-pdf text-red-400"></i>
+                                        <span class="text-xs text-slate-200">Q3_Financial_Report.pdf</span>
+                                        <i class="fa-solid fa-check text-emerald-400 ml-auto opacity-0 transition-opacity duration-300 text-xs" id="upload-check"></i>
+                                    </div>
+                                    <div class="absolute bottom-0 left-0 h-1 bg-violet-500 transition-all duration-[1500ms] ease-out w-0" id="upload-progress"></div>
+                                </div>
+                                <button id="fake-browse-btn" class="px-6 py-2 rounded-lg bg-violet-600/80 hover:bg-violet-600 text-white text-sm font-medium transition-all shadow-lg shadow-violet-500/10">Browse Files</button>
+                            </div>
+                        </div>
+
+                        <div id="app-view" class="absolute inset-0 flex opacity-0 scale-95 transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]">
+                            <div class="hidden md:block w-[45%] bg-slate-950/30 border-r border-white/5 p-6 space-y-4 overflow-hidden relative">
+                                <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px] z-10 pointer-events-none opacity-0 transition-opacity duration-500" id="doc-highlight-overlay"></div>
+                                <div class="w-2/3 h-4 bg-slate-700/30 rounded mb-6 animate-pulse"></div>
+                                <div class="space-y-2 opacity-50">
+                                    <div class="w-full h-2 bg-slate-700/20 rounded"></div>
+                                    <div class="w-full h-2 bg-slate-700/20 rounded"></div>
+                                    <div class="w-3/4 h-2 bg-slate-700/20 rounded"></div>
+                                </div>
+                                <div class="space-y-2 mt-6 opacity-60 transition-all duration-500 p-2 rounded-lg" id="highlight-target">
+                                    <div class="w-full h-2 bg-slate-600/30 rounded"></div>
+                                    <div class="w-full h-2 bg-slate-600/30 rounded"></div>
+                                    <div class="w-full h-2 bg-slate-600/30 rounded"></div>
+                                    <div class="w-5/6 h-2 bg-slate-600/30 rounded"></div>
+                                </div>
+                                <div class="space-y-2 mt-6 opacity-40">
+                                    <div class="w-full h-2 bg-slate-700/20 rounded"></div>
+                                    <div class="w-4/5 h-2 bg-slate-700/20 rounded"></div>
+                                </div>
+                                <div class="absolute top-4 right-4 bg-slate-900/90 border border-violet-500/20 text-[10px] text-violet-300 px-2 py-1 rounded shadow-lg backdrop-blur-md z-20">
+                                    <i class="fa-solid fa-eye mr-1"></i> Preview
+                                </div>
+                            </div>
+                            <div class="flex-1 flex flex-col bg-slate-950/10 relative z-10">
+                                <div class="flex-1 p-4 md:p-6 space-y-6 overflow-hidden relative" id="chat-messages"></div>
+                                <div class="p-4 border-t border-white/5 bg-slate-950/60 backdrop-blur-lg relative z-20">
+                                    <div class="relative group">
+                                        <div class="absolute -inset-0.5 bg-gradient-to-r from-violet-600/50 to-fuchsia-600/50 rounded-xl blur opacity-20 transition duration-1000"></div>
+                                        <div class="relative w-full bg-slate-900/80 border border-white/10 rounded-xl py-3 px-4 text-sm text-slate-400 flex items-center justify-between">
+                                            <span id="input-placeholder">Ask about this document...</span>
+                                            <div class="w-6 h-6 rounded bg-violet-600/20 flex items-center justify-center">
+                                                <i class="fa-solid fa-arrow-up text-violet-400 text-xs"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="demo-workspace" class="py-24 relative bg-slate-950/50 border-y border-white/5 scroll-mt-20">
+        <div class="max-w-[1250px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col items-center">
+            
+            <div class="text-center mb-12">
+                 <h2 class="reveal-up text-violet-400 font-semibold tracking-[0.2em] uppercase text-xs mb-3">Workspace</h2>
+                <h3 class="reveal-up delay-100 font-display text-3xl font-bold text-white">
+                    Compact & <span class="text-gradient-magic">Efficient.</span>
+                </h3>
+            </div>
+
+            <div class="reveal-up delay-200 w-full h-[750px] bg-[#020617] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row ring-1 ring-white/5 font-sans relative">
+                
+                <div class="hidden md:flex w-64 bg-[#0B0F17] border-r border-white/5 flex-col flex-shrink-0 z-20">
+                    <div class="p-5 flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center shadow-lg shadow-violet-500/20">
+                             <i class="fa-solid fa-cube text-white text-sm"></i>
+                        </div>
+                        <span class="font-display font-bold text-white text-lg">InsightDocs</span>
+                    </div>
+
+                    <div class="px-4 mb-4">
+                        <div class="bg-gradient-to-r from-violet-900/20 to-indigo-900/20 rounded-xl p-3 border border-violet-500/20 relative overflow-hidden group">
+                            <div class="absolute inset-0 bg-violet-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="relative flex h-2 w-2">
+                                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                  <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                </span>
+                                <span class="text-[10px] uppercase tracking-wider text-violet-300 font-bold">Active Session</span>
+                            </div>
+                            <div class="text-white text-xs font-semibold truncate mb-1">Q3_Financial_Overview.pdf</div>
+                            <div class="text-[10px] text-slate-400">Updated 2 mins ago</div>
+                        </div>
+                    </div>
+
+                    <div class="px-4 mb-6">
+                        <button class="w-full py-2.5 bg-white hover:bg-slate-100 text-slate-900 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md active:scale-95">
+                            Start new chat <i class="fa-solid fa-plus text-xs"></i>
+                        </button>
+                    </div>
+
+                    <div class="flex-1 px-4 overflow-y-auto space-y-1">
+                        <div class="text-[10px] font-bold text-slate-500 uppercase mb-3 px-2">Recent History</div>
+                        
+                        <div class="group cursor-pointer p-2 rounded-lg hover:bg-white/5 transition-colors">
+                            <div class="flex justify-between text-slate-300 text-xs font-medium mb-0.5 group-hover:text-white">
+                                <span class="truncate max-w-[140px]">Marketing_Strategy_2026</span>
+                                <span class="text-[10px] bg-slate-800 px-1 rounded text-slate-400 border border-white/5">PDF</span>
+                            </div>
+                            <div class="text-[10px] text-slate-600">2 days ago</div>
+                        </div>
+
+                        <div class="group cursor-pointer p-2 rounded-lg hover:bg-white/5 transition-colors">
+                            <div class="flex justify-between text-slate-300 text-xs font-medium mb-0.5 group-hover:text-white">
+                                <span class="truncate max-w-[140px]">Employee_Handbook_v2</span>
+                                <span class="text-[10px] bg-slate-800 px-1 rounded text-slate-400 border border-white/5">DOC</span>
+                            </div>
+                            <div class="text-[10px] text-slate-600">5 days ago</div>
+                        </div>
+
+                        <div class="group cursor-pointer p-2 rounded-lg hover:bg-white/5 transition-colors">
+                            <div class="flex justify-between text-slate-300 text-xs font-medium mb-0.5 group-hover:text-white">
+                                <span class="truncate max-w-[140px]">Product_Roadmap_Q1</span>
+                                <span class="text-[10px] bg-slate-800 px-1 rounded text-slate-400 border border-white/5">PDF</span>
+                            </div>
+                            <div class="text-[10px] text-slate-600">1 week ago</div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 border-t border-white/5 mt-auto bg-[#0B0F17]">
+                        <div class="flex items-center gap-3 bg-[#131625] p-2 rounded-lg border border-white/5 cursor-pointer hover:border-white/10 transition-colors">
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-violet-500 flex items-center justify-center text-xs text-white font-bold shadow-lg">JD</div>
+                            <div class="flex-1 overflow-hidden">
+                                <div class="text-xs text-white font-bold truncate">John Doe</div>
+                                <div class="text-[10px] text-slate-500 truncate">Pro Plan Member</div>
+                            </div>
+                            <i class="fa-solid fa-gear text-slate-500 text-xs hover:text-white transition-colors"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex-1 flex flex-col bg-[#050810] relative z-10">
+                    <div class="absolute inset-0 opacity-[0.03]" style="background-image: linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px); background-size: 30px 30px;"></div>
+
+                    <div class="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-[#050810]/80 backdrop-blur-md z-20">
+                        <div class="flex items-center gap-4">
+                            <i class="fa-solid fa-bars text-slate-400 md:hidden cursor-pointer"></i>
+                            <div class="flex items-center gap-2 bg-[#131625] px-3 py-1.5 rounded-full border border-white/5 hover:border-violet-500/30 transition-colors cursor-pointer group">
+                                <i class="fa-regular fa-file-lines text-slate-400 group-hover:text-violet-400 transition-colors text-xs"></i>
+                                <span class="text-xs text-white font-medium truncate max-w-[150px] md:max-w-[250px]">Q3_Financial_Overview.pdf</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <div class="hidden md:flex items-center gap-1.5 bg-emerald-500/10 px-2 py-1 rounded-full text-emerald-400 text-[10px] font-bold border border-emerald-500/20 uppercase tracking-wide">
+                                <div class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div> Live
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 p-6 overflow-y-auto space-y-6 relative z-0 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+                        
+                        <div class="flex justify-center">
+                            <div class="bg-[#131625] border border-white/5 text-slate-500 text-[10px] px-3 py-1 rounded-full font-medium">
+                                Today, 10:23 AM
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end reveal-up active">
+                             <div class="bg-violet-600 text-white p-4 rounded-2xl rounded-tr-none max-w-[80%] text-sm shadow-lg shadow-violet-900/20 border border-white/10 leading-relaxed">
+                                Summarize the key revenue growth factors mentioned in the executive summary.
+                             </div>
+                        </div>
+
+                        <div class="flex gap-4 reveal-up active delay-100">
+                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shrink-0 border border-white/10 mt-1 shadow-[0_0_15px_rgba(139,92,246,0.3)]">
+                                <i class="fa-solid fa-wand-magic-sparkles text-white text-xs"></i>
+                            </div>
+                            <div class="space-y-3 max-w-[90%]">
+                                <div class="text-sm text-slate-200 leading-relaxed">
+                                    Based on the executive summary, the <span class="text-violet-300 font-semibold bg-violet-500/10 px-1 rounded">22% YoY revenue growth</span> was primarily driven by three factors:
+                                </div>
+                                
+                                <div class="bg-[#131625]/80 border border-white/5 rounded-xl p-4 text-sm text-slate-300 space-y-3 backdrop-blur-sm">
+                                    <div class="flex gap-3">
+                                        <div class="mt-1 w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></div>
+                                        <div><strong class="text-white">Enterprise Adoption:</strong> A 40% increase in large-scale contracts.</div>
+                                    </div>
+                                    <div class="flex gap-3">
+                                        <div class="mt-1 w-1.5 h-1.5 rounded-full bg-fuchsia-400 shrink-0"></div>
+                                        <div><strong class="text-white">New Market Entry:</strong> Successful launch in the APAC region contributing $2M.</div>
+                                    </div>
+                                    <div class="flex gap-3">
+                                        <div class="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></div>
+                                        <div><strong class="text-white">Churn Reduction:</strong> Implementation of the new customer success platform reduced churn by 5%.</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex gap-2">
+                                    <button class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-slate-400 transition-colors flex items-center gap-1">
+                                        <i class="fa-regular fa-copy"></i> Copy
+                                    </button>
+                                    <button class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-slate-400 transition-colors flex items-center gap-1">
+                                        <i class="fa-solid fa-share-nodes"></i> Share
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-6 pt-2 z-20">
+                        <div class="relative group">
+                            <div class="absolute -inset-0.5 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+                            <div class="relative bg-[#0B0F17] rounded-xl flex items-center border border-white/10 group-focus-within:border-violet-500/50 transition-colors">
+                                <input type="text" placeholder="Ask a follow-up question..." class="w-full bg-transparent border-none py-4 pl-5 pr-12 text-sm text-white focus:outline-none focus:ring-0 placeholder:text-slate-600">
+                                <button class="absolute right-2 p-2 bg-violet-600 hover:bg-violet-500 rounded-lg flex items-center justify-center text-white transition-all hover:scale-105 shadow-lg shadow-violet-900/30">
+                                    <i class="fa-solid fa-arrow-up text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="text-center mt-3 flex items-center justify-center gap-2">
+                             <i class="fa-solid fa-bolt text-amber-400 text-[10px]"></i>
+                             <span class="text-[10px] text-slate-600">Powered by Gemini 2.5 Flash. Accuracy may vary.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="hidden lg:flex w-[400px] bg-[#0B0F17] border-l border-white/5 flex-col flex-shrink-0 z-20">
+                    <div class="h-12 border-b border-white/5 flex items-center justify-between px-4 bg-[#0B0F17]">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-white">Document Preview</span>
+                            <span class="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-white/5">Page 4 of 22</span>
+                        </div>
+                        <div class="flex gap-3 text-slate-400">
+                             <i class="fa-solid fa-magnifying-glass-plus hover:text-white cursor-pointer transition-colors text-xs"></i>
+                             <i class="fa-solid fa-expand hover:text-white cursor-pointer transition-colors text-xs"></i>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 bg-[#1e1e1e] p-6 overflow-hidden relative flex items-center justify-center">
+                        
+                        <div class="w-full h-full bg-white rounded-md shadow-2xl p-8 relative overflow-hidden group">
+                             
+                             <div class="absolute top-0 left-0 w-full h-1 bg-violet-500/50 shadow-[0_0_15px_rgba(139,92,246,0.8)] z-10 animate-[scan_4s_ease-in-out_infinite]"></div>
+                             
+                             <div class="text-slate-900 font-bold text-lg mb-6">3. Revenue Analysis</div>
+                             
+                             <div class="space-y-4 opacity-80">
+                                <div class="space-y-2">
+                                     <div class="h-2 w-full bg-slate-200 rounded"></div>
+                                     <div class="h-2 w-11/12 bg-slate-200 rounded"></div>
+                                     <div class="h-2 w-full bg-slate-200 rounded"></div>
+                                     <div class="h-2 w-4/5 bg-slate-200 rounded"></div>
+                                </div>
+
+                                <div class="py-4 flex items-end gap-2 h-24 border-b border-l border-slate-300 pl-2 pb-2">
+                                    <div class="w-8 bg-indigo-200 h-[40%] rounded-t-sm"></div>
+                                    <div class="w-8 bg-indigo-300 h-[60%] rounded-t-sm"></div>
+                                    <div class="w-8 bg-indigo-400 h-[50%] rounded-t-sm"></div>
+                                    <div class="w-8 bg-indigo-500 h-[80%] rounded-t-sm"></div>
+                                    <div class="w-8 bg-indigo-600 h-[100%] rounded-t-sm relative">
+                                        <div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-violet-600 text-white text-[8px] px-1.5 py-0.5 rounded shadow-lg">
+                                            +22%
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-2 pt-2">
+                                     <div class="h-2 w-full bg-slate-200 rounded"></div>
+                                     <div class="h-2 w-full bg-violet-100 rounded relative overflow-hidden">
+                                         <div class="absolute inset-0 bg-violet-200/50 animate-pulse"></div>
+                                     </div>
+                                     <div class="h-2 w-3/4 bg-slate-200 rounded"></div>
+                                </div>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+        
+        <style>
+            @keyframes scan {
+                0%, 100% { top: 0%; opacity: 0; }
+                10% { opacity: 1; }
+                50% { top: 100%; opacity: 1; }
+                90% { opacity: 1; }
+            }
+        </style>
+    </section>
+
+    <section id="features" class="py-24 relative z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-20 relative">
+                <div
+                    class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/2 h-32 bg-violet-500/20 blur-[100px] -z-10 pointer-events-none opacity-50">
+                </div>
+                <h2
+                    class="reveal-up text-violet-400 font-semibold tracking-[0.2em] uppercase text-xs mb-3 drop-shadow-[0_0_10px_rgba(139,92,246,0.4)]">
+                    Powers & Capabilities</h2>
+                <h3 class="reveal-up delay-100 font-display text-3xl md:text-5xl font-bold text-white leading-tight">
+                    Intelligence, <span class="text-gradient-magic">Elevated.</span></h3>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="cards-container">
+                <div
+                    class="reveal-up spotlight-card rounded-[2rem] p-8 flex flex-col items-center text-center group cursor-default relative">
+                    <div
+                        class="absolute top-8 right-8 text-violet-500/20 text-4xl animate-float-slow opacity-0 group-hover:opacity-100 transition-opacity duration-700">
+                        <i class="fa-brands fa-google"></i>
+                    </div>
+
+                    <div class="w-16 h-16 relative shrink-0 mb-6">
+                        <div
+                            class="absolute inset-0 bg-violet-600/30 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-500 animate-pulse-deep">
+                        </div>
+                        <div
+                            class="relative w-full h-full bg-gradient-to-br from-violet-950 to-slate-900 rounded-2xl flex items-center justify-center border border-violet-500/30 group-hover:scale-110 transition-transform duration-500 shadow-xl">
+                            <i
+                                class="fa-solid fa-brain text-violet-300 text-2xl drop-shadow-[0_0_8px_rgba(167,139,250,0.8)]"></i>
+                        </div>
+                    </div>
+                    <div class="z-10">
+                        <h4
+                            class="font-display text-xl font-bold text-white mb-3 group-hover:text-violet-100 transition-colors">
+                            Gemini 2.5 Flash</h4>
+                        <p class="text-slate-400/90 text-sm leading-relaxed font-light">Powered by Google's latest generative model for high-speed, context-aware Q&A with minimal latency.
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    class="reveal-up delay-100 spotlight-card rounded-[2rem] p-8 flex flex-col items-center text-center group cursor-default relative overflow-hidden">
+                    <div
+                        class="absolute -bottom-10 -right-10 text-sky-500/10 text-8xl animate-float-medium opacity-0 group-hover:opacity-100 transition-opacity duration-700 rotate-12">
+                        <i class="fa-solid fa-server"></i>
+                    </div>
+
+                    <div class="w-16 h-16 relative mb-6">
+                        <div
+                            class="absolute inset-0 bg-sky-600/30 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-500 animate-pulse-deep">
+                        </div>
+                        <div
+                            class="relative w-full h-full bg-gradient-to-br from-sky-950 to-slate-900 rounded-2xl flex items-center justify-center border border-sky-500/30 group-hover:scale-110 transition-transform duration-500 shadow-xl">
+                            <i
+                                class="fa-solid fa-bolt text-sky-300 text-2xl drop-shadow-[0_0_8px_rgba(56,189,248,0.8)]"></i>
+                        </div>
+                    </div>
+                    <h4
+                        class="font-display text-xl font-bold text-white mb-3 group-hover:text-sky-100 transition-colors relative z-10">
+                        Real-Time WebSockets</h4>
+                    <p class="text-slate-400/90 text-sm leading-relaxed font-light relative z-10">Built with Django Channels & Redis. Experience seamless, fluid conversations with your documents instantly.</p>
+                </div>
+
+                <div
+                    class="reveal-up delay-200 spotlight-card rounded-[2rem] p-8 flex flex-col items-center text-center group cursor-default relative">
+                    <div class="w-16 h-16 relative mb-6">
+                        <div
+                            class="absolute inset-0 bg-fuchsia-600/30 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-500 animate-pulse-deep">
+                        </div>
+                        <div
+                            class="relative w-full h-full bg-gradient-to-br from-fuchsia-950 to-slate-900 rounded-2xl flex items-center justify-center border border-fuchsia-500/30 group-hover:scale-110 transition-transform duration-500 shadow-xl">
+                            <i
+                                class="fa-solid fa-shield-halved text-fuchsia-300 text-2xl drop-shadow-[0_0_8px_rgba(232,121,249,0.8)]"></i>
+                        </div>
+                    </div>
+                    <h4
+                        class="font-display text-xl font-bold text-white mb-3 group-hover:text-fuchsia-100 transition-colors">
+                        Secure Intelligence</h4>
+                    <p class="text-slate-400/90 text-sm leading-relaxed font-light">Your data is protected with secure Authentication, OTP verification, and rate-limiting safeguards.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="how-it-works" class="py-24 relative overflow-hidden bg-slate-950/30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+            <div class="text-center mb-16 relative z-10">
+                <h2 class="reveal-up text-violet-400 font-semibold tracking-[0.2em] uppercase text-xs mb-3">System Architecture</h2>
+                <h3 class="reveal-up delay-100 font-display text-3xl md:text-5xl font-bold text-white leading-tight">
+                    Under the <span class="text-gradient-magic">Hood.</span>
+                </h3>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div class="space-y-12">
+                     <div class="reveal-up flex gap-6">
+                        <div class="w-12 h-12 rounded-xl bg-violet-900/20 border border-violet-500/20 flex items-center justify-center shrink-0">
+                            <i class="fa-solid fa-file-arrow-up text-violet-400"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-xl font-bold text-white mb-2">1. Secure Ingestion</h4>
+                            <p class="text-slate-400 text-sm leading-relaxed">Files (PDF, DOCX) are validated for security and MIME types before being processed. Rate limiters ensure fair usage.</p>
+                        </div>
+                    </div>
+
+                    <div class="reveal-up delay-100 flex gap-6">
+                        <div class="w-12 h-12 rounded-xl bg-sky-900/20 border border-sky-500/20 flex items-center justify-center shrink-0">
+                            <i class="fa-solid fa-microchip text-sky-400"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-xl font-bold text-white mb-2">2. Gemini Processing</h4>
+                            <p class="text-slate-400 text-sm leading-relaxed">Content is extracted and sent to Google Gemini 2.5 Flash, creating a context-aware session for deep understanding.</p>
+                        </div>
+                    </div>
+
+                    <div class="reveal-up delay-200 flex gap-6">
+                        <div class="w-12 h-12 rounded-xl bg-fuchsia-900/20 border border-fuchsia-500/20 flex items-center justify-center shrink-0">
+                            <i class="fa-solid fa-satellite-dish text-fuchsia-400"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-xl font-bold text-white mb-2">3. WebSocket Stream</h4>
+                            <p class="text-slate-400 text-sm leading-relaxed">Responses are streamed back in real-time using Django Channels and Redis, mimicking a human conversation.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="reveal-up delay-300 relative group">
+                    <div class="absolute -inset-1 bg-gradient-to-r from-violet-600 to-sky-600 rounded-xl blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
+                    <div class="relative bg-slate-900 border border-white/10 rounded-xl overflow-hidden shadow-2xl font-mono text-xs md:text-sm">
+                        <div class="bg-slate-950 border-b border-white/5 p-3 flex items-center gap-2">
+                            <div class="flex gap-1.5">
+                                <div class="w-2.5 h-2.5 rounded-full bg-red-500/50"></div>
+                                <div class="w-2.5 h-2.5 rounded-full bg-amber-500/50"></div>
+                                <div class="w-2.5 h-2.5 rounded-full bg-emerald-500/50"></div>
+                            </div>
+                            <div class="ml-4 text-slate-500">server_logs.py</div>
+                        </div>
+                        <div class="p-6 text-slate-300 space-y-2">
+                            <div class="flex gap-2">
+                                <span class="text-slate-500">10:42:01</span>
+                                <span class="text-violet-400">[INFO]</span>
+                                <span>Initiating upload: <span class="text-amber-300">"Contract_v2.pdf"</span></span>
+                            </div>
+                            <div class="flex gap-2">
+                                <span class="text-slate-500">10:42:02</span>
+                                <span class="text-sky-400">[DEBUG]</span>
+                                <span>MIME Type detected: <span class="text-emerald-300">application/pdf</span></span>
+                            </div>
+                            <div class="flex gap-2">
+                                <span class="text-slate-500">10:42:03</span>
+                                <span class="text-violet-400">[INFO]</span>
+                                <span>Gemini 2.5 Flash context window established.</span>
+                            </div>
+                             <div class="flex gap-2">
+                                <span class="text-slate-500">10:42:04</span>
+                                <span class="text-fuchsia-400">[WS]</span>
+                                <span>Channel layer active. Connected to <span class="text-fuchsia-300">redis://127.0.0.1:6379</span></span>
+                            </div>
+                            <div class="flex gap-2">
+                                <span class="text-slate-500">10:42:05</span>
+                                <span class="text-emerald-400">[SUCCESS]</span>
+                                <span>Session ready. Awaiting user query...</span>
+                            </div>
+                            <div class="mt-4 flex gap-2 animate-pulse">
+                                <span class="text-violet-500">$</span>
+                                <span class="bg-slate-700 w-2 h-4 block"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="border-t border-white/5 bg-slate-950/50 pt-16 pb-12 text-sm relative overflow-hidden">
+        <div
+            class="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-32 bg-violet-900/20 blur-[100px] -z-10 pointer-events-none opacity-30">
+        </div>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+            <div class="mb-12">
+                <div class="flex items-center gap-2 mb-6">
+                    <div class="relative w-7 h-7 flex items-center justify-center">
+                        <div class="absolute inset-0 bg-violet-500 rounded-lg blur-sm opacity-60"></div>
+                        <div
+                            class="relative w-full h-full bg-gradient-to-br from-violet-600 to-indigo-600 rounded-lg flex items-center justify-center border border-white/10">
+                            <i class="fa-solid fa-cube text-white text-[10px]"></i>
+                        </div>
+                    </div>
+                    <span class="font-bold text-white text-lg tracking-tight">InsightDocs<span
+                            class="text-violet-400">.ai</span></span>
+                </div>
+                <p class="text-slate-400/80 text-sm leading-relaxed max-w-md font-light">
+                    Pioneering the future of knowledge retrieval through generative artificial intelligence. Transform
+                    your static documents into active conversations instantly.
+                </p>
+            </div>
+
+            <div class="glow-divider mb-8 opacity-30"></div>
+
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <p class="text-slate-500 text-xs font-light">&copy; 2025 InsightDocs AI Inc. Crafted in the ether.</p>
+                <div class="flex gap-5 text-slate-500">
+                    <a href="https://x.com/InsightDocsAI" target="_blank"
+                        class="hover:text-violet-300 hover:scale-110 transition-all duration-300">
+                        <i class="fa-brands fa-twitter"></i>
+                    </a>
+                    <a href="https://github.com/NikhilAmbure/InsightDocs_AI" target="_blank"
+                        class="hover:text-violet-300 hover:scale-110 transition-all duration-300">
+                        <i class="fa-brands fa-github"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // 1. Mobile Toggle with smooth transition
+        const btn = document.getElementById('mobile-toggle');
+        const menu = document.getElementById('mobile-menu');
+
+        btn.addEventListener('click', () => {
+            menu.classList.toggle('hidden');
+            const icon = btn.querySelector('i');
+            if (menu.classList.contains('hidden')) {
+                icon.classList.remove('fa-xmark');
+                icon.classList.add('fa-bars');
+                menu.style.opacity = '0';
+                menu.style.transform = 'translateY(-10px)';
+            } else {
+                icon.classList.remove('fa-bars');
+                icon.classList.add('fa-xmark');
+                menu.style.opacity = '1';
+                menu.style.transform = 'translateY(0)';
+            }
+        });
+
+        // 2. Enhanced Navbar Glass Effect on Scroll
+        window.addEventListener('scroll', () => {
+            const nav = document.getElementById('navbar');
+            const navBg = document.getElementById('navbar-bg');
+            if (window.scrollY > 20) {
+                nav.classList.add('border-white/5');
+                nav.classList.remove('border-transparent', 'py-2');
+                navBg.classList.remove('bg-background/20', 'backdrop-blur-xl');
+                navBg.classList.add('bg-slate-950/80', 'backdrop-blur-2xl');
+            } else {
+                nav.classList.add('border-transparent', 'py-2');
+                nav.classList.remove('border-white/5');
+                navBg.classList.add('bg-background/20', 'backdrop-blur-xl');
+                navBg.classList.remove('bg-slate-950/80', 'backdrop-blur-2xl');
+            }
+        });
+
+        // 3. Scroll Reveal Observer
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    setTimeout(() => {
+                        entry.target.classList.add('active');
+                    }, 100); // Fixed small delay for smoother feel, removed dynamic calculation
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.1, rootMargin: "0px" }); // REMOVED -100px margin
+
+        document.querySelectorAll('.reveal-up').forEach(el => observer.observe(el));
+
+        // 4. Spotlight Effect (Desktop Only)
+        const cardsContainer = document.getElementById('cards-container');
+        if (cardsContainer) {
+            cardsContainer.onmousemove = e => {
+                for (const card of document.getElementsByClassName("spotlight-card")) {
+                    const rect = card.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    card.style.setProperty("--mouse-x", `${x}px`);
+                    card.style.setProperty("--mouse-y", `${y}px`);
+                }
+            }
+        }
+
+        // ==========================================
+        // ANIMATION ORCHESTRATION SCRIPT
+        // ==========================================
+        
+        const uploadView = document.getElementById('upload-view');
+        const appView = document.getElementById('app-view');
+        const uploadProgress = document.getElementById('upload-progress');
+        const fileUploadUi = document.getElementById('file-upload-ui');
+        const fakeBrowseBtn = document.getElementById('fake-browse-btn');
+        const uploadCheck = document.getElementById('upload-check');
+        const chatMessages = document.getElementById('chat-messages');
+        const inputPlaceholder = document.getElementById('input-placeholder');
+        const highlightTarget = document.getElementById('highlight-target');
+
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+        // Helper: Typewriter effect
+        async function typeText(element, text, speed = 30) {
+            element.innerHTML = '';
+            for (let i = 0; i < text.length; i++) {
+                element.innerHTML += text.charAt(i);
+                await sleep(speed + Math.random() * 20); // Randomize slightly for realism
+            }
+        }
+
+        // Helper: Create User Message Bubble
+        function createUserMessage(text) {
+            const div = document.createElement('div');
+            div.className = "flex gap-3 md:gap-4 flex-row-reverse relative reveal-up active";
+            div.innerHTML = `
+                <div class="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-slate-800 flex items-center justify-center shrink-0 border border-white/5">
+                    <i class="fa-solid fa-user text-slate-400 text-xs"></i>
+                </div>
+                <div class="space-y-2 text-right max-w-[85%]">
+                    <div class="p-4 bg-violet-600/90 text-white rounded-2xl rounded-tr-none text-sm shadow-lg shadow-violet-500/20 backdrop-blur-md border border-violet-400/20 relative overflow-hidden leading-relaxed">
+                        ${text}
+                    </div>
+                </div>
+            `;
+            return div;
+        }
+
+        // Helper: Create AI Thinking Bubble
+        function createThinkingBubble() {
+            const div = document.createElement('div');
+            div.id = "thinking-bubble";
+            div.className = "flex gap-3 md:gap-4 relative opacity-70 reveal-up active";
+            div.innerHTML = `
+                <div class="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shrink-0 border border-white/10">
+                    <i class="fa-solid fa-wand-magic-sparkles text-white text-xs"></i>
+                </div>
+                <div class="flex items-center gap-1 p-4 bg-slate-800/40 border border-white/5 rounded-2xl rounded-tl-none backdrop-blur-md">
+                    <span class="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce"></span>
+                    <span class="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></span>
+                    <span class="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></span>
+                </div>
+            `;
+            return div;
+        }
+
+        // Helper: Create AI Response Bubble
+        function createAIResponse() {
+            const div = document.createElement('div');
+            div.className = "flex gap-3 md:gap-4 relative reveal-up active";
+            div.innerHTML = `
+                <div class="absolute -left-2 -top-2 w-12 h-12 bg-violet-500/20 blur-xl rounded-full -z-10"></div>
+                <div class="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shrink-0 shadow-lg shadow-violet-500/20 border border-white/10">
+                    <i class="fa-solid fa-wand-magic-sparkles text-white text-xs"></i>
+                </div>
+                <div class="space-y-1 md:space-y-2 max-w-[85%]">
+                    <div class="p-4 bg-slate-800/60 border border-white/5 rounded-2xl rounded-tl-none text-sm text-slate-200 leading-relaxed backdrop-blur-md shadow-sm relative overflow-hidden">
+                        <span id="ai-text-content" class="typing-cursor"></span>
+                    </div>
+                </div>
+            `;
+            return div;
+        }
+
+        async function runAnimationLoop() {
+            while (true) {
+                // --- RESET STATE ---
+                uploadView.style.opacity = '1';
+                uploadView.style.transform = 'scale(1)';
+                uploadView.style.pointerEvents = 'auto';
+                
+                appView.style.opacity = '0';
+                appView.style.transform = 'scale(0.95)';
+                
+                fakeBrowseBtn.style.display = 'block';
+                fileUploadUi.classList.add('hidden');
+                uploadProgress.style.width = '0';
+                uploadCheck.style.opacity = '0';
+                
+                chatMessages.innerHTML = ''; // Clear chat
+                inputPlaceholder.innerText = "Ask about this document...";
+                highlightTarget.className = "space-y-2 mt-6 opacity-60 transition-all duration-500 p-2 rounded-lg"; // Remove highlight
+                
+                await sleep(1000); // Initial pause
+
+                // --- STAGE 1: UPLOAD SIMULATION ---
+                fakeBrowseBtn.classList.add('scale-95'); // Press effect
+                await sleep(200);
+                fakeBrowseBtn.style.display = 'none';
+                fakeBrowseBtn.classList.remove('scale-95');
+                
+                fileUploadUi.classList.remove('hidden');
+                
+                // Animate Progress
+                await sleep(100);
+                uploadProgress.style.width = '100%';
+                
+                await sleep(1500); // Wait for bar to fill
+                uploadCheck.style.opacity = '1';
+                await sleep(800);
+
+                // --- STAGE 2: TRANSITION TO APP ---
+                uploadView.style.opacity = '0';
+                uploadView.style.transform = 'scale(0.9)';
+                uploadView.style.pointerEvents = 'none';
+                
+                await sleep(200);
+                
+                appView.style.opacity = '1';
+                appView.style.transform = 'scale(1)';
+                
+                await sleep(1500);
+
+                // --- STAGE 3: CHAT INTERACTION ---
+                
+                // 3a. Typing User Question in Input (Simulated by changing placeholder or injecting text)
+                // Let's type into a temp message first
+                const userText = "What were the key revenue drivers in Q3?";
+                inputPlaceholder.innerText = "";
+                
+                // Simulate typing in placeholder area
+                for (let i = 0; i < userText.length; i++) {
+                    inputPlaceholder.innerText += userText.charAt(i);
+                    await sleep(40);
+                }
+                await sleep(500);
+                inputPlaceholder.innerText = "Ask further questions..."; // Reset input
+
+                // 3b. User Bubble appears
+                const userMsg = createUserMessage(userText);
+                chatMessages.appendChild(userMsg);
+                
+                await sleep(600);
+
+                // 3c. Thinking Bubble
+                const thinkingMsg = createThinkingBubble();
+                chatMessages.appendChild(thinkingMsg);
+                
+                await sleep(1800); // AI Thinking time
+                thinkingMsg.remove(); // Remove thinking bubble
+
+                // 3d. AI Response Streaming
+                const aiMsg = createAIResponse();
+                chatMessages.appendChild(aiMsg);
+                const aiTextContainer = aiMsg.querySelector('#ai-text-content');
+                
+                const responseTextPart1 = "Based on the report, the primary driver was the ";
+                const responseHighlight = "Enterprise Subscription Tier";
+                const responseTextPart2 = ", which grew by 22% YoY contributing $4.5M.";
+                
+                // Highlight Document logic starts here
+                highlightTarget.classList.remove('opacity-60');
+                highlightTarget.classList.add('bg-violet-500/20', 'shadow-[0_0_15px_rgba(139,92,246,0.1)]', 'border', 'border-violet-500/30', 'opacity-100');
+
+                // Type first part
+                await typeText(aiTextContainer, responseTextPart1, 20);
+                
+                // Insert highlighted span
+                const span = document.createElement('span');
+                span.className = "text-violet-300 font-semibold";
+                span.innerText = responseHighlight;
+                aiTextContainer.appendChild(span);
+                
+                // Continue typing second part
+                const remainingText = document.createTextNode(responseTextPart2);
+                aiTextContainer.appendChild(remainingText);
+                
+                // Remove cursor at end
+                aiTextContainer.classList.remove('typing-cursor');
+
+                await sleep(4000); // Read time before loop resets
+                
+                // Fade out app view for loop
+                appView.style.opacity = '0';
+                await sleep(500);
+            }
+        }
+
+        // Start the loop when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+             // Delay slightly to match reveal animations
+             setTimeout(runAnimationLoop, 800);
+        });
+
+    </script>
+</body>
+
+</html>

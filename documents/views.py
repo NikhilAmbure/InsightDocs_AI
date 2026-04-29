@@ -13,6 +13,7 @@ from .forms import DocumentUploadForm
 from .models import Document, ChatSession, ChatMessage
 from .utils.rate_limit import check_rate_limit
 from .tasks import process_document_task
+from .utils.rag import process_document_for_rag
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,16 @@ def upload_view(request):
                 document.title = document.original_name
             document.save()
 
-            process_document_task.delay(document.id)
+            try:
+                process_document_task.delay(document.id)
+            except Exception:
+                # Celery/Redis not available — process synchronously
+                logger.info(f"Celery unavailable, processing doc {document.id} synchronously.")
+                try:
+                    file_path = document.file.path
+                except NotImplementedError:
+                    file_path = document.file.url
+                process_document_for_rag(document, file_path)
             
             # Create a chat session
             ChatSession.objects.create(document=document, user=request.user)
