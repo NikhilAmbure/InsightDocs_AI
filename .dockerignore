@@ -1,0 +1,17 @@
+.git
+.gitignore
+venv
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+.env
+.env.*
+!/.env.docker
+node_modules
+media
+staticfiles
+agent-transcripts
+.cursor

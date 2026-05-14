@@ -116,7 +116,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             full_response = ""
 
             # 2. Stream chunks to the client as we receive them
-            async for chunk in get_gemini_response(user_message, document, chat_history):
+            async for chunk in get_gemini_response(
+                user_message,
+                document,
+                chat_history,
+            ):
                 full_response += chunk
                 await self.send(text_data=json.dumps({
                     'type': 'ai_stream_chunk',
@@ -308,7 +312,3 @@ class EditorConsumer(AsyncWebsocketConsumer):
 
     async def send_error(self, message):
         await self.send(text_data=json.dumps({"type": "error", "message": message}))
-
-    @database_sync_to_async
-    def check_document_permission(self):
-        return Document.objects.filter(id=self.document_id, owner=self.user).exists()

@@ -167,6 +167,77 @@ python manage.py runserver
 
 ---
 
+## 🐳 Docker Setup (Full Stack)
+
+This repository now includes a complete Docker setup for:
+- Django ASGI app (`daphne`)
+- Celery worker
+- PostgreSQL with `pgvector`
+- Redis
+
+### 1) Prepare environment file
+
+```bash
+cp .env.docker.example .env.docker
+```
+
+Update `.env.docker` with your real keys (`SECRET_KEY`, `GOOGLE_API_KEY`, `RESEND_API_KEY`, etc.).
+
+### 2) Build and run
+
+```bash
+docker compose up --build
+```
+
+App runs at `http://localhost:8000`.
+
+### 3) Stop
+
+```bash
+docker compose down
+```
+
+To remove volumes too:
+
+```bash
+docker compose down -v
+```
+
+### Included Docker files
+- `Dockerfile`
+- `docker-compose.yml`
+- `docker/entrypoint.sh`
+- `.dockerignore`
+- `.env.docker.example`
+
+---
+
+## ☁️ Deploying on AWS
+
+You can deploy this containerized app using ECS Fargate, App Runner, or EC2.
+
+### Recommended production topology
+- **Web service:** runs `daphne ... InsightDocs_AI.asgi:application`
+- **Worker service:** runs `celery -A InsightDocs_AI worker --loglevel=info`
+- **Managed DB:** Amazon RDS PostgreSQL (with `pgvector` enabled)
+- **Managed cache/broker:** Amazon ElastiCache Redis
+
+### Minimum environment variables (AWS)
+- `SECRET_KEY`
+- `DEBUG=False`
+- `ALLOWED_HOSTS=<your-domain>,<load-balancer-hostname>`
+- `DATABASE_URL=postgresql://<user>:<pass>@<rds-endpoint>:5432/<db>`
+- `REDIS_URL=redis://<elasticache-endpoint>:6379/0`
+- `GOOGLE_API_KEY`
+- `RESEND_API_KEY`
+- `RAZORPAY_KEY_ID`
+- `RAZORPAY_KEY_SECRET`
+- `RAZORPAY_WEBHOOK_SECRET`
+
+For production, do not use the local `db` and `redis` services from `docker-compose.yml`; use AWS managed services instead.
+
+---
+
 ## 📂 Project Structure
 
 ```text

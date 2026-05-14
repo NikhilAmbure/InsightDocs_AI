@@ -126,6 +126,27 @@
         #drag-handle:hover > div { background-color: #8b5cf6; }
         body.resizing { cursor: col-resize; user-select: none; }
         body.resizing iframe { pointer-events: none; }
+
+        .pdf-page-stage { position: relative; display: inline-block; }
+        .pdf-text-layer {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            color: transparent;
+            line-height: 1;
+            overflow: hidden;
+        }
+        .pdf-text-layer span {
+            position: absolute;
+            white-space: pre;
+            transform-origin: 0 0;
+            color: transparent;
+        }
+        .pdf-text-layer span.source-hit {
+            background: rgba(139, 92, 246, 0.35);
+            border-radius: 2px;
+            box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.4);
+        }
     </style>
     <script>
         tailwind.config = {
@@ -297,6 +318,69 @@
                                 </div>
                             </div>
 
+                            {% if document_insights %}
+                            <div class="rounded-2xl border border-violet-500/20 bg-violet-500/5 p-4 shadow-inner shadow-violet-500/10">
+                                <div class="mb-3 flex items-center justify-between">
+                                    <h3 class="text-[11px] font-semibold uppercase tracking-wider text-violet-300">
+                                        Document Insights
+                                    </h3>
+                                    <span class="rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-zinc-300">
+                                        {{ document_insights.status|title }}
+                                    </span>
+                                </div>
+
+                                {% if document_insights.status == "processing" %}
+                                    <p class="text-xs text-zinc-300">
+                                        Analysis is running. Insights will appear here shortly.
+                                    </p>
+                                {% elif document_insights.status == "failed" %}
+                                    <p class="text-xs text-red-300">
+                                        Insight generation failed. You can still chat with the document normally.
+                                    </p>
+                                {% else %}
+                                    {% if document_insights.summary %}
+                                        <div class="mb-4">
+                                            <p class="mb-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-400">Summary</p>
+                                            <p class="text-xs leading-relaxed text-zinc-200">{{ document_insights.summary }}</p>
+                                        </div>
+                                    {% endif %}
+
+                                    {% if document_insights.entities %}
+                                        <div class="mb-4">
+                                            <p class="mb-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-400">Entities</p>
+                                            <div class="flex flex-wrap gap-1.5">
+                                                {% for entity_type, values in document_insights.entities.items %}
+                                                    {% if values %}
+                                                        {% for value in values %}
+                                                            <span class="rounded-full border border-white/10 bg-black/20 px-2 py-0.5 text-[10px] text-zinc-200">
+                                                                {{ entity_type|title }}: {{ value }}
+                                                            </span>
+                                                        {% endfor %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    {% endif %}
+
+                                    {% if document_insights.suggested_questions %}
+                                        <div>
+                                            <p class="mb-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-400">Try Asking</p>
+                                            <div class="flex flex-wrap gap-2">
+                                                {% for suggested_q in document_insights.suggested_questions %}
+                                                    <button
+                                                        type="button"
+                                                        onclick="document.getElementById('message-input').value='{{ suggested_q|escapejs }}'; document.getElementById('message-input').focus();"
+                                                        class="rounded-full border border-violet-400/30 bg-violet-500/10 px-3 py-1 text-[10px] text-violet-200 hover:bg-violet-500/20 hover:text-white transition-colors">
+                                                        {{ suggested_q }}
+                                                    </button>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                            {% endif %}
+
                             <div id="chat-messages" class="space-y-6 flex flex-col pb-4">
                                 {% for msg in chat_history %}
                                     <div class="w-full msg-animate flex gap-4 {% if msg.role == 'user' %}justify-end{% else %}justify-start{% endif %}">
@@ -427,7 +511,10 @@
                                 </div>
                                 <div id="pdf-viewer-container" class="flex-1 overflow-auto p-4 flex flex-col items-center relative">
                                     <!-- PDF Single Page Renders Here via JS -->
-                                    <canvas id="pdf-single-page" class="max-w-none bg-white shadow-xl shadow-black/50 transition-transform origin-top"></canvas>
+                                    <div id="pdf-page-stage" class="pdf-page-stage">
+                                        <canvas id="pdf-single-page" class="max-w-none bg-white shadow-xl shadow-black/50 transition-transform origin-top"></canvas>
+                                        <div id="pdf-text-layer" class="pdf-text-layer"></div>
+                                    </div>
                                 </div>
                             </div>
                             <div id="pdf-loading-indicator" class="absolute inset-0 flex flex-col items-center justify-center bg-[#323639] z-10 transition-opacity">
@@ -495,6 +582,8 @@
 
         let chatSocket = null;
         let isConnecting = false;
+        let latestUserQuestion = '';
+        let latestProgressStage = '';
 
         function copyMessage(btn) {
             const wrapper = btn.closest('.markdown-body');
@@ -662,7 +751,7 @@
         }
 
         function formatCitations(text) {
-            return text.replace(/\[Page\s+(\d+)\]/gi, '<button onclick="scrollToPage($1)" class="text-[10px] ml-1 px-1.5 py-0.5 rounded-md bg-violet-500/20 text-violet-300 hover:bg-violet-500/40 hover:text-white transition-colors cursor-pointer border border-violet-500/30 font-medium align-middle inline-flex items-center gap-1"><i class="fa-solid fa-file-pdf text-[9px]"></i> Page $1</button>');
+            return text.replace(/\[Page\s+(\d+)\]/gi, '<button onclick="scrollToPage($1, this)" class="text-[10px] ml-1 px-1.5 py-0.5 rounded-md bg-violet-500/20 text-violet-300 hover:bg-violet-500/40 hover:text-white transition-colors cursor-pointer border border-violet-500/30 font-medium align-middle inline-flex items-center gap-1"><i class="fa-solid fa-file-pdf text-[9px]"></i> Page $1</button>');
         }
 
         function appendAiStreamChunk(chunk) {
@@ -826,6 +915,7 @@
             msgWrapper.id = `msg-${id}`;
 
             if (role === 'user') {
+                latestUserQuestion = content;
                 msgWrapper.innerHTML = `
                     <div class="max-w-[85%] sm:max-w-[75%] min-w-0">
                         <div class="bg-violet-600 text-white rounded-2xl rounded-tr-sm px-5 py-3 text-sm leading-relaxed shadow-md">
@@ -881,9 +971,15 @@
                         </div>
                     </div>
                 </div>
-                <div class="max-w-[85%] pt-2">
+                <div class="max-w-[85%] pt-2 space-y-2">
                     <div class="flex items-center gap-2">
                         <span class="text-xs font-medium animate-shimmer">Thinking...</span>
+                    </div>
+                    <div class="rounded-lg border border-white/10 bg-white/5 p-2">
+                        <div class="text-[10px] text-zinc-300" id="progress-stage-current">Initializing AI pipeline...</div>
+                        <div class="mt-2 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                            <div id="progress-stage-bar" class="h-full w-1/4 bg-violet-500 transition-all duration-500"></div>
+                        </div>
                     </div>
                 </div>`;
                 
@@ -894,6 +990,20 @@
         function removeLoadingIndicator() {
             const loader = document.getElementById('loading-indicator');
             if (loader) loader.remove();
+        }
+
+        function updateProgressStage(stage) {
+            latestProgressStage = stage;
+            const stageEl = document.getElementById('progress-stage-current');
+            const barEl = document.getElementById('progress-stage-bar');
+            if (!stageEl || !barEl) return;
+            stageEl.textContent = stage;
+            let width = '25%';
+            const value = stage.toLowerCase();
+            if (value.includes('retriev') || value.includes('rank')) width = '50%';
+            else if (value.includes('refin') || value.includes('context')) width = '75%';
+            else if (value.includes('generat') || value.includes('switch')) width = '95%';
+            barEl.style.width = width;
         }
 
         function handleSendMessage(e) {
@@ -1032,6 +1142,7 @@
         let pdfCurrentPage = 1;
         let pdfScale = 0.8;
         let pdfCanvas = null;
+        let pdfTextLayer = null;
         let pdfCtx = null;
         let isPdfRendering = false;
         let pdfPagePending = null;
@@ -1045,6 +1156,7 @@
             const container = document.getElementById('pdf-viewer-container');
             const loadingIndicator = document.getElementById('pdf-loading-indicator');
             pdfCanvas = document.getElementById('pdf-single-page');
+            pdfTextLayer = document.getElementById('pdf-text-layer');
             if (pdfCanvas) pdfCtx = pdfCanvas.getContext('2d');
 
             pdfjsLib.getDocument(pdfUrl).promise.then(function(pdf) {
@@ -1090,8 +1202,9 @@
                 };
                 
                 let renderTask = page.render(renderContext);
-                renderTask.promise.then(function() {
+                renderTask.promise.then(async function() {
                     isPdfRendering = false;
+                    await renderPdfTextLayer(page, viewport);
                     if (pdfPagePending !== null) {
                         renderPage(pdfPagePending);
                         pdfPagePending = null;
@@ -1135,6 +1248,41 @@
             renderPage(pdfCurrentPage);
         }
 
+        async function renderPdfTextLayer(page, viewport) {
+            if (!pdfTextLayer) return;
+            const textContent = await page.getTextContent();
+            pdfTextLayer.innerHTML = '';
+            pdfTextLayer.style.width = `${viewport.width}px`;
+            pdfTextLayer.style.height = `${viewport.height}px`;
+            pdfTextLayer.style.setProperty('--scale-factor', '1');
+            pdfjsLib.renderTextLayer({
+                textContentSource: textContent,
+                container: pdfTextLayer,
+                viewport: viewport,
+                textDivs: [],
+            });
+            highlightTextLayerTerms(getHighlightTerms(latestUserQuestion));
+        }
+
+        function getHighlightTerms(text) {
+            return (text || '')
+                .toLowerCase()
+                .split(/\s+/)
+                .map(t => t.replace(/[^a-z0-9]/g, ''))
+                .filter(t => t.length > 3)
+                .slice(0, 6);
+        }
+
+        function highlightTextLayerTerms(terms) {
+            if (!pdfTextLayer || !terms || !terms.length) return;
+            const spans = pdfTextLayer.querySelectorAll('span');
+            spans.forEach(span => {
+                const raw = (span.textContent || '').toLowerCase();
+                const hit = terms.some(t => raw.includes(t));
+                span.classList.toggle('source-hit', hit);
+            });
+        }
+
         function scrollToPage(pageNum) {
             if (window.innerWidth < 1024) {
                 switchMobileTab('doc');
@@ -1163,6 +1311,20 @@
             document.querySelectorAll('.markdown-content').forEach(el => {
                 if (!el.dataset.rendered) {
                     el.innerHTML = marked.parse(el.textContent);
+                    if (window.renderMathInElement) {
+                        renderMathInElement(el, {
+                            delimiters: [
+                                { left: '$$', right: '$$', display: true },
+                                { left: '$', right: '$', display: false },
+                                { left: '\\(', right: '\\)', display: false },
+                                { left: '\\[', right: '\\]', display: true }
+                            ],
+                            throwOnError: false
+                        });
+                    }
+                    if (window.hljs) {
+                        el.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+                    }
                     el.dataset.rendered = 'true';
                 }
             });

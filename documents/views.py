@@ -10,12 +10,20 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.http import HttpResponse, Http404, JsonResponse
 
 from .forms import DocumentUploadForm
-from .models import Document, ChatSession, ChatMessage
+from .models import Document, ChatSession, ChatMessage, DocumentInsights
 from .utils.rate_limit import check_rate_limit
-from .tasks import process_document_task
+from .tasks import process_document_task, analyze_document_task
 from .utils.rag import process_document_for_rag
 
 logger = logging.getLogger(__name__)
+
+def _default_follow_up_questions(document):
+    title = (document.title or "this document").strip()
+    return [
+        f"What are the main insights in {title}?",
+        "Can you explain this in simpler terms?",
+        "Which section should I review next?",
+    ]
 
 
 def landing_page_view(request):
@@ -84,6 +92,7 @@ def upload_view(request):
                 except NotImplementedError:
                     file_path = document.file.url
                 process_document_for_rag(document, file_path)
+                analyze_document_task(document.id)
             
             # Create a chat session
             ChatSession.objects.create(document=document, user=request.user)
@@ -125,11 +134,19 @@ def chat_view(request, document_id):
     
     # Get recent documents for sidebar
     recent_docs = Document.objects.filter(owner=request.user).exclude(id=document.id).order_by('-uploaded_at')[:5]
+    insights = DocumentInsights.objects.filter(document=document).first()
+    follow_up_questions = []
+    if insights and isinstance(insights.suggested_questions, list):
+        follow_up_questions = [q for q in insights.suggested_questions if isinstance(q, str) and q.strip()]
+    if not follow_up_questions:
+        follow_up_questions = _default_follow_up_questions(document)
 
     return render(request, "chat.html", {
         "document": document,
         "chat_history": chat_history_qs,
         "recent_documents": recent_docs,
+        "document_insights": insights,
+        "follow_up_questions": follow_up_questions,
     })
 
 @login_required(login_url='login')
@@ -186,7 +203,6 @@ def delete_document_view(request, document_id):
     if request.method == "POST":
         document = get_object_or_404(Document, id=document_id, owner=request.user)
         
-        # Delete the actual file from storage (CLoudinary)
         if document.file:
             try:
                 document.file.delete(save=False)
