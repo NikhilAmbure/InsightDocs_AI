@@ -34,7 +34,7 @@ google-auth-httplib2==0.2.1
 google-generativeai==0.8.5
 googleapis-common-protos==1.72.0
 grpcio==1.76.0
-grpcio-status==1.71.2
+grpcio-status==1.75.1
 httplib2==0.31.0
 hyperlink==21.0.0
 idna==3.11
@@ -42,7 +42,7 @@ incremental==24.7.2
 lxml==6.0.2
 MarkupSafe==3.0.3
 proto-plus==1.26.1
-protobuf==5.29.5
+protobuf==6.31.1
 psycopg2==2.9.11
 psycopg2-binary==2.9.11
 pyasn1==0.6.1
@@ -83,13 +83,5 @@ langchain-text-splitters==0.3.5
 razorpay==1.4.2
 pytesseract==0.3.10
 python-pptx==1.0.2
-Pillow==10.2.0
+Pillow==11.3.0
 sentence-transformers==3.3.1
-
-# --- Missing Real-time & Vector Support ---
-channels-redis==4.2.0
-pgvector==0.3.6
-
-# --- Missing AI & RAG Utilities ---
-langchain-text-splitters==0.3.5
-google-generativeai==0.8.5

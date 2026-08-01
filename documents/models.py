@@ -23,9 +23,6 @@ class Document(models.Model):
 
     # Added a flag to track if RAG processing is done
     is_processed = models.BooleanField(default=False)
-    # Optional editable plain-text version of the document for in-app editing
-    editable_text = models.TextField(blank=True, null=True, help_text="Editable plain-text representation of the document.")
-    
 
     class Meta:
         ordering = ("-uploaded_at",)

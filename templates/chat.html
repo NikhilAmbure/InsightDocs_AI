@@ -417,38 +417,6 @@
                                     </div>
                                 {% endfor %}
                             </div>
-
-                            <!-- Notes Panel (inline, minimizable) -->
-                            <div id="notes-panel" class="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
-                                <div class="flex items-center justify-between mb-2">
-                                    <button type="button"
-                                            onclick="toggleNotesPanel()"
-                                            class="flex items-center gap-2 text-left">
-                                        <span class="text-[10px] font-semibold uppercase tracking-widest text-zinc-400">
-                                            Notes
-                                        </span>
-                                        <span id="notes-status" class="text-[10px] text-zinc-500"></span>
-                                        <i id="notes-toggle-icon" class="fa-solid fa-chevron-down text-[9px] text-zinc-400 transition-transform"></i>
-                                    </button>
-                                    <div class="flex items-center gap-2">
-                                        <button type="button"
-                                                onclick="saveEditableDocument()"
-                                                class="rounded-full border border-violet-500/40 bg-violet-600/80 px-3 py-1 text-[10px] font-semibold text-white hover:bg-violet-500 transition-colors">
-                                            Save
-                                        </button>
-                                        <button type="button"
-                                                onclick="downloadEditableDocument()"
-                                                class="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-medium text-zinc-200 hover:bg-white/10 transition-colors">
-                                            Download .txt
-                                        </button>
-                                    </div>
-                                </div>
-                                <div id="notes-body">
-                                    <textarea id="doc-editor-textarea"
-                                              class="w-full h-40 bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-zinc-100 resize-y focus:outline-none focus:ring-1 focus:ring-violet-500/60"
-                                              placeholder="Write notes about this document or your conversation here..."></textarea>
-                                </div>
-                            </div>
                         </div>
                     </div>
 

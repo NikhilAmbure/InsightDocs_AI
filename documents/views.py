@@ -160,37 +160,6 @@ def serve_document_view(request, document_id):
     return redirect(document.file.url)
 
 
-@login_required(login_url='login')
-def document_editable_api_view(request, document_id):
-    """
-    Lightweight API for getting/saving an editable text version of a document.
-    - GET: returns {"text": "..."} (from Document.editable_text or chunks fallback)
-    - POST: accepts {"text": "..."} and stores it on the Document.
-    """
-    document = get_object_or_404(Document, id=document_id, owner=request.user)
-
-    if request.method == "GET":
-        text = document.editable_text
-        if not text:
-            # Fallback: reconstruct from chunks (if available)
-            chunks_qs = document.chunks.order_by("chunk_index").values_list("content", flat=True)
-            text = "\n\n".join(chunks_qs)
-        return JsonResponse({"text": text or ""})
-
-    if request.method == "POST":
-        try:
-            payload = json.loads(request.body.decode("utf-8") or "{}")
-        except json.JSONDecodeError:
-            return JsonResponse({"detail": "Invalid JSON"}, status=400)
-
-        text = payload.get("text", "")
-        document.editable_text = text
-        document.save(update_fields=["editable_text"])
-        return JsonResponse({"status": "ok"})
-
-    return JsonResponse({"detail": "Method not allowed"}, status=405)
-
-
 def coming_soon(request):
     return render(request, 'coming-soon.html')
 

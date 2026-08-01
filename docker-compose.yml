@@ -1,69 +1,21 @@
 version: "3.9"
 
 services:
-  web:
-    build: .
-    command: daphne -b 0.0.0.0 -p 8000 InsightDocs_AI.asgi:application
-    env_file:
-      - .env.docker
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/insightdocs_db
-      REDIS_URL: redis://redis:6379/0
-      DB_HOST: db
-      DB_PORT: 5432
-      DEBUG: "False"
-    ports:
-      - "8000:8000"
-    volumes:
-      - .:/app
-      - static_volume:/app/staticfiles
-      - media_volume:/app/media
-    depends_on:
-      - db
-      - redis
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: insightdocs_postgres
     restart: unless-stopped
 
-  worker:
-    build: .
-    command: celery -A InsightDocs_AI worker --loglevel=info
-    env_file:
-      - .env.docker
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/insightdocs_db
-      REDIS_URL: redis://redis:6379/0
-      DB_HOST: db
-      DB_PORT: 5432
-      DEBUG: "False"
-    volumes:
-      - .:/app
-      - media_volume:/app/media
-    depends_on:
-      - db
-      - redis
-    restart: unless-stopped
-
-  db:
-    image: pgvector/pgvector:pg16
-    environment:
-      POSTGRES_DB: insightdocs_db
+      POSTGRES_DB: insightdocs_dev
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+
     ports:
-      - "5433:5432"
+      - "5432:5432"
+
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6380:6379"
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
 
 volumes:
   postgres_data:
-  redis_data:
-  static_volume:
-  media_volume:
