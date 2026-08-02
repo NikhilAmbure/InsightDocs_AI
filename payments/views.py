@@ -14,6 +14,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from .models import SubscriptionPlan, Subscription, Payment
+from .services import get_usage_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -209,11 +210,14 @@ def razorpay_webhook(request):
         return JsonResponse({"status": "not_found"}, status=404)
 
     if event_type == "payment.captured":
+        if payment.status == "captured":
+            logger.info(f"Webhook: order {razorpay_order_id} already captured, skipping.")
+            return JsonResponse({"status": "already_processed"})
+
         payment.razorpay_payment_id = razorpay_payment_id
         payment.status = "captured"
         payment.save(update_fields=["razorpay_payment_id", "status", "updated_at"])
         _activate_subscription(payment.user, payment.plan)
-        logger.info(f"Webhook: payment.captured for order {razorpay_order_id}")
 
     elif event_type == "payment.failed":
         payment.razorpay_payment_id = razorpay_payment_id
@@ -250,9 +254,17 @@ def _activate_subscription(user, plan):
             "status": "active",
             "start_date": now,
             "end_date": end_date,
+            "tokens_allocated": plan.token_quota,
+            "tokens_used": 0,
+            "tokens_granted_at": now,
         },
     )
 
     # Update the user's premium flag
     user.is_premium = True
     user.save(update_fields=["is_premium"])
+    return subscription
+
+@login_required(login_url="login")
+def usage_status(request):
+    return JsonResponse(get_usage_snapshot(request.user))

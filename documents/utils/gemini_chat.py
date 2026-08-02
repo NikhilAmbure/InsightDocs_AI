@@ -31,6 +31,8 @@ _CROSS_ENCODER = None
 _CROSS_ENCODER_DISABLED = False
 
 
+
+
 def _extract_retry_seconds(error_text):
     if not error_text:
         return 60
@@ -85,6 +87,13 @@ USER QUESTION:
     cleaned = [q.strip() for q in queries if isinstance(q, str) and q.strip()]
     return cleaned[:3] or [user_message]
 
+def _track_usage(usage_acc, response):
+    """Append total_token_count from a Gemini response's usage_metadata, if present."""
+    if usage_acc is None:
+        return
+    usage = getattr(response, "usage_metadata", None)
+    if usage is not None:
+        usage_acc.append(getattr(usage, "total_token_count", 0) or 0)
 
 def _hybrid_retrieve(document, query_text, top_k=TOP_K_PER_STEP):
     result = genai.embed_content(
@@ -304,7 +313,7 @@ async def _yield_in_chunks(text, size=FALLBACK_CHUNK_SIZE):
         yield text[i : i + size]
 
 
-async def get_gemini_response(user_message, document, chat_history, progress_callback=None):
+async def get_gemini_response(user_message, document, chat_history, progress_callback=None, usage_callback=None):
     """
     Async generator that streams response using agentic hybrid RAG.
     """
@@ -431,12 +440,35 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
             chat = model.start_chat(history=history)
             response_stream = await chat.send_message_async(user_message, stream=True)
 
+            last_usage = None
             async for chunk in response_stream:
                 try:
                     if chunk.text:
                         yield chunk.text
                 except (ValueError, AttributeError):
                     pass
+                last_usage = getattr(chunk, "usage_metadata", None) or last_usage
+
+            if usage_callback and last_usage is not None:
+                total_tokens = getattr(last_usage, "total_token_count", 0) or 0
+                await usage_callback(total_tokens)
+
+            usage_acc = []
+            usage_reported = False
+
+            async def _report_usage(extra_tokens=0):
+                nonlocal usage_reported
+                if usage_reported or not usage_callback:
+                    return
+                total_tokens = sum(usage_acc) + (extra_tokens or 0)
+                if total_tokens <= 0:
+                    return
+                usage_reported = True
+                try:
+                    await usage_callback(total_tokens)
+                except Exception as usage_error:
+                    logger.warning(f"usage_callback failed for doc {document.id}: {usage_error}")
+            
         except ResourceExhausted:
             _set_gemini_cooldown_from_error("seconds: 60")
             logger.warning(f"Gemini API limit reached for doc {document.id}, switching to Groq.")
@@ -483,3 +515,4 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
                 yield part
         else:
             yield "An error occurred while processing your request. Please try again later."
+

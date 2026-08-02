@@ -12,11 +12,21 @@ class SubscriptionPlan(models.Model):
     slug = models.SlugField(unique=True)                              # e.g. "free", "pro", "enterprise"
     price_inr = models.DecimalField(max_digits=10, decimal_places=2)  # Price in INR (₹)
     price_display = models.CharField(max_length=20, blank=True)       # e.g. "₹799", "$9.99"
-    duration_days = models.IntegerField(default=30)                   # Billing cycle length
+    duration_days = models.IntegerField(default=30)     
+              # Billing cycle length
     doc_limit = models.IntegerField(default=10)
     chat_limit = models.IntegerField(default=500)
     max_file_size_mb = models.IntegerField(default=10)
     is_active = models.BooleanField(default=True)
+
+    # Token-metered usage (pay-as-you-go against the master Gemini key).
+    # 0 = "not token metered" — falls back to doc_limit/chat_limit instead
+    # (e.g. the Free plan). Pro-style plans set this to the purchased budget,
+    # e.g. 5_000_000 for a $10 top-up.
+    token_quota = models.BigIntegerField(
+        default=0,
+        help_text="LLM tokens granted per billing cycle. 0 = not token-metered.",
+    )
 
     class Meta:
         ordering = ("price_inr",)
@@ -54,9 +64,36 @@ class Subscription(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="active")
     start_date = models.DateTimeField(default=timezone.now)
     end_date = models.DateTimeField(null=True, blank=True)
+
     razorpay_subscription_id = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    tokens_allocated = models.BigIntegerField(default=0)
+    tokens_used = models.BigIntegerField(default=0)
+    tokens_granted_at = models.DateTimeField(
+        null=True, blank=True, help_text="When the current token bucket was last topped up."
+    )
+
+    @property
+    def current_period_end(self):
+        return self.end_date  # you already have end_date
+
+    @property
+    def tokens_remaining(self):
+        return max(self.tokens_allocated - self.tokens_used, 0)
+
+    @property
+    def is_token_metered(self):
+        return bool(self.plan and self.plan.token_quota > 0)
+
+    @property
+    def has_tokens_available(self):
+        if not self.is_active:
+            return False
+        if not self.is_token_metered:
+            return True  # not gated here — Free plan uses chat_limit instead
+        return self.tokens_used < self.tokens_allocated
 
     def __str__(self):
         return f"{self.user.username} – {self.plan.name if self.plan else 'None'} ({self.status})"

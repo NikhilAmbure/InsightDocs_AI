@@ -1301,6 +1301,15 @@
         window.addEventListener('beforeunload', function() {
             if (chatSocket && chatSocket.readyState === WebSocket.OPEN) chatSocket.close();
         });
+
+        function updateUsagePill(usage) {
+            const pill = document.getElementById('token-usage-pill');
+            if (!usage || !usage.is_token_metered) { pill.classList.add('hidden'); pill.classList.remove('flex'); return; }
+            pill.classList.remove('hidden'); pill.classList.add('flex');
+            const pct = Math.min(usage.percent_used || 0, 100);
+            document.getElementById('token-usage-pill-bar').style.width = `${pct}%`;
+            document.getElementById('token-usage-pill-text').textContent = `${formatTokenCount(usage.tokens_remaining)} left`;
+        }
     </script>
 </body>
 </html>

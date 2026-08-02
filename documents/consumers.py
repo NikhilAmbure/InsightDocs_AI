@@ -110,17 +110,32 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def process_ai_response(self, document, session, user_message, chat_history):
         """Process message through Gemini AI using RAG (Streaming)"""
         try:
+
+            if self.user.is_premium:
+                has_quota = await self.has_token_quota()
+                if not has_quota:
+                    await self.send_error(
+                        "You've used up your Pro plan quota for this billing cycle. "
+                        "It renews on your next billing date."
+                    )
+                    return
+            
             # 1. Notify client that AI is thinking
             await self.send(text_data=json.dumps({'type': 'ai_thinking'}))
 
             full_response = ""
+
+            async def _record_usage(total_tokens):
+                await self.deduct_user_tokens(total_tokens)
 
             # 2. Stream chunks to the client as we receive them
             async for chunk in get_gemini_response(
                 user_message,
                 document,
                 chat_history,
+                usage_callback=_record_usage,
             ):
+
                 full_response += chunk
                 await self.send(text_data=json.dumps({
                     'type': 'ai_stream_chunk',
@@ -177,6 +192,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
         except Document.DoesNotExist:
             return False
 
+    @database_sync_to_async
+    def has_token_quota(self):
+        from payments.services import has_available_tokens
+        return has_available_tokens(self.user)
+
+    @database_sync_to_async
+    def deduct_user_tokens(self, total_tokens):
+        from payments.services import deduct_tokens
+        deduct_tokens(self.user, total_tokens)
+
+        async def _record_usage(total_tokens):
+            usage = await self.deduct_user_tokens(total_tokens)
+            await self.send(text_data=json.dumps({'type': 'usage_update', 'usage': usage}))
+
+    
     @database_sync_to_async
     def get_document(self):
         try:
