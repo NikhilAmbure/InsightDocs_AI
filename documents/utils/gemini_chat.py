@@ -320,6 +320,16 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
     try:
         logger.info(f"Starting Gemini generation for doc {document.id}...")
         model = genai.GenerativeModel("gemini-2.5-flash")
+
+        # Detect global query vs local query
+        query_lower = user_message.lower()
+        global_keywords = [
+            "list all", "all questions", "every question", "entire", "summarize", 
+            "summary", "full", "whole", "table of contents", "index", "complete list",
+            "all the questions", "list questions", "list the questions"
+        ]
+        is_global_query = any(w in query_lower for w in global_keywords)
+
         if progress_callback:
             await progress_callback("Analyzing question intent...")
 
@@ -341,38 +351,26 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
                 logger.warning(f"Doc {document.id} not yet processed for RAG.")
                 return None
 
-            query_steps = _plan_query_steps(user_message)
-            logger.info(f"Planned retrieval steps: {query_steps}")
+            if is_global_query:
+                # For global/summary/comprehensive queries, fetch up to 60 chunks in chronological order to ensure full recall.
+                chunks_to_use = list(DocumentChunk.objects.filter(document=document).order_by("chunk_index")[:60])
+            else:
+                # Normal local query: retrieve top hybrid chunks.
+                # Bypassing the slow LLM planner, LLM rerankers, and LLM compressor.
+                retrieval = _hybrid_retrieve(document, user_message, top_k=10)
+                chunks_to_use = retrieval["hybrid_chunks"]
 
-            selected = []
-            seen = set()
-            for step_query in query_steps:
-                retrieval = _hybrid_retrieve(document, step_query, top_k=TOP_K_PER_STEP)
-
-                # 1) Take top pgvector chunks (primary semantic retrieval).
-                vector_chunks = retrieval["vector_chunks"]
-                cross_reranked = _rerank_chunks_cross_encoder(user_message, vector_chunks)
-                if cross_reranked is None:
-                    cross_reranked = _rerank_chunks_gemini(user_message, vector_chunks)
-
-                # 2) Add keyword chunks from PostgreSQL FTS to keep exact-term recall high.
-                fts_chunks = retrieval["keyword_chunks"]
-                step_chunks = (cross_reranked[:TOP_K_PER_STEP] if cross_reranked else []) + fts_chunks
-
-                for chunk in step_chunks:
-                    if chunk.id not in seen:
-                        selected.append(chunk)
-                        seen.add(chunk.id)
-
-            if not selected:
+            if not chunks_to_use:
                 return None
 
-            final_reranked = _rerank_chunks_cross_encoder(user_message, selected[:10])
-            if final_reranked is None:
-                final_reranked = _rerank_chunks_gemini(user_message, selected[:10])
-
-            # Contextual compression before answer generation.
-            return _compress_context(user_message, final_reranked[:TOP_K_PER_STEP])
+            # Format chunks with page markers
+            parts = []
+            for c in chunks_to_use:
+                if c.page_number is not None:
+                    parts.append(f"[Page {c.page_number}]: {c.content}")
+                else:
+                    parts.append(c.content)
+            return "\n\n".join(parts)
 
         try:
             if progress_callback:
@@ -417,9 +415,25 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
             "- If the document does NOT contain the answer, answer using general knowledge.\n"
             "- If using general knowledge, explicitly say: "
             "'This answer is based on general knowledge, not the document.'\n"
-            "- Do NOT hallucinate document-specific facts.\n"
-            "- Be concise, clear, and helpful.\n"
+            "- Do NOT hallucinate document-specific facts.\n\n"
+            "Formatting & Structure Guidelines:\n"
+            "- Structure your answers using clean, readable Markdown layout.\n"
+            "- Use relevant level-3 headers (###) to separate distinct topics, sections, or categories. Do not use H1 or H2.\n"
+            "- Use bolding (**word**) to highlight critical names, terms, metrics, numbers, or section labels.\n"
+            "- Present lists using bullet points (- ) or numbered lists (1. ) instead of dense, multi-sentence paragraphs.\n"
+            "- When comparing data, key parameters, or presenting structured lists of metrics/properties, organize them in a clean Markdown table.\n"
+            "- Wrap direct quotes or critical definitions from the document in blockquotes (> quote).\n"
+            "- For programming code, commands, database queries, or structured JSON configurations, wrap them in code blocks specifying the language name (e.g. ```python, ```sql).\n"
+            "- Keep paragraphs short and concise (2-3 sentences max) to improve readability.\n"
         )
+        if is_global_query:
+            base_instruction += (
+                "- The user is asking for a comprehensive list or summary. "
+                "You must be EXHAUSTIVE and list EVERY single item, question, or detail found in the context. "
+                "Do NOT truncate the list, omit items, or skip numbers. List all of them completely.\n"
+            )
+        else:
+            base_instruction += "- Be concise, clear, and helpful.\n"
 
         system_parts = _build_system_parts(base_instruction, context_text)
 
@@ -450,7 +464,9 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
                 last_usage = getattr(chunk, "usage_metadata", None) or last_usage
 
             if usage_callback and last_usage is not None:
-                total_tokens = getattr(last_usage, "total_token_count", 0) or 0
+                prompt_tokens = getattr(last_usage, "prompt_token_count", 0) or 0
+                candidates_tokens = getattr(last_usage, "candidates_token_count", 0) or 0
+                total_tokens = prompt_tokens + candidates_tokens
                 await usage_callback(total_tokens)
 
             usage_acc = []

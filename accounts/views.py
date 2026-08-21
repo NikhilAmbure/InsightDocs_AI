@@ -482,3 +482,124 @@ def reset_password(request):
         return redirect('login')
 
     return render(request, 'otp_reset_template.html', {'mode': 'password_reset'})
+
+
+def google_login(request):
+    """
+    Redirects the user to Google's OAuth2 authorization page.
+    """
+    from django.conf import settings
+    from django.urls import reverse
+    from django.utils.crypto import get_random_string
+
+    client_id = getattr(settings, 'GOOGLE_OAUTH_CLIENT_ID', '')
+    if not client_id:
+        messages.error(request, "Google OAuth is not configured. Please contact support.")
+        return redirect('login')
+
+    redirect_uri = request.build_absolute_uri(reverse('google_callback'))
+    state = get_random_string(32)
+    request.session['google_oauth_state'] = state
+
+    auth_url = (
+        "https://accounts.google.com/o/oauth2/v2/auth"
+        f"?response_type=code"
+        f"&client_id={client_id}"
+        f"&redirect_uri={redirect_uri}"
+        f"&scope=openid%20email%20profile"
+        f"&state={state}"
+    )
+    return redirect(auth_url)
+
+
+def google_callback(request):
+    """
+    Handles the callback from Google, exchanges the auth code for access token,
+    retrieves user details, and logs the user in (creating account if needed).
+    """
+    import requests
+    from django.conf import settings
+    from django.urls import reverse
+    from django.utils.crypto import get_random_string
+
+    state = request.GET.get('state')
+    code = request.GET.get('code')
+    error = request.GET.get('error')
+
+    if error or not code:
+        messages.error(request, f"Google login failed: {error or 'No code provided'}")
+        return redirect('login')
+
+    saved_state = request.session.pop('google_oauth_state', None)
+    if not state or state != saved_state:
+        messages.error(request, "Security verification failed (Invalid state). Please try again.")
+        return redirect('login')
+
+    client_id = getattr(settings, 'GOOGLE_OAUTH_CLIENT_ID', '')
+    client_secret = getattr(settings, 'GOOGLE_OAUTH_CLIENT_SECRET', '')
+    redirect_uri = request.build_absolute_uri(reverse('google_callback'))
+
+    token_url = "https://oauth2.googleapis.com/token"
+    data = {
+        'code': code,
+        'client_id': client_id,
+        'client_secret': client_secret,
+        'redirect_uri': redirect_uri,
+        'grant_type': 'authorization_code'
+    }
+
+    try:
+        token_response = requests.post(token_url, data=data, timeout=10)
+        token_response_data = token_response.json()
+
+        if 'error' in token_response_data:
+            logger.error(f"Google token exchange error: {token_response_data}")
+            messages.error(request, f"Token exchange failed: {token_response_data.get('error_description', '')}")
+            return redirect('login')
+
+        access_token = token_response_data.get('access_token')
+        if not access_token:
+            messages.error(request, "Failed to get access token from Google.")
+            return redirect('login')
+
+        user_info_url = "https://www.googleapis.com/oauth2/v3/userinfo"
+        headers = {'Authorization': f'Bearer {access_token}'}
+        user_info_response = requests.get(user_info_url, headers=headers, timeout=10)
+        user_info = user_info_response.json()
+
+        email = user_info.get('email')
+        if not email:
+            messages.error(request, "Failed to retrieve email address from Google.")
+            return redirect('login')
+
+        if not email.lower().endswith('@gmail.com'):
+            messages.error(request, "Only @gmail.com email addresses are allowed.")
+            return redirect('login')
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            username_prefix = email.split('@')[0]
+            username = username_prefix
+            counter = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{username_prefix}{counter}"
+                counter += 1
+
+            user = User.objects.create(
+                username=username,
+                email=email,
+                email_verified=True,
+                is_2fa_enabled=False
+            )
+            user.set_password(get_random_string(32))
+            user.save()
+
+        login(request, user)
+        messages.success(request, f"Welcome, {user.username}! Successfully logged in via Google.")
+        return redirect('upload')
+
+    except Exception as e:
+        logger.error(f"Exception during Google callback: {str(e)}", exc_info=True)
+        messages.error(request, f"Google login failed due to a server error. Please try again.")
+        return redirect('login')

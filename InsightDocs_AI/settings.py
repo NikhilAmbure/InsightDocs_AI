@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     'accounts',
     'documents',
     'payments',
+    'rest_framework',
 ]
 
 MIDDLEWARE = [
@@ -345,3 +346,7 @@ SECURE_SSL_REDIRECT = False
 RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '')
 RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '')
 RAZORPAY_WEBHOOK_SECRET = os.environ.get('RAZORPAY_WEBHOOK_SECRET', '')
+
+# Google OAuth Credentials
+GOOGLE_OAUTH_CLIENT_ID = os.environ.get('GOOGLE_OAUTH_CLIENT_ID', '')
+GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get('GOOGLE_OAUTH_CLIENT_SECRET', '')

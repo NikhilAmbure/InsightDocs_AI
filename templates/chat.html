@@ -10,6 +10,15 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     
+    <!-- Highlight.js for syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    
+    <!-- KaTeX for mathematical notation rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+    
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -80,19 +89,90 @@
         .markdown-body { font-size: 14px; line-height: 1.6; color: #e4e4e7; } /* Reduced from 15px */
         .markdown-body p { margin-bottom: 0.8rem; }
         .markdown-body p:last-child { margin-bottom: 0; }
+        
+        /* Headers */
+        .markdown-body h3 { font-size: 1.15rem; font-weight: 650; color: #fff; margin-top: 1.2rem; margin-bottom: 0.5rem; font-family: 'Plus Jakarta Sans', sans-serif; }
+        .markdown-body h4 { font-size: 1.05rem; font-weight: 600; color: #fff; margin-top: 0.9rem; margin-bottom: 0.4rem; }
+        
+        /* Lists */
         .markdown-body ul { list-style-type: disc; margin-left: 1.5rem; margin-bottom: 1rem; }
         .markdown-body ol { list-style-type: decimal; margin-left: 1.5rem; margin-bottom: 1rem; }
+        .markdown-body li { margin-bottom: 0.25rem; }
+        .markdown-body li::marker { color: #a78bfa; }
+        
         .markdown-body strong { font-weight: 600; color: #fff; }
+        
+        /* Code blocks & code */
         .markdown-body pre { 
             background: #18181b; padding: 1rem; border-radius: 0.75rem; overflow-x: auto; 
             margin-bottom: 1rem; border: 1px solid rgba(255,255,255,0.08);
         }
         .markdown-body code { 
             font-family: 'Menlo', 'Monaco', 'Courier New', monospace; 
-            background: rgba(255,255,255,0.1); 
-            padding: 0.1rem 0.3rem; border-radius: 0.25rem; font-size: 0.85em;
+            background: rgba(255,255,255,0.06); 
+            padding: 0.15rem 0.35rem; border-radius: 0.25rem; font-size: 0.85em;
+            color: #f472b6; /* slightly tinted code color for single backticks */
         }
-        .markdown-body pre code { background: transparent; padding: 0; color: #e2e8f0; font-size: 0.9em; }
+        .markdown-body pre code { 
+            background: transparent; 
+            padding: 0; 
+            color: #e2e8f0; 
+            font-size: 0.9em; 
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace; 
+        }
+        
+        /* Tables */
+        .markdown-body table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 0.75rem; 
+            margin-bottom: 1rem; 
+            font-size: 0.85rem; 
+            color: #d1d5db; 
+            display: block; 
+            overflow-x: auto; 
+            border-radius: 0.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .markdown-body th { 
+            background: rgba(124, 58, 237, 0.15); 
+            color: #fff; 
+            font-weight: 600; 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
+            padding: 0.5rem 0.75rem; 
+            text-align: left; 
+        }
+        .markdown-body td { 
+            border: 1px solid rgba(255, 255, 255, 0.06); 
+            padding: 0.5rem 0.75rem; 
+        }
+        .markdown-body tr:nth-child(even) { 
+            background: rgba(255, 255, 255, 0.015); 
+        }
+        .markdown-body tr:hover { 
+            background: rgba(255, 255, 255, 0.03); 
+        }
+        
+        /* Blockquotes */
+        .markdown-body blockquote { 
+            border-left: 3px solid #7c3aed; 
+            padding-left: 1rem; 
+            margin: 1rem 0; 
+            color: #a1a1aa; 
+            font-style: italic; 
+            background: rgba(124, 58, 237, 0.03); 
+            padding-top: 0.4rem; 
+            padding-bottom: 0.4rem; 
+            border-radius: 0 0.5rem 0.5rem 0; 
+        }
+        
+        /* Horizontal rules */
+        .markdown-body hr { 
+            border: 0; 
+            border-top: 1px solid rgba(255, 255, 255, 0.08); 
+            margin: 1.25rem 0; 
+        }
+        
         .markdown-body a { color: #a78bfa; text-decoration: underline; }
 
         /* Sidebar Transition */
@@ -279,9 +359,18 @@
                     </button>
 
                     <div class="flex flex-col border-l border-white/10 pl-4">
-                        <h1 class="flex items-center gap-2 text-xs font-semibold text-white sm:text-sm">
+                        <h1 class="flex flex-wrap items-center gap-2 text-xs font-semibold text-white sm:text-sm">
                             {{ document.title }}
                             <span class="hidden rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-zinc-300 sm:inline-block">{{ document.extension|upper }}</span>
+                            {% if document.is_processed %}
+                                <span id="doc-processing-status" class="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> Ready
+                                </span>
+                            {% else %}
+                                <span id="doc-processing-status" class="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-300 border border-amber-500/30 flex items-center gap-1 animate-pulse">
+                                    <span class="h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping"></span> Processing...
+                                </span>
+                            {% endif %}
                         </h1>
                     </div>
                 </div>
@@ -291,6 +380,13 @@
                         <span class="status-dot connecting"></span>
                         <span class="hidden sm:inline">Connecting...</span>
                     </div>
+
+                    {% if request.user.subscription.is_token_metered %}
+                        <div id="token-usage-display" class="hidden sm:flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/5 px-3 py-1 text-[10px] text-violet-300 backdrop-blur-md">
+                            <i class="fa-solid fa-microchip"></i>
+                            <span>Tokens: <strong id="tokens-remaining-count">{{ request.user.subscription.tokens_remaining }}</strong></span>
+                        </div>
+                    {% endif %}
 
                     <a href="{% url 'subscription' %}" class="flex items-center gap-1.5 sm:gap-2 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-1 sm:px-4 sm:py-1.5 text-[10px] font-bold text-white shadow-lg shadow-violet-500/20 hover:scale-105 hover:shadow-violet-500/30 transition-all">
                         <i class="fa-solid fa-crown text-[9px]"></i>
@@ -311,11 +407,18 @@
                     <div id="chat-container" class="flex-1 overflow-y-auto px-4 py-6 sm:px-8 scroll-smooth scrollbar-thin">
                         <div class="mx-auto max-w-3xl space-y-8 pb-32">
                             
-                            <div class="flex items-center justify-center pb-2 opacity-80">
-                                <div class="flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-[10px] text-violet-300 backdrop-blur">
-                                    <i class="fa-solid fa-sparkles animate-pulse"></i>
-                                    AI is ready to chat
-                                </div>
+                            <div id="ai-chat-readiness" class="flex items-center justify-center pb-2 opacity-80">
+                                {% if document.is_processed %}
+                                    <div class="flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-[10px] text-violet-300 backdrop-blur">
+                                        <i class="fa-solid fa-sparkles animate-pulse"></i>
+                                        AI is ready to chat
+                                    </div>
+                                {% else %}
+                                    <div class="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[10px] text-amber-300 backdrop-blur">
+                                        <i class="fa-solid fa-circle-notch animate-spin"></i>
+                                        AI is reading and indexing document...
+                                    </div>
+                                {% endif %}
                             </div>
 
                             {% if document_insights %}
@@ -714,7 +817,7 @@
             messagesDiv.appendChild(msgWrapper);
             activeAssistantMsgEl = msgWrapper;
             activeAssistantContent = '';
-            scrollToBottom();
+            scrollToBottom(true);
             return activeAssistantMsgEl;
         }
 
@@ -739,14 +842,14 @@
             const contentDiv = container.querySelector('#ai-stream-content');
             activeAssistantContent = data.content || activeAssistantContent;
             if (contentDiv) {
-                contentDiv.innerHTML = marked.parse(formatCitations(activeAssistantContent || ''));
+                renderMarkdownElement(contentDiv, activeAssistantContent);
             }
             if (data.id) {
                 container.id = `msg-${data.id}`;
             }
             activeAssistantMsgEl = null;
             activeAssistantContent = '';
-            scrollToBottom();
+            scrollToBottom(true);
         }
 
         function handleWebSocketMessage(data) {
@@ -756,6 +859,14 @@
             else if (data.type === 'ai_stream_end') finalizeAiStream(data);
             else if (data.type === 'ai_message') { removeLoadingIndicator(); addMessageToUI(data.content, 'assistant', data.id); } // fallback
             else if (data.type === 'error') { removeLoadingIndicator(); showError(data.message); }
+            else if (data.type === 'usage_update') {
+                const countEl = document.getElementById('tokens-remaining-count');
+                const displayEl = document.getElementById('token-usage-display');
+                if (data.usage && data.usage.is_token_metered) {
+                    if (countEl) countEl.textContent = Number(data.usage.tokens_remaining).toLocaleString();
+                    if (displayEl) displayEl.classList.remove('hidden');
+                }
+            }
         }
 
         // --- Editable Document Helpers (real-time editing & download) ---
@@ -909,7 +1020,7 @@
                                 </div>
                             </div>
                             <div class="bg-transparent text-sm text-zinc-200 markdown-body">
-                                <div class="markdown-content">${marked.parse(formatCitations(content))}</div>
+                                <div class="markdown-content"></div>
                             </div>
                             <div class="flex items-center gap-3 mt-3">
                                 <button onclick="copyMessage(this)" class="group/btn flex items-center gap-1.5 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors">
@@ -920,9 +1031,13 @@
                         </div>
                     </div>
                 `;
+                const contentDiv = msgWrapper.querySelector('.markdown-content');
+                if (contentDiv) {
+                    renderMarkdownElement(contentDiv, content);
+                }
             }
             messagesDiv.appendChild(msgWrapper);
-            scrollToBottom();
+            scrollToBottom(role === 'user');
         }
 
         function addLoadingIndicator() {
@@ -996,12 +1111,16 @@
             errorDiv.className = 'mx-auto max-w-3xl mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-xs text-center';
             errorDiv.textContent = message;
             messagesDiv.appendChild(errorDiv);
-            scrollToBottom();
+            scrollToBottom(true);
         }
 
-        function scrollToBottom() {
+        function scrollToBottom(force = false) {
             const container = document.getElementById('chat-container');
-            if (container) setTimeout(() => { container.scrollTop = container.scrollHeight; }, 0);
+            if (!container) return;
+            const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+            if (force || isNearBottom) {
+                setTimeout(() => { container.scrollTop = container.scrollHeight; }, 0);
+            }
         }
 
         const textarea = document.getElementById('message-input');
@@ -1098,12 +1217,54 @@
             }
         });
 
+        let isDocumentProcessed = {% if document.is_processed %}true{% else %}false{% endif %};
+        function pollDocumentStatus() {
+            if (isDocumentProcessed) return;
+            const interval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/document/${DOCUMENT_ID}/status/`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.is_processed) {
+                            isDocumentProcessed = true;
+                            clearInterval(interval);
+                            
+                            // Update header status badge
+                            const headerStatus = document.getElementById('doc-processing-status');
+                            if (headerStatus) {
+                                headerStatus.className = "rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-300 border border-emerald-500/30 flex items-center gap-1";
+                                headerStatus.innerHTML = '<span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> Ready';
+                            }
+                            
+                            // Update readiness indicator in chat area
+                            const chatReadiness = document.getElementById('ai-chat-readiness');
+                            if (chatReadiness) {
+                                chatReadiness.innerHTML = `
+                                    <div class="flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-[10px] text-violet-300 backdrop-blur">
+                                        <i class="fa-solid fa-sparkles animate-pulse"></i>
+                                        AI is ready to chat
+                                    </div>
+                                `;
+                            }
+                            
+                            // Reload page to display new insights
+                            window.location.reload();
+                        }
+                    }
+                } catch (err) {
+                    console.error("Error polling document status:", err);
+                }
+            }, 3000);
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             initWebSocket();
             renderMarkdown();
-            scrollToBottom();
+            scrollToBottom(true);
             loadEditableDocument();
             initPdfViewer();
+            pollDocumentStatus();
+            fetchAndDisplayTokenUsage();
         });
 
         let thePdf = null;
@@ -1275,25 +1436,58 @@
             }
         }
 
+        function renderMarkdownElement(el, rawMarkdown) {
+            el.innerHTML = marked.parse(formatCitations(rawMarkdown || ''));
+            if (window.renderMathInElement) {
+                renderMathInElement(el, {
+                    delimiters: [
+                        { left: '$$', right: '$$', display: true },
+                        { left: '$', right: '$', display: false },
+                        { left: '\\(', right: '\\)', display: false },
+                        { left: '\\[', right: '\\]', display: true }
+                    ],
+                    throwOnError: false
+                });
+            }
+            if (window.hljs) {
+                el.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+            }
+            
+            // Add Copy Code hover buttons to code blocks
+            el.querySelectorAll('pre').forEach(preBlock => {
+                if (preBlock.querySelector('.copy-code-btn')) return;
+                
+                preBlock.style.position = 'relative';
+                preBlock.classList.add('group');
+                
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-code-btn absolute top-2 right-2 opacity-0 group-hover:opacity-100 focus:opacity-100 text-zinc-400 hover:text-white bg-zinc-900/80 hover:bg-zinc-800 border border-white/10 rounded px-2 py-1 text-[10px] flex items-center gap-1.5 transition-all select-none z-10';
+                copyBtn.innerHTML = '<i class="fa-regular fa-copy"></i> <span>Copy</span>';
+                
+                copyBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const codeText = preBlock.querySelector('code')?.innerText || '';
+                    try {
+                        await navigator.clipboard.writeText(codeText);
+                        copyBtn.innerHTML = '<i class="fa-solid fa-check text-green-400"></i> <span class="text-green-400">Copied!</span>';
+                        setTimeout(() => {
+                            copyBtn.innerHTML = '<i class="fa-regular fa-copy"></i> <span>Copy</span>';
+                        }, 2000);
+                    } catch (err) {
+                        console.error('Failed to copy code: ', err);
+                    }
+                });
+                
+                preBlock.appendChild(copyBtn);
+            });
+            
+            el.dataset.rendered = 'true';
+        }
+
         function renderMarkdown() {
             document.querySelectorAll('.markdown-content').forEach(el => {
                 if (!el.dataset.rendered) {
-                    el.innerHTML = marked.parse(el.textContent);
-                    if (window.renderMathInElement) {
-                        renderMathInElement(el, {
-                            delimiters: [
-                                { left: '$$', right: '$$', display: true },
-                                { left: '$', right: '$', display: false },
-                                { left: '\\(', right: '\\)', display: false },
-                                { left: '\\[', right: '\\]', display: true }
-                            ],
-                            throwOnError: false
-                        });
-                    }
-                    if (window.hljs) {
-                        el.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
-                    }
-                    el.dataset.rendered = 'true';
+                    renderMarkdownElement(el, el.textContent);
                 }
             });
         }
@@ -1302,13 +1496,30 @@
             if (chatSocket && chatSocket.readyState === WebSocket.OPEN) chatSocket.close();
         });
 
-        function updateUsagePill(usage) {
-            const pill = document.getElementById('token-usage-pill');
-            if (!usage || !usage.is_token_metered) { pill.classList.add('hidden'); pill.classList.remove('flex'); return; }
-            pill.classList.remove('hidden'); pill.classList.add('flex');
-            const pct = Math.min(usage.percent_used || 0, 100);
-            document.getElementById('token-usage-pill-bar').style.width = `${pct}%`;
-            document.getElementById('token-usage-pill-text').textContent = `${formatTokenCount(usage.tokens_remaining)} left`;
+        async function fetchAndDisplayTokenUsage() {
+            try {
+                const response = await fetch('/payments/usage/');
+                if (response.ok) {
+                    const usage = await response.json();
+                    const countEl = document.getElementById('tokens-remaining-count');
+                    const displayEl = document.getElementById('token-usage-display');
+                    
+                    if (usage && usage.is_token_metered) {
+                        if (countEl) countEl.textContent = Number(usage.tokens_remaining).toLocaleString();
+                        if (displayEl) {
+                            displayEl.classList.remove('hidden');
+                            displayEl.classList.add('flex');
+                        }
+                    } else {
+                        if (displayEl) {
+                            displayEl.classList.add('hidden');
+                            displayEl.classList.remove('flex');
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Error fetching token usage:", err);
+            }
         }
     </script>
 </body>

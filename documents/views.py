@@ -39,15 +39,15 @@ def upload_view(request):
     form = DocumentUploadForm(request.POST or None, request.FILES or None, user=request.user)
 
     if request.method == "POST":
-        upload_rate_limit = getattr(settings, "RATE_LIMITS", {}).get(
-            "upload",
-            {"limit": 5, "window": 60},
-        )
+        # Free users: 5 uploads per min; Premium users: 20 uploads per min
+        limit = 20 if request.user.is_premium else 5
+        window = 60
+        
         limit_result = check_rate_limit(
             request,
             scope="upload",
-            limit=upload_rate_limit.get("limit", 5),
-            window=upload_rate_limit.get("window", 60),
+            limit=limit,
+            window=window,
         )
 
         if limit_result.limited:
@@ -185,3 +185,20 @@ def delete_document_view(request, document_id):
         return redirect("upload")
     
     return redirect("upload")
+
+
+@login_required(login_url='login')
+def document_status_view(request, document_id):
+    document = get_object_or_404(Document, id=document_id, owner=request.user)
+    
+    is_processed = document.is_processed
+    insights_ready = False
+    try:
+        insights = DocumentInsights.objects.get(document=document)
+        if insights.status in [DocumentInsights.STATUS_COMPLETED, DocumentInsights.STATUS_FAILED]:
+            insights_ready = True
+    except DocumentInsights.DoesNotExist:
+        # If it hasn't been created yet, it's not ready
+        pass
+
+    return JsonResponse({"is_processed": is_processed and insights_ready})

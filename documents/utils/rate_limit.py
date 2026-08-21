@@ -53,6 +53,32 @@ def check_rate_limit(
     return RateLimitResult(False, remaining_ttl)
 
 
+def check_user_rate_limit(
+    user,
+    scope: str,
+    limit: int,
+    window: int,
+) -> RateLimitResult:
+    """
+    Check if the specific user has exceeded the rate limit.
+    Useful for WebSocket consumers where we don't have a standard request object.
+    """
+    if user and user.is_authenticated:
+        identifier = f"user:{user.pk}"
+    else:
+        identifier = "anonymous"
+    cache_key = f"rate-limit:{scope}:{identifier}"
+
+    current = cache.get(cache_key, 0)
+    if current >= limit:
+        retry_after = _cache_ttl(cache_key, fallback=window)
+        return RateLimitResult(True, retry_after)
+
+    _increment_counter(cache_key, window)
+    remaining_ttl = _cache_ttl(cache_key, fallback=window)
+    return RateLimitResult(False, remaining_ttl)
+
+
 def _increment_counter(cache_key: str, window: int) -> None:
     """Increment the cached counter, initializing if required."""
     added = cache.add(cache_key, 1, timeout=window)

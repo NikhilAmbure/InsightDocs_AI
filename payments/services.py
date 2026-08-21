@@ -24,7 +24,7 @@ def tokens_remaining(user) -> int:
 
 
 def deduct_tokens(user, consumed_tokens: int) -> None:
-    """Atomic F() update — same pattern as your Aforro inventory deduction."""
+    """Atomic F() update — deduct from tokens_allocated and track in tokens_used."""
     try:
         consumed_tokens = int(consumed_tokens or 0)
     except (TypeError, ValueError):
@@ -33,6 +33,7 @@ def deduct_tokens(user, consumed_tokens: int) -> None:
         return
 
     updated = Subscription.objects.filter(user=user).update(
+        tokens_allocated=F("tokens_allocated") - consumed_tokens,
         tokens_used=F("tokens_used") + consumed_tokens
     )
     if not updated:

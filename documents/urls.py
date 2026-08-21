@@ -12,5 +12,6 @@ urlpatterns = [
     path("chat/<int:document_id>/", views.chat_view, name="chat"),
     path("document/<int:document_id>/serve/", views.serve_document_view, name="serve_document"),
     path("document/<int:document_id>/delete/", views.delete_document_view, name="delete_document"),
+    path("document/<int:document_id>/status/", views.document_status_view, name="document_status"),
     # path("document/<int:document_id>/editable/", views.document_editable_api_view, name="document_editable_api"),
 ]

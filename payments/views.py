@@ -165,67 +165,141 @@ def verify_payment(request):
 
 
 # ─────────── Razorpay Webhook (server‑side verification) ────────────
-@csrf_exempt
-@require_POST
-def razorpay_webhook(request):
-    """
-    Handles Razorpay webhook events (payment.captured, payment.failed, etc.).
-    Verify the webhook signature using X-Razorpay-Signature header.
-    """
-    webhook_secret = getattr(settings, "RAZORPAY_WEBHOOK_SECRET", "")
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status as drf_status
+from django.utils.decorators import method_decorator
 
-    if not webhook_secret:
-        logger.error("RAZORPAY_WEBHOOK_SECRET is not configured!")
-        return JsonResponse({"error": "Webhook not configured."}, status=500)
+@method_decorator(csrf_exempt, name='dispatch')
+class RazorpayWebhookView(APIView):
+    authentication_classes = []
+    permission_classes = []
 
-    signature = request.headers.get("X-Razorpay-Signature", "")
-    payload = request.body.decode("utf-8")
+    def post(self, request, *args, **kwargs):
+        webhook_secret = getattr(settings, "RAZORPAY_WEBHOOK_SECRET", "")
 
-    client = _get_razorpay_client()
-    try:
-        client.utility.verify_webhook_signature(payload, signature, webhook_secret)
-    except razorpay.errors.SignatureVerificationError:
-        logger.warning("Webhook signature verification failed.")
-        return JsonResponse({"error": "Invalid signature."}, status=400)
+        if not webhook_secret:
+            logger.error("RAZORPAY_WEBHOOK_SECRET is not configured!")
+            return Response({"error": "Webhook secret not configured."}, status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # Parse event
-    try:
-        event = json.loads(payload)
-    except json.JSONDecodeError:
-        return JsonResponse({"error": "Invalid JSON payload."}, status=400)
+        signature = request.headers.get("X-Razorpay-Signature", "")
+        payload = request.body.decode("utf-8")
 
-    event_type = event.get("event", "")
-    payment_entity = event.get("payload", {}).get("payment", {}).get("entity", {})
+        client = _get_razorpay_client()
+        try:
+            client.utility.verify_webhook_signature(payload, signature, webhook_secret)
+        except razorpay.errors.SignatureVerificationError:
+            logger.warning("Webhook signature verification failed.")
+            return Response({"error": "Invalid signature."}, status=drf_status.HTTP_400_BAD_REQUEST)
 
-    razorpay_order_id = payment_entity.get("order_id")
-    razorpay_payment_id = payment_entity.get("id")
+        try:
+            event = json.loads(payload)
+        except json.JSONDecodeError:
+            return Response({"error": "Invalid JSON payload."}, status=drf_status.HTTP_400_BAD_REQUEST)
 
-    if not razorpay_order_id:
-        return JsonResponse({"status": "ignored"})
+        event_type = event.get("event", "")
+        payload_data = event.get("payload", {})
+        payment_entity = payload_data.get("payment", {}).get("entity", {})
+        subscription_entity = payload_data.get("subscription", {}).get("entity", {})
 
-    try:
-        payment = Payment.objects.get(razorpay_order_id=razorpay_order_id)
-    except Payment.DoesNotExist:
-        logger.warning(f"Webhook: Payment not found for order {razorpay_order_id}")
-        return JsonResponse({"status": "not_found"}, status=404)
+        user = None
+        plan = None
 
-    if event_type == "payment.captured":
-        if payment.status == "captured":
-            logger.info(f"Webhook: order {razorpay_order_id} already captured, skipping.")
-            return JsonResponse({"status": "already_processed"})
+        if event_type in ["payment.captured", "subscription.charged"]:
+            notes = payment_entity.get("notes", {}) or subscription_entity.get("notes", {}) or {}
+            user_id = notes.get("user_id")
+            plan_id = notes.get("plan_id")
 
-        payment.razorpay_payment_id = razorpay_payment_id
-        payment.status = "captured"
-        payment.save(update_fields=["razorpay_payment_id", "status", "updated_at"])
-        _activate_subscription(payment.user, payment.plan)
+            razorpay_order_id = payment_entity.get("order_id")
+            if not user_id and razorpay_order_id:
+                try:
+                    payment = Payment.objects.get(razorpay_order_id=razorpay_order_id)
+                    user = payment.user
+                    plan = payment.plan
+                except Payment.DoesNotExist:
+                    pass
 
-    elif event_type == "payment.failed":
-        payment.razorpay_payment_id = razorpay_payment_id
-        payment.status = "failed"
-        payment.save(update_fields=["razorpay_payment_id", "status", "updated_at"])
-        logger.info(f"Webhook: payment.failed for order {razorpay_order_id}")
+            razorpay_sub_id = subscription_entity.get("id") or payment_entity.get("subscription_id")
+            if not user and razorpay_sub_id:
+                try:
+                    subscription = Subscription.objects.get(razorpay_subscription_id=razorpay_sub_id)
+                    user = subscription.user
+                    plan = subscription.plan
+                except Subscription.DoesNotExist:
+                    pass
 
-    return JsonResponse({"status": "ok"})
+            from accounts.models import User
+            if not user and user_id:
+                try:
+                    user = User.objects.get(id=user_id)
+                except User.DoesNotExist:
+                    pass
+
+            if not plan and plan_id:
+                try:
+                    plan = SubscriptionPlan.objects.get(id=plan_id)
+                except SubscriptionPlan.DoesNotExist:
+                    pass
+
+            if user:
+                user.is_premium = True
+                user.save(update_fields=["is_premium"])
+
+                now = timezone.now()
+                from django.db.models import F
+                duration_days = plan.duration_days if plan else 60
+                end_date = now + timedelta(days=duration_days)
+
+                sub, created = Subscription.objects.get_or_create(
+                    user=user,
+                    defaults={
+                        "plan": plan,
+                        "plan_type": plan.slug if plan else "pro",
+                        "status": "active",
+                        "start_date": now,
+                        "end_date": end_date,
+                        "tokens_allocated": 2000000,
+                        "tokens_used": 0,
+                        "tokens_granted_at": now,
+                        "razorpay_subscription_id": razorpay_sub_id or "",
+                    }
+                )
+                if not created:
+                    sub.status = "active"
+                    if plan:
+                        sub.plan = plan
+                        sub.plan_type = plan.slug
+                    sub.end_date = end_date
+                    sub.tokens_allocated = F('tokens_allocated') + 2000000
+                    sub.tokens_granted_at = now
+                    if razorpay_sub_id:
+                        sub.razorpay_subscription_id = razorpay_sub_id
+                    sub.save()
+
+                if razorpay_order_id:
+                    Payment.objects.filter(razorpay_order_id=razorpay_order_id).update(
+                        status="captured",
+                        razorpay_payment_id=payment_entity.get("id"),
+                        updated_at=now
+                    )
+
+                logger.info(f"Webhook success: Added 2,000,000 tokens for user {user.username}")
+                return Response({"status": "success", "message": "Tokens added successfully."}, status=drf_status.HTTP_200_OK)
+            else:
+                logger.warning("Webhook user identification failed.")
+                return Response({"error": "User identification failed."}, status=drf_status.HTTP_400_BAD_REQUEST)
+
+        elif event_type == "payment.failed":
+            razorpay_order_id = payment_entity.get("order_id")
+            if razorpay_order_id:
+                Payment.objects.filter(razorpay_order_id=razorpay_order_id).update(
+                    status="failed",
+                    razorpay_payment_id=payment_entity.get("id"),
+                    updated_at=timezone.now()
+                )
+            return Response({"status": "ok"}, status=drf_status.HTTP_200_OK)
+
+        return Response({"status": "ignored"}, status=drf_status.HTTP_200_OK)
 
 
 # ────────── Payment Success & Failure Redirect pages ─────────────────
@@ -247,18 +321,29 @@ def _activate_subscription(user, plan):
     now = timezone.now()
     end_date = now + timedelta(days=plan.duration_days)
 
-    subscription, created = Subscription.objects.update_or_create(
-        user=user,
-        defaults={
-            "plan": plan,
-            "status": "active",
-            "start_date": now,
-            "end_date": end_date,
-            "tokens_allocated": plan.token_quota,
-            "tokens_used": 0,
-            "tokens_granted_at": now,
-        },
-    )
+    tokens_to_allocate = 2000000 if plan.slug == 'pro' else plan.token_quota
+
+    try:
+        subscription = Subscription.objects.get(user=user)
+        subscription.plan = plan
+        subscription.plan_type = plan.slug
+        subscription.status = "active"
+        subscription.end_date = end_date
+        subscription.tokens_allocated = F("tokens_allocated") + tokens_to_allocate
+        subscription.tokens_granted_at = now
+        subscription.save()
+    except Subscription.DoesNotExist:
+        subscription = Subscription.objects.create(
+            user=user,
+            plan=plan,
+            plan_type=plan.slug,
+            status="active",
+            start_date=now,
+            end_date=end_date,
+            tokens_allocated=tokens_to_allocate,
+            tokens_used=0,
+            tokens_granted_at=now,
+        )
 
     # Update the user's premium flag
     user.is_premium = True

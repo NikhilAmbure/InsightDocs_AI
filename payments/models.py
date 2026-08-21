@@ -61,6 +61,7 @@ class Subscription(models.Model):
         null=True,
         related_name="subscriptions",
     )
+    plan_type = models.CharField(max_length=50, default="free", help_text="Plan type (e.g., free, pro).")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="active")
     start_date = models.DateTimeField(default=timezone.now)
     end_date = models.DateTimeField(null=True, blank=True)
@@ -69,7 +70,7 @@ class Subscription(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    tokens_allocated = models.BigIntegerField(default=0)
+    tokens_allocated = models.IntegerField(default=0, help_text="Tracks remaining token balance.")
     tokens_used = models.BigIntegerField(default=0)
     tokens_granted_at = models.DateTimeField(
         null=True, blank=True, help_text="When the current token bucket was last topped up."
@@ -81,11 +82,11 @@ class Subscription(models.Model):
 
     @property
     def tokens_remaining(self):
-        return max(self.tokens_allocated - self.tokens_used, 0)
+        return max(self.tokens_allocated, 0)
 
     @property
     def is_token_metered(self):
-        return bool(self.plan and self.plan.token_quota > 0)
+        return bool(self.plan and self.plan.token_quota > 0) or self.plan_type == 'pro'
 
     @property
     def has_tokens_available(self):
@@ -93,10 +94,10 @@ class Subscription(models.Model):
             return False
         if not self.is_token_metered:
             return True  # not gated here — Free plan uses chat_limit instead
-        return self.tokens_used < self.tokens_allocated
+        return self.tokens_allocated > 0
 
     def __str__(self):
-        return f"{self.user.username} – {self.plan.name if self.plan else 'None'} ({self.status})"
+        return f"{self.user.username} – {self.plan.name if self.plan else self.plan_type} ({self.status})"
 
     @property
     def is_active(self):
