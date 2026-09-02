@@ -1,4 +1,5 @@
 import logging
+# pyrefly: ignore [missing-import]
 from django.db.models import F
 from .models import Subscription
 

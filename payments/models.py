@@ -1,4 +1,5 @@
 import uuid
+# pyrefly: ignore [missing-import]
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -46,7 +47,7 @@ class Subscription(models.Model):
     """
     STATUS_CHOICES = (
         ("active", "Active"),
-        ("expired", "Expired"),
+        ("expired", "Expired"), 
         ("cancelled", "Cancelled"),
     )
 

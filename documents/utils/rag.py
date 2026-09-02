@@ -15,6 +15,9 @@ logger = logging.getLogger(__name__)
 
 genai.configure(api_key=settings.GOOGLE_API_KEY)
 
+# Batch size for embedding API calls (Gemini supports up to 100 texts per call)
+EMBEDDING_BATCH_SIZE = 100
+
 def extract_text_from_file(file_path, mime_type):
     """Extract text content based on file type."""
     pages = []
@@ -78,8 +81,40 @@ def extract_text_from_file(file_path, mime_type):
         
     return pages
 
+
+def _batch_embed(texts):
+    """
+    Embed a list of texts in batches using the Gemini embedding API.
+    Returns a flat list of embedding vectors (one per input text).
+    """
+    all_embeddings = []
+
+    for i in range(0, len(texts), EMBEDDING_BATCH_SIZE):
+        batch = texts[i : i + EMBEDDING_BATCH_SIZE]
+        result = genai.embed_content(
+            model="models/gemini-embedding-001",
+            content=batch,
+            task_type="retrieval_document",
+            output_dimensionality=768,
+        )
+
+        # result["embedding"] is a list of embeddings when content is a list
+        if isinstance(result, dict):
+            embeddings = result.get("embedding", [])
+        else:
+            embeddings = getattr(result, "embedding", [])
+
+        # Normalize: if single text was passed, embedding is a flat list
+        if embeddings and not isinstance(embeddings[0], list):
+            embeddings = [embeddings]
+
+        all_embeddings.extend(embeddings)
+
+    return all_embeddings
+
+
 def process_document_for_rag(document, file_path):
-    """Chunk document and save embeddings."""
+    """Chunk document and save embeddings using batched API calls."""
     try:
         ext_map = {
             'pdf': 'application/pdf',
@@ -100,14 +135,15 @@ def process_document_for_rag(document, file_path):
             logger.warning(f"No text extracted for doc {document.id}")
             return
 
+        # Larger chunks = fewer chunks = fewer API calls + better semantic context
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200,
+            chunk_size=2000,
+            chunk_overlap=300,
             separators=["\n\n", "\n", ".", " ", ""]
         )
 
-        objs = []
-        chunk_index = 0
+        # Phase 1: Split all pages into chunks (fast, no API calls)
+        chunk_data = []  # list of (chunk_text, page_number)
         for page_data in pages_data:
             page_text = page_data["text"]
             page_num = page_data["page_number"]
@@ -116,39 +152,38 @@ def process_document_for_rag(document, file_path):
 
             chunks = text_splitter.split_text(page_text)
             for chunk_text in chunks:
-                if not chunk_text.strip():
-                    continue
+                if chunk_text.strip():
+                    chunk_data.append((chunk_text, page_num))
 
-                # ✅ FIX: Use text-embedding-004 consistently (same model used at query time)
-                result = genai.embed_content(
-                    model="models/gemini-embedding-001",
+        if not chunk_data:
+            logger.warning(f"No non-empty chunks for doc {document.id}")
+            return
+
+        # Phase 2: Batch embed all chunks in one (or few) API call(s)
+        chunk_texts = [text for text, _ in chunk_data]
+        logger.info(f"Embedding {len(chunk_texts)} chunks for doc {document.id} in batch...")
+        embeddings = _batch_embed(chunk_texts)
+
+        if len(embeddings) != len(chunk_data):
+            raise ValueError(
+                f"Embedding count mismatch: got {len(embeddings)} embeddings "
+                f"for {len(chunk_data)} chunks"
+            )
+
+        # Phase 3: Build ORM objects and bulk insert
+        objs = []
+        for idx, ((chunk_text, page_num), embedding) in enumerate(zip(chunk_data, embeddings)):
+            objs.append(
+                DocumentChunk(
+                    document=document,
                     content=chunk_text,
-                    task_type="retrieval_document",
-                    output_dimensionality=3072
+                    embedding=list(embedding),
+                    chunk_index=idx,
+                    page_number=page_num,
                 )
+            )
 
-                if isinstance(result, dict):
-                    embedding_obj = result.get("embedding")
-                else:
-                    embedding_obj = getattr(result, "embedding", None)
-
-                if embedding_obj is None:
-                    raise ValueError("No embedding returned from Gemini for a document chunk.")
-
-                embedding = list(getattr(embedding_obj, "values", embedding_obj))
-
-                objs.append(
-                    DocumentChunk(
-                        document=document,
-                        content=chunk_text,
-                        embedding=embedding,
-                        chunk_index=chunk_index,
-                        page_number=page_num,
-                    )
-                )
-                chunk_index += 1
-
-        logger.info(f"Generated {chunk_index} chunks for doc {document.id}")
+        logger.info(f"Generated {len(objs)} chunks for doc {document.id}")
 
         if objs:
             DocumentChunk.objects.bulk_create(objs)

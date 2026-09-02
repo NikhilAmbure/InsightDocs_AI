@@ -100,7 +100,7 @@ def _hybrid_retrieve(document, query_text, top_k=TOP_K_PER_STEP):
         model="models/gemini-embedding-001",
         content=query_text,
         task_type="retrieval_query",
-        output_dimensionality=3072,
+        output_dimensionality=768,
     )
     query_embedding = result["embedding"]
 

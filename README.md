@@ -41,7 +41,7 @@ Here is a glimpse of the InsightDocs AI experience:
 ## ✨ Key Features
 
 * **📄 Multi-Format Ingestion:** Robust support for PDF, DOCX, TXT, PPTX, PPT files, and images (with OCR) using `PyMuPDF`, `python-docx`, `python-pptx`, and `pytesseract`.
-* **🔍 Advanced RAG System:** Vector-based semantic search using **pgvector** with Gemini embeddings (`text-embedding-004`) for precise document retrieval.
+* **🔍 Advanced RAG System:** Vector-based semantic search using **pgvector** with HNSW indexing and Gemini embeddings (`gemini-embedding-001`) for fast, precise document retrieval.
 * **🤖 Intelligent Chat:** Powered by **Google Gemini 2.5 Flash** for high-speed, context-aware Q&A with intelligent fallback strategies.
 * **⚡ Real-Time Interaction:** Built with **Django Channels** and **Redis** for seamless, low-latency WebSocket communication.
 * **🔐 Secure Authentication:** Complete signup/login system with OTP verification (via Resend), password recovery, and 2FA support.
@@ -49,6 +49,9 @@ Here is a glimpse of the InsightDocs AI experience:
 * **🎨 Futuristic UI:** A responsive, cinematic interface built with **Tailwind CSS** and vanilla JavaScript.
 * **📊 Smart Rate Limiting:** Configurable safeguards to manage upload frequency and API usage.
 * **⚙️ Background Processing:** Celery-powered async document processing and embedding generation.
+* **🚀 Batch Embeddings & HNSW Indexing:** All document chunks are embedded in a single batched API call and indexed with PostgreSQL HNSW for O(log n) approximate nearest neighbor search.
+* **💳 Razorpay Payments:** Integrated Razorpay payment gateway for Pro subscriptions and token top-ups.
+* **🪙 Virtual Credit Ledger:** Token-based usage tracking with atomic balance mutations, immutable audit trail, and automatic top-up via Razorpay webhooks.
 
 ## 🛠️ Tech Stack
 
@@ -56,12 +59,13 @@ Here is a glimpse of the InsightDocs AI experience:
 |:--- |:--- |
 | **Backend** | Python, Django 5.2, Django REST Framework |
 | **AI Model** | Google Generative AI (Gemini 2.5 Flash) |
-| **Embeddings** | Gemini text-embedding-004 (768 dimensions) |
-| **Vector Database** | pgvector (PostgreSQL extension) |
+| **Embeddings** | Gemini gemini-embedding-001 (768 dimensions) |
+| **Vector Database** | pgvector (PostgreSQL extension) with HNSW indexing |
 | **RAG Framework** | LangChain (Text Splitting) |
 | **Real-time** | Django Channels, Daphne, Redis |
 | **Task Queue** | Celery (Background tasks) |
-| **Database** | PostgreSQL with pgvector (Production), SQLite (Local Dev) |
+| **Database** | PostgreSQL with pgvector + HNSW |
+| **Payments** | Razorpay |
 | **Storage** | Cloudinary (Media/Static) |
 | **Frontend** | HTML5, Tailwind CSS, JavaScript |
 | **Infrastructure** | Railway (Hosting), Whitenoise |
@@ -76,8 +80,7 @@ Follow these steps to get the project running locally.
 
 * Python 3.10+
 * Redis (Required for WebSockets/Celery)
-* PostgreSQL with pgvector extension (Recommended for production; SQLite for local dev)
-  * **Note:** Vector search features require PostgreSQL with pgvector. For local development, you can use SQLite, but RAG functionality will be limited.
+* PostgreSQL with pgvector extension (Required for vector search and HNSW indexing)
 
 ### Installation
 
@@ -115,7 +118,7 @@ DEBUG=True
 SECRET_KEY=your_secret_key_here
 
 # Database & Cache
-DATABASE_URL=sqlite:///db.sqlite3
+DATABASE_URL=postgresql://user:password@localhost:5432/insightdocs
 REDIS_URL=redis://127.0.0.1:6379/0
 
 # AI & Email
@@ -126,6 +129,11 @@ RESEND_API_KEY=your_resend_api_key
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
+
+# Razorpay (Required for payments)
+RAZORPAY_KEY_ID=your_razorpay_key_id
+RAZORPAY_KEY_SECRET=your_razorpay_key_secret
+RAZORPAY_WEBHOOK_SECRET=your_razorpay_webhook_secret
 
 # Rate Limiting (Optional settings)
 UPLOAD_RATE_LIMIT=5
@@ -161,7 +169,14 @@ python manage.py runserver
 
 ```
 
-**Note:** For production or full RAG functionality, ensure PostgreSQL with pgvector extension is set up. The vector search features require pgvector for optimal performance.
+9. **Re-embed Existing Documents (Optional):**
+If you have existing documents and need to re-process them with the latest embedding model and chunk size:
+```bash
+python manage.py reembed_documents
+
+```
+
+**Note:** For full RAG functionality, PostgreSQL with the pgvector extension is required. The HNSW vector index is automatically created during migrations.
 
 
 
@@ -252,10 +267,18 @@ InsightDocs_AI/
 │   ├── views.py          # Document upload & management views
 │   ├── consumers.py      # WebSocket consumers for real-time chat
 │   ├── tasks.py          # Celery tasks for document processing
+│   ├── management/
+│   │   └── commands/
+│   │       └── reembed_documents.py  # Re-embedding management command
 │   └── utils/
 │       ├── rag.py        # RAG processing (chunking & embeddings)
 │       ├── gemini_chat.py # Gemini chat with vector search
 │       └── storage.py    # File storage utilities
+├── payments/             # Payment & credit management
+│   ├── models.py         # UserCreditAccount, CreditTransaction models
+│   ├── views.py          # Razorpay checkout & webhook views
+│   ├── signals.py        # Auto-create credit account on user registration
+│   └── services.py       # Atomic credit/debit operations
 ├── InsightDocs_AI/       # Project settings & URL routing
 │   ├── settings.py       # Django configuration
 │   ├── asgi.py          # ASGI config for Channels
@@ -275,14 +298,14 @@ InsightDocs_AI/
 1. **Document Upload & Processing:**
    - User uploads a document (PDF, DOCX, PPTX, etc.)
    - Text is extracted using format-specific parsers
-   - Document is chunked using LangChain's `RecursiveCharacterTextSplitter`
-   - Each chunk is embedded using Gemini's `text-embedding-004` model (768 dimensions)
-   - Embeddings are stored in PostgreSQL with pgvector extension
+   - Document is chunked using LangChain's `RecursiveCharacterTextSplitter` (2000-character chunks for better semantic context)
+   - All chunks are embedded in a **single batched API call** using Gemini's `gemini-embedding-001` model (768 dimensions) — reducing API calls from one-per-chunk to one-per-document
+   - Embeddings are stored in PostgreSQL with pgvector and indexed using an **HNSW vector index** for O(log n) approximate nearest neighbor search
 
 2. **Query Processing:**
    - User asks a question via WebSocket
    - Query is embedded using the same embedding model
-   - Vector similarity search (L2 distance) retrieves top 5 most relevant chunks
+   - **HNSW-indexed** vector similarity search (L2 distance) retrieves top 5 most relevant chunks in sub-millisecond time
    - Retrieved context is passed to Gemini 2.5 Flash along with chat history
    - Response is streamed back in real-time
 
@@ -290,9 +313,18 @@ InsightDocs_AI/
    - If RAG processing isn't complete or no relevant chunks found, the system falls back to general knowledge mode
    - Gemini still provides helpful responses using its training data
 
+4. **Virtual Credit Ledger:**
+   - Each user has a `UserCreditAccount` (auto-created on registration via Django signals) that holds their token balance
+   - Every credit or debit is recorded as an immutable `CreditTransaction` for a full audit trail
+   - Token balance is checked **before** each Gemini API call; tokens are deducted atomically **after** streaming completes
+   - All balance mutations use `select_for_update()` for race-condition-safe concurrency
+   - Razorpay webhook integration automatically tops up tokens when payments are confirmed
+
 ### Technology Highlights
 
-- **Vector Search:** Fast semantic search using pgvector's L2 distance metric
+- **HNSW Vector Index:** O(log n) approximate nearest neighbor search via pgvector HNSW, replacing sequential scans for dramatically faster retrieval
+- **Batch Embeddings:** All chunks embedded in a single API call (e.g., 50 chunks → 1 call instead of 50), reducing latency and API quota usage
+- **Atomic Credit Operations:** `select_for_update()` ensures safe concurrent balance mutations with an immutable transaction log
 - **Async Processing:** Celery handles document processing in the background
 - **Real-time Streaming:** WebSocket connections for instant, streaming responses
 - **Multi-format Support:** Handles documents, presentations, and images with OCR
@@ -307,7 +339,9 @@ InsightDocs_AI/
 * [x] **Vector Store:** Vector embeddings with pgvector and Gemini embeddings
 * [x] **RAG System:** Semantic search and retrieval-augmented generation
 * [x] **Multi-Format Support:** PDF, DOCX, TXT, PPTX, PPT, and image OCR
-* [ ] **Monetization:** Stripe integration for Pro subscriptions
+* [x] **Monetization:** Razorpay integration for Pro subscriptions
+* [x] **Virtual Credit Ledger:** Atomic token balance with immutable audit trail
+* [x] **Performance:** Batch embeddings + HNSW vector indexing
 * [ ] **Multi-Doc Chat:** Querying across multiple files simultaneously
 * [ ] **2FA Enhancement:** Complete two-factor authentication UI/UX
 
@@ -324,7 +358,3 @@ Contributions are welcome! Please follow these steps:
 ---
 
 **Developed by Nikhil Ambure**
-
-```
-
-```
