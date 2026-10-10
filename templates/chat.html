@@ -1138,9 +1138,23 @@
                         <div class="flex items-center justify-between text-[11px] text-zinc-400 mb-2">
                             <div class="flex items-center gap-2">
                                 <span class="rounded-full bg-violet-600/20 text-violet-200 px-2 py-0.5 font-semibold">AI</span>
-                                <span>Streaming...</span>
+                                <span id="ai-stream-status">Streaming...</span>
                             </div>
                         </div>
+
+                        <!-- DeepSeek Chain-of-Thought Reasoning Accordion -->
+                        <div id="ai-thinking-accordion" class="hidden mb-3 rounded-xl border border-fuchsia-500/25 bg-slate-900/90 overflow-hidden text-xs">
+                            <button type="button" onclick="toggleThinkingBlock(this)" class="w-full flex items-center justify-between px-3 py-2 bg-fuchsia-950/25 hover:bg-fuchsia-950/40 text-fuchsia-300 font-mono text-[11px] font-semibold transition-colors">
+                                <span class="flex items-center gap-2">
+                                    <i class="fa-solid fa-brain text-fuchsia-400 text-xs animate-pulse"></i>
+                                    <span>DeepSeek Reasoning (Chain-of-Thought)</span>
+                                    <span class="text-[10px] text-zinc-400 font-normal" id="ai-thinking-state">(Thinking...)</span>
+                                </span>
+                                <i class="fa-solid fa-chevron-down text-zinc-400 text-[10px] transition-transform duration-200"></i>
+                            </button>
+                            <div id="ai-thinking-content" class="px-3 py-2.5 text-[11px] font-mono text-zinc-400 border-t border-fuchsia-500/15 max-h-48 overflow-y-auto whitespace-pre-wrap leading-relaxed select-text"></div>
+                        </div>
+
                         <div class="bg-transparent text-sm text-zinc-200 markdown-body">
                             <div class="markdown-content" id="ai-stream-content"></div>
                         </div>
@@ -1158,6 +1172,33 @@
             activeAssistantContent = '';
             scrollToBottom(true);
             return activeAssistantMsgEl;
+        }
+
+        function toggleThinkingBlock(btn) {
+            const parent = btn.closest('#ai-thinking-accordion') || btn.parentElement;
+            const body = parent.querySelector('#ai-thinking-content');
+            const icon = btn.querySelector('.fa-chevron-down');
+            if (body) {
+                body.classList.toggle('hidden');
+                if (icon) {
+                    icon.classList.toggle('rotate-180');
+                }
+            }
+        }
+
+        function appendAiThinkingChunk(chunk) {
+            removeLoadingIndicator();
+            const container = ensureAssistantStreamContainer();
+            const accordion = container.querySelector('#ai-thinking-accordion');
+            const content = container.querySelector('#ai-thinking-content');
+            const status = container.querySelector('#ai-stream-status');
+            if (accordion) accordion.classList.remove('hidden');
+            if (status) status.textContent = 'Reasoning (DeepSeek v4)...';
+            if (content) {
+                content.textContent += chunk;
+                content.scrollTop = content.scrollHeight;
+            }
+            scrollToBottom();
         }
 
         function escapeForJs(str) {
@@ -1180,6 +1221,12 @@
             removeLoadingIndicator(); // hide loader as soon as text starts streaming
             const container = ensureAssistantStreamContainer();
             const contentDiv = container.querySelector('#ai-stream-content');
+            const thinkingState = container.querySelector('#ai-thinking-state');
+            const status = container.querySelector('#ai-stream-status');
+            if (thinkingState && thinkingState.textContent.includes('Thinking')) {
+                thinkingState.textContent = '(Thought completed)';
+            }
+            if (status) status.textContent = 'Streaming answer...';
             activeAssistantContent += chunk;
             if (contentDiv) {
                 contentDiv.innerHTML = marked.parse(formatCitations(activeAssistantContent));
@@ -1191,6 +1238,12 @@
             removeLoadingIndicator();
             const container = ensureAssistantStreamContainer();
             const contentDiv = container.querySelector('#ai-stream-content');
+            const thinkingState = container.querySelector('#ai-thinking-state');
+            const status = container.querySelector('#ai-stream-status');
+            if (thinkingState && thinkingState.textContent.includes('Thinking')) {
+                thinkingState.textContent = '(Thought completed)';
+            }
+            if (status) status.textContent = 'Completed';
             activeAssistantContent = data.content || activeAssistantContent;
             if (contentDiv) {
                 renderMarkdownElement(contentDiv, activeAssistantContent);
@@ -1206,6 +1259,7 @@
         function handleWebSocketMessage(data) {
             if (data.type === 'user_message') addMessageToUI(data.content, 'user', data.id);
             else if (data.type === 'ai_thinking') addLoadingIndicator(data.model);
+            else if (data.type === 'ai_thinking_chunk') appendAiThinkingChunk(data.content || '');
             else if (data.type === 'ai_progress') updateProgressStage(data.stage);
             else if (data.type === 'ai_stream_chunk') appendAiStreamChunk(data.content || '');
             else if (data.type === 'ai_stream_end') finalizeAiStream(data);

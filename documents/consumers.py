@@ -159,12 +159,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 usage_callback=_record_usage,
                 user=self.user,
             ):
-
-                full_response += chunk
-                await self.send(text_data=json.dumps({
-                    'type': 'ai_stream_chunk',
-                    'content': chunk
-                }))
+                if isinstance(chunk, dict) and chunk.get("type") == "thinking":
+                    th_text = chunk.get("chunk", "")
+                    if th_text:
+                        await self.send(text_data=json.dumps({
+                            'type': 'ai_thinking_chunk',
+                            'content': th_text
+                        }))
+                else:
+                    text_chunk = chunk.get("chunk", "") if isinstance(chunk, dict) else chunk
+                    if text_chunk:
+                        full_response += text_chunk
+                        await self.send(text_data=json.dumps({
+                            'type': 'ai_stream_chunk',
+                            'content': text_chunk
+                        }))
 
             # 3. Save AI Message to DB
             ai_msg = await self.save_ai_message(session, full_response)
@@ -596,11 +605,21 @@ class WorkspaceChatConsumer(AsyncWebsocketConsumer):
                 usage_callback=_record_usage,
                 user=self.user,
             ):
-                full_response += chunk
-                await self.send(text_data=json.dumps({
-                    'type': 'ai_stream_chunk',
-                    'content': chunk
-                }))
+                if isinstance(chunk, dict) and chunk.get("type") == "thinking":
+                    th_text = chunk.get("chunk", "")
+                    if th_text:
+                        await self.send(text_data=json.dumps({
+                            'type': 'ai_thinking_chunk',
+                            'content': th_text
+                        }))
+                else:
+                    text_chunk = chunk.get("chunk", "") if isinstance(chunk, dict) else chunk
+                    if text_chunk:
+                        full_response += text_chunk
+                        await self.send(text_data=json.dumps({
+                            'type': 'ai_stream_chunk',
+                            'content': text_chunk
+                        }))
 
             latency_ms = int((time.time() - start_time) * 1000)
             ai_msg = await self.save_ai_message(

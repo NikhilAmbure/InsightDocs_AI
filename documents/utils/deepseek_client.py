@@ -1,13 +1,12 @@
 import asyncio
 import logging
+import os
 import threading
 from django.conf import settings
 from anthropic import Anthropic
 
 logger = logging.getLogger(__name__)
 
-
-import os
 
 def _get_client():
     token = getattr(settings, "ANTHROPIC_AUTH_TOKEN", "") or os.environ.get("ANTHROPIC_AUTH_TOKEN", "")
@@ -22,9 +21,12 @@ def _get_model_name():
     return getattr(settings, "ANTHROPIC_MODEL", "deepseek-v4-flash")
 
 
-async def stream_deepseek_chat(system_prompt, messages, max_tokens=3000, usage_callback=None):
+async def stream_deepseek_chat(system_prompt, messages, max_tokens=3500, usage_callback=None):
     """
     Async generator that streams responses from DeepSeek v4 Flash via AgentRouter Anthropic gateway.
+    Emits both Chain-of-Thought (thinking) chunks and final text chunks as structured dictionaries:
+      {"type": "thinking", "chunk": "..."}
+      {"type": "text", "chunk": "..."}
     Uses Anthropic official client in a thread-safe queue bridge to ensure TLS compatibility with WAF.
     """
     client = _get_client()
@@ -59,9 +61,19 @@ async def stream_deepseek_chat(system_prompt, messages, max_tokens=3000, usage_c
     def worker():
         try:
             with client.messages.stream(**stream_kwargs) as stream:
-                for text in stream.text_stream:
-                    if text:
-                        loop.call_soon_threadsafe(q.put_nowait, ("chunk", text))
+                for event in stream:
+                    event_type = getattr(event, "type", None)
+                    if event_type == "content_block_delta":
+                        delta = getattr(event, "delta", None)
+                        delta_type = getattr(delta, "type", None)
+                        if delta_type == "thinking_delta":
+                            th = getattr(delta, "thinking", "")
+                            if th:
+                                loop.call_soon_threadsafe(q.put_nowait, ("thinking", th))
+                        elif delta_type == "text_delta":
+                            tx = getattr(delta, "text", "")
+                            if tx:
+                                loop.call_soon_threadsafe(q.put_nowait, ("text", tx))
 
                 msg = stream.get_final_message()
                 in_tok = getattr(msg.usage, "input_tokens", 0) or 0
@@ -78,9 +90,12 @@ async def stream_deepseek_chat(system_prompt, messages, max_tokens=3000, usage_c
     try:
         while True:
             event_type, val = await q.get()
-            if event_type == "chunk":
+            if event_type == "thinking":
                 received_any_chunk = True
-                yield val
+                yield {"type": "thinking", "chunk": val}
+            elif event_type == "text":
+                received_any_chunk = True
+                yield {"type": "text", "chunk": val}
             elif event_type == "usage":
                 if usage_callback and val > 0:
                     try:
@@ -123,9 +138,10 @@ async def call_deepseek_chat(system_prompt, messages, max_tokens=3000):
 
     def _call_sync():
         resp = client.messages.create(**create_kwargs)
+        text_parts = []
         for block in resp.content:
-            if hasattr(block, "text") and block.text:
-                return block.text
-        return ""
+            if getattr(block, "type", None) == "text" and hasattr(block, "text") and block.text:
+                text_parts.append(block.text)
+        return "".join(text_parts) if text_parts else ""
 
     return await asyncio.to_thread(_call_sync)
