@@ -616,18 +616,27 @@
                             </div>
 
                             {% if workspace and suggested_questions %}
-                            <div class="rounded-2xl border border-violet-500/20 bg-violet-500/5 p-4 shadow-inner shadow-violet-500/10">
-                                <div class="mb-3 flex items-center justify-between">
-                                    <h3 class="text-[11px] font-semibold uppercase tracking-wider text-violet-300 flex items-center gap-1.5">
-                                        <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
-                                        Synthesize Workspace
-                                    </h3>
-                                    <span class="rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-zinc-300">
-                                        {{ workspace_docs.count }} Documents
-                                    </span>
+                            <div id="workspace-suggestions-container" class="rounded-2xl border border-violet-500/20 bg-violet-500/5 p-4 shadow-inner shadow-violet-500/10 transition-all duration-300">
+                                <div class="flex items-center justify-between cursor-pointer select-none group" onclick="toggleWorkspaceSuggestions()" role="button" aria-expanded="true" aria-controls="workspace-suggestions-body" title="Click to collapse / expand">
+                                    <div class="flex items-center gap-2">
+                                        <div class="h-6 w-6 rounded-lg bg-violet-500/20 flex items-center justify-center text-violet-300">
+                                            <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
+                                        </div>
+                                        <h3 class="text-[11px] font-semibold uppercase tracking-wider text-violet-300 group-hover:text-violet-200 transition-colors flex items-center gap-1.5">
+                                            Synthesize Workspace
+                                        </h3>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-zinc-300">
+                                            {{ workspace_docs.count }} Documents
+                                        </span>
+                                        <span class="h-6 w-6 rounded-lg bg-white/5 group-hover:bg-violet-500/20 flex items-center justify-center text-zinc-400 group-hover:text-violet-300 transition-colors">
+                                            <i id="workspace-suggestions-chevron" class="fa-solid fa-chevron-up text-xs transition-transform duration-200"></i>
+                                        </span>
+                                    </div>
                                 </div>
 
-                                <div class="flex flex-wrap gap-2">
+                                <div id="workspace-suggestions-body" class="mt-3.5 pt-3 border-t border-violet-500/10 flex flex-wrap gap-2 transition-all duration-300">
                                     {% for sq in suggested_questions %}
                                     <button
                                         type="button"
@@ -642,65 +651,77 @@
                             {% endif %}
 
                             {% if document_insights %}
-                            <div class="rounded-2xl border border-violet-500/20 bg-violet-500/5 p-4 shadow-inner shadow-violet-500/10">
-                                <div class="mb-3 flex items-center justify-between">
-                                    <h3 class="text-[11px] font-semibold uppercase tracking-wider text-violet-300">
-                                        Document Insights
-                                    </h3>
-                                    <span class="rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-zinc-300">
-                                        {{ document_insights.status|title }}
-                                    </span>
+                            <div id="document-insights-container" class="rounded-2xl border border-violet-500/20 bg-violet-500/5 p-4 shadow-inner shadow-violet-500/10 transition-all duration-300">
+                                <div class="flex items-center justify-between cursor-pointer select-none group" onclick="toggleDocumentInsights()" role="button" aria-expanded="true" aria-controls="document-insights-body" title="Click to collapse / expand">
+                                    <div class="flex items-center gap-2">
+                                        <div class="h-6 w-6 rounded-lg bg-violet-500/20 flex items-center justify-center text-violet-300">
+                                            <i class="fa-solid fa-lightbulb text-xs"></i>
+                                        </div>
+                                        <h3 class="text-[11px] font-semibold uppercase tracking-wider text-violet-300 group-hover:text-violet-200 transition-colors flex items-center gap-1.5">
+                                            Document Insights
+                                        </h3>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-zinc-300">
+                                            {{ document_insights.status|title }}
+                                        </span>
+                                        <span class="h-6 w-6 rounded-lg bg-white/5 group-hover:bg-violet-500/20 flex items-center justify-center text-zinc-400 group-hover:text-violet-300 transition-colors">
+                                            <i id="document-insights-chevron" class="fa-solid fa-chevron-up text-xs transition-transform duration-200"></i>
+                                        </span>
+                                    </div>
                                 </div>
 
-                                {% if document_insights.status == "processing" %}
-                                    <p class="text-xs text-zinc-300">
-                                        Analysis is running. Insights will appear here shortly.
-                                    </p>
-                                {% elif document_insights.status == "failed" %}
-                                    <p class="text-xs text-red-300">
-                                        Insight generation failed. You can still chat with the document normally.
-                                    </p>
-                                {% else %}
-                                    {% if document_insights.summary %}
-                                        <div class="mb-4">
-                                            <p class="mb-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-400">Summary</p>
-                                            <p class="text-xs leading-relaxed text-zinc-200">{{ document_insights.summary }}</p>
-                                        </div>
-                                    {% endif %}
-
-                                    {% if document_insights.entities %}
-                                        <div class="mb-4">
-                                            <p class="mb-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-400">Entities</p>
-                                            <div class="flex flex-wrap gap-1.5">
-                                                {% for entity_type, values in document_insights.entities.items %}
-                                                    {% if values %}
-                                                        {% for value in values %}
-                                                            <span class="rounded-full border border-white/10 bg-black/20 px-2 py-0.5 text-[10px] text-zinc-200">
-                                                                {{ entity_type|title }}: {{ value }}
-                                                            </span>
-                                                        {% endfor %}
-                                                    {% endif %}
-                                                {% endfor %}
+                                <div id="document-insights-body" class="mt-3.5 pt-3 border-t border-violet-500/10 transition-all duration-300">
+                                    {% if document_insights.status == "processing" %}
+                                        <p class="text-xs text-zinc-300">
+                                            Analysis is running. Insights will appear here shortly.
+                                        </p>
+                                    {% elif document_insights.status == "failed" %}
+                                        <p class="text-xs text-red-300">
+                                            Insight generation failed. You can still chat with the document normally.
+                                        </p>
+                                    {% else %}
+                                        {% if document_insights.summary %}
+                                            <div class="mb-4">
+                                                <p class="mb-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-400">Summary</p>
+                                                <p class="text-xs leading-relaxed text-zinc-200">{{ document_insights.summary }}</p>
                                             </div>
-                                        </div>
-                                    {% endif %}
+                                        {% endif %}
 
-                                    {% if document_insights.suggested_questions %}
-                                        <div>
-                                            <p class="mb-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-400">Try Asking</p>
-                                            <div class="flex flex-wrap gap-2">
-                                                {% for suggested_q in document_insights.suggested_questions %}
-                                                    <button
-                                                        type="button"
-                                                        onclick="document.getElementById('message-input').value='{{ suggested_q|escapejs }}'; document.getElementById('message-input').focus();"
-                                                        class="rounded-full border border-violet-400/30 bg-violet-500/10 px-3 py-1 text-[10px] text-violet-200 hover:bg-violet-500/20 hover:text-white transition-colors">
-                                                        {{ suggested_q }}
-                                                    </button>
-                                                {% endfor %}
+                                        {% if document_insights.entities %}
+                                            <div class="mb-4">
+                                                <p class="mb-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-400">Entities</p>
+                                                <div class="flex flex-wrap gap-1.5">
+                                                    {% for entity_type, values in document_insights.entities.items %}
+                                                        {% if values %}
+                                                            {% for value in values %}
+                                                                <span class="rounded-full border border-white/10 bg-black/20 px-2 py-0.5 text-[10px] text-zinc-200">
+                                                                    {{ entity_type|title }}: {{ value }}
+                                                                </span>
+                                                            {% endfor %}
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </div>
                                             </div>
-                                        </div>
+                                        {% endif %}
+
+                                        {% if document_insights.suggested_questions %}
+                                            <div>
+                                                <p class="mb-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-400">Try Asking</p>
+                                                <div class="flex flex-wrap gap-2">
+                                                    {% for suggested_q in document_insights.suggested_questions %}
+                                                        <button
+                                                            type="button"
+                                                            onclick="document.getElementById('message-input').value='{{ suggested_q|escapejs }}'; document.getElementById('message-input').focus();"
+                                                            class="rounded-full border border-violet-400/30 bg-violet-500/10 px-3 py-1 text-[10px] text-violet-200 hover:bg-violet-500/20 hover:text-white transition-colors">
+                                                            {{ suggested_q }}
+                                                        </button>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                        {% endif %}
                                     {% endif %}
-                                {% endif %}
+                                </div>
                             </div>
                             {% endif %}
 
@@ -1184,6 +1205,44 @@
                     icon.classList.toggle('rotate-180');
                 }
             }
+        }
+
+        function toggleDocumentInsights() {
+            const body = document.getElementById('document-insights-body');
+            const chevron = document.getElementById('document-insights-chevron');
+            if (!body) return;
+            const isHidden = body.classList.toggle('hidden');
+            if (chevron) {
+                if (isHidden) {
+                    chevron.classList.remove('fa-chevron-up');
+                    chevron.classList.add('fa-chevron-down');
+                } else {
+                    chevron.classList.remove('fa-chevron-down');
+                    chevron.classList.add('fa-chevron-up');
+                }
+            }
+            try {
+                localStorage.setItem('insightDocs_insights_collapsed', isHidden ? 'true' : 'false');
+            } catch (e) {}
+        }
+
+        function toggleWorkspaceSuggestions() {
+            const body = document.getElementById('workspace-suggestions-body');
+            const chevron = document.getElementById('workspace-suggestions-chevron');
+            if (!body) return;
+            const isHidden = body.classList.toggle('hidden');
+            if (chevron) {
+                if (isHidden) {
+                    chevron.classList.remove('fa-chevron-up');
+                    chevron.classList.add('fa-chevron-down');
+                } else {
+                    chevron.classList.remove('fa-chevron-down');
+                    chevron.classList.add('fa-chevron-up');
+                }
+            }
+            try {
+                localStorage.setItem('insightDocs_ws_suggestions_collapsed', isHidden ? 'true' : 'false');
+            } catch (e) {}
         }
 
         function appendAiThinkingChunk(chunk) {
@@ -1756,6 +1815,28 @@
                 initPdfViewer();
             }
             fetchAndDisplayTokenUsage();
+
+            // Restore collapsed state if preferred by user
+            try {
+                if (localStorage.getItem('insightDocs_insights_collapsed') === 'true') {
+                    const body = document.getElementById('document-insights-body');
+                    const chevron = document.getElementById('document-insights-chevron');
+                    if (body) body.classList.add('hidden');
+                    if (chevron) {
+                        chevron.classList.remove('fa-chevron-up');
+                        chevron.classList.add('fa-chevron-down');
+                    }
+                }
+                if (localStorage.getItem('insightDocs_ws_suggestions_collapsed') === 'true') {
+                    const wsBody = document.getElementById('workspace-suggestions-body');
+                    const wsChevron = document.getElementById('workspace-suggestions-chevron');
+                    if (wsBody) wsBody.classList.add('hidden');
+                    if (wsChevron) {
+                        wsChevron.classList.remove('fa-chevron-up');
+                        wsChevron.classList.add('fa-chevron-down');
+                    }
+                }
+            } catch (e) {}
         });
 
         let thePdf = null;
