@@ -66,9 +66,6 @@ INSTALLED_APPS = [
     'channels',
     'corsheaders',
 
-    # 'cloudinary',
-    # 'cloudinary_storage',
-
     'accounts',
     'documents',
     'payments',
@@ -201,10 +198,13 @@ else:
 #         "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=False)
 #     }
     
+# Media Storage Configuration (Local FileSystem)
+DEFAULT_STORAGE_BACKEND = "django.core.files.storage.FileSystemStorage"
+DEFAULT_FILE_STORAGE = DEFAULT_STORAGE_BACKEND
+
 STORAGES = {
-    # Media files (Images, PDFs) -> Cloudinary / Local
+    # Media files (Images, PDFs, Documents) -> Local FileSystem
     "default": {
-        # "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
         "BACKEND": "django.core.files.storage.FileSystemStorage",
     },
     # Static files (CSS, JS) -> WhiteNoise (non-strict compression prevents missing manifest 500 errors)
@@ -339,17 +339,6 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "False").lower() == "true"
 CSRF_COOKIE_SECURE = os.environ.get("CSRF_COOKIE_SECURE", "False").lower() == "true"
 SECURE_SSL_REDIRECT = os.environ.get("SECURE_SSL_REDIRECT", "False").lower() == "true"
-
-
-# Cloudinary Configuration
-# CLOUDINARY_STORAGE = {
-#     'CLOUD_NAME': os.environ.get('CLOUDINARY_CLOUD_NAME'),
-#     'API_KEY': os.environ.get('CLOUDINARY_API_KEY'),
-#     'API_SECRET': os.environ.get('CLOUDINARY_API_SECRET'),
-#     'SECURE': True
-# }
-
-# DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 
 # Razorpay Payment Gateway

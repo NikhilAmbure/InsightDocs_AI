@@ -276,18 +276,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return ChatMessage.objects.create(session=session, role="assistant", content=content)
 
     @database_sync_to_async
-    def get_chat_history(self, session):
-        messages = ChatMessage.objects.filter(session=session).order_by('created_at')
+    def get_chat_history(self, session, limit=20):
+        # Rolling window of the last 20 messages prevents latency bloat and context overflow
+        messages = list(
+            ChatMessage.objects.filter(session=session)
+            .order_by('-created_at')[:limit]
+        )
+        messages.reverse()
         return [{"role": msg.role, "content": msg.content} for msg in messages]
 
     @database_sync_to_async
     def check_chat_limit(self):
+        # Pro and Industry subscribers are metered by token quotas, bypassing global message table scans
+        if getattr(self.user, "is_premium", False):
+            return False
         user_msg_count = ChatMessage.objects.filter(
             session__user=self.user, 
             role='user'
         ).count()
-        limit = 5000 if self.user.is_premium else 500
-        return user_msg_count >= limit
+        return user_msg_count >= 500
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -733,15 +740,22 @@ class WorkspaceChatConsumer(AsyncWebsocketConsumer):
         )
 
     @database_sync_to_async
-    def get_chat_history(self, session):
-        messages = ChatMessage.objects.filter(session=session).order_by('created_at')
+    def get_chat_history(self, session, limit=20):
+        # Rolling window of the last 20 messages prevents latency bloat and context overflow
+        messages = list(
+            ChatMessage.objects.filter(session=session)
+            .order_by('-created_at')[:limit]
+        )
+        messages.reverse()
         return [{"role": msg.role, "content": msg.content} for msg in messages]
 
     @database_sync_to_async
     def check_chat_limit(self):
+        # Pro and Industry subscribers are metered by token quotas, bypassing global message table scans
+        if getattr(self.user, "is_premium", False):
+            return False
         user_msg_count = ChatMessage.objects.filter(
             session__user=self.user, 
             role='user'
         ).count()
-        limit = 5000 if self.user.is_premium else 500
-        return user_msg_count >= limit
+        return user_msg_count >= 500

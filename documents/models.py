@@ -32,19 +32,22 @@ class Document(models.Model):
 
     @property
     def extension(self) -> str:
-        # Try getting extension from the file name first
-        name = self.file.name
-        _, ext = os.path.splitext(name)
-        
-        # If missing, fall back to the original filename
-        if not ext and self.original_name:
-            _, ext = os.path.splitext(self.original_name)
-            
-        return ext.lower().lstrip(".")
+        for val in [self.file.name if self.file else "", self.original_name, self.title]:
+            if val:
+                _, ext = os.path.splitext(val)
+                if ext:
+                    return ext.lower().lstrip(".")
+        return ""
 
     @property
     def is_pdf(self) -> bool:
-        return self.extension == "pdf"
+        ext = self.extension.lower()
+        if ext == "pdf":
+            return True
+        for candidate in [self.original_name, self.title, self.file.name if self.file else ""]:
+            if candidate and ".pdf" in candidate.lower():
+                return True
+        return False
     
 
 class DocumentChunk(models.Model):

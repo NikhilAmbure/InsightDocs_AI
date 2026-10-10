@@ -1,6 +1,9 @@
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.hashers import make_password
 from django.contrib import messages
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 
@@ -16,25 +19,44 @@ from .tasks import send_otp_email_task
 
 logger = logging.getLogger(__name__)
 
+
+def _dispatch_otp_email(email, subject, otp):
+    """
+    Safely dispatch OTP email via Celery background task if available,
+    falling back to synchronous delivery via Resend API immediately
+    if Celery or Redis is unreachable.
+    """
+    try:
+        send_otp_email_task.delay(email, subject, otp)
+    except Exception as e:
+        logger.warning(f"Celery dispatch failed for {email}, falling back to direct delivery: {e}")
+        sendOTPToEmail(email, subject, otp)
+
+
 # ----------------- Register -----------------
 def register_view(request):
     """
     Handles user registration and sending OTP to email.
-    Actual OTP verification and user creation are handled in verify_otp_view.
+    Securely stores only password hash in session during verification.
     """
     if request.method == 'POST':
-        # Initial registration form submission
-        username = request.POST.get('username')
-        email = request.POST.get('email')
+        username = (request.POST.get('username') or '').strip()
+        email = (request.POST.get('email') or '').strip().lower()
         password = request.POST.get('password')
 
         # Basic validation
         if not username or not email or not password:
             messages.error(request, "All fields are required.")
             return render(request, 'signup.html')
-        
-        if not email.lower().endswith('@gmail.com'):
-            messages.error(request, "Only @gmail.com emails are allowed.")
+
+        try:
+            validate_email(email)
+        except ValidationError:
+            messages.error(request, "Please enter a valid email address.")
+            return render(request, 'signup.html')
+
+        if len(password) < 8:
+            messages.error(request, "Password must be at least 8 characters long.")
             return render(request, 'signup.html')
 
         if User.objects.filter(username=username).exists():
@@ -45,22 +67,20 @@ def register_view(request):
             messages.error(request, "Email already in use.")
             return render(request, 'signup.html')
 
-        # Store registration data in session
+        # Store cryptographic password hash in session instead of plaintext credentials
         request.session['registration_data'] = {
             'username': username,
             'email': email,
-            'password': password,
+            'password_hash': make_password(password),
         }
 
         # Generate and send OTP
         otp = random.randint(100000, 999999)
         request.session['registration_otp'] = otp
         subject = "Verify your InsightDocs AI Account"
-        
+
         try:
-            # Celery task to send OTP email
-            send_otp_email_task.delay(email, subject, otp)
-            
+            _dispatch_otp_email(email, subject, otp)
             messages.success(request, "We have sent a 6-digit OTP to your email.")
             return redirect('verify_otp')
         except Exception as e:
@@ -88,8 +108,8 @@ def login_view(request):
 
                     subject = "Login Verification Code"
                     
-                    # Celery task to send OTP email
-                    send_otp_email_task.delay(user.email, subject, otp)
+                    # Safe dispatch (Celery with synchronous Resend fallback)
+                    _dispatch_otp_email(user.email, subject, otp)
 
                     messages.success(request, "Enter the code sent to your email to log in.")
                     return redirect('verify_login_2fa')
@@ -152,8 +172,6 @@ def enable_2fa_init_view(request):
             messages.error(request, "Email is required.")
             return redirect('enable_2fa_init')
             
-        # Check if email matches account or allow different email?
-        # Typically 2FA email matches account email.
         if email != request.user.email:
              messages.warning(request, "For security, we are using your account email.")
              email = request.user.email
@@ -164,8 +182,8 @@ def enable_2fa_init_view(request):
         
         subject = "Verify 2FA Setup"
         
-        # Celery task to send OTP email
-        send_otp_email_task.delay(email, subject, otp)
+        # Safe dispatch
+        _dispatch_otp_email(email, subject, otp)
         
         messages.success(request, "We sent a code to your email to enable 2FA.")
         return redirect('verify_enable_2fa_otp')
@@ -213,8 +231,8 @@ def disable_2fa_init_view(request):
     
     subject = "Verify 2FA Deactivation"
 
-    # Celery task to send OTP email
-    send_otp_email_task.delay(request.user.email, subject, otp)   
+    # Safe dispatch
+    _dispatch_otp_email(request.user.email, subject, otp)   
 
     messages.success(request, "We sent a code to your email to confirm deactivation.")
     return redirect('verify_disable_2fa_otp')
@@ -338,13 +356,19 @@ def verify_otp_view(request):
 
         try:
             if int(entered_otp) == int(stored_otp):
-                # Create the user
+                password_hash = registration_data.get('password_hash')
+                raw_password = registration_data.get('password')
+
                 user = User(
                     username=registration_data['username'],
                     email=registration_data['email'],
                 )
-                user.set_password(registration_data['password'])
-                # Ensure 2FA is False by default
+                if password_hash:
+                    user.password = password_hash
+                elif raw_password:
+                    user.set_password(raw_password)
+
+                user.email_verified = True
                 user.is_2fa_enabled = False
                 user.save()
 
@@ -402,8 +426,8 @@ def password_reset_request(request):
         }
         subject = "Reset your Password"
 
-        # Celery task to send OTP email
-        send_otp_email_task.delay(email, subject, otp)
+        # Safe dispatch (Celery with synchronous Resend fallback)
+        _dispatch_otp_email(email, subject, otp)
 
         messages.success(request, "We sent a 6-digit verification code to your email.")
 
@@ -441,7 +465,7 @@ def verify_reset_otp(request):
         except ValueError:
             messages.error(request, "Verification code must be a 6-digit number.")
 
-        return render(request, 'otp_reset_templte.html', {'mode': 'otp_verification'})
+        return render(request, 'otp_reset_template.html', {'mode': 'otp_verification'})
 
     return render(request, 'otp_reset_template.html', {'mode': 'otp_verification'})
 
@@ -466,8 +490,7 @@ def resend_reset_otp(request):
     subject = "New Password Reset Code"
     
     try:
-        # Celery task to send OTP email
-        send_otp_email_task.delay(email, subject, otp)
+        _dispatch_otp_email(email, subject, otp)
         return JsonResponse({'message': 'A new verification code has been sent to your email.'})
     except Exception as e:
         logger.error(f"Failed to resend OTP to {email}: {str(e)}")

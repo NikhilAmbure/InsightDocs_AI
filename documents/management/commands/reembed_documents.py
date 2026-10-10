@@ -14,6 +14,7 @@ from django.core.management.base import BaseCommand
 
 from documents.models import Document
 from documents.utils.rag import process_document_for_rag
+from documents.utils.storage import prepare_local_document
 
 logger = logging.getLogger(__name__)
 
@@ -71,14 +72,13 @@ class Command(BaseCommand):
                 doc.is_processed = False
                 doc.save(update_fields=["is_processed"])
 
-                # Get file path
+                # Prepare local file copy (handles local and Cloudinary/remote)
+                local_path, cleanup = prepare_local_document(doc)
                 try:
-                    file_path = doc.file.path
-                except NotImplementedError:
-                    file_path = doc.file.url
-
-                # Re-process with new batch embeddings + 768 dims
-                process_document_for_rag(doc, file_path)
+                    # Re-process with new batch embeddings + 768 dims
+                    process_document_for_rag(doc, local_path)
+                finally:
+                    cleanup()
 
                 elapsed = time.time() - start
                 new_count = doc.chunks.count()

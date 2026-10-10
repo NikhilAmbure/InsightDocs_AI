@@ -826,7 +826,7 @@
                             </div>
                         {% endif %}
                         <div class="flex items-center gap-2 shrink-0">
-                            <a id="open-new-tab-btn" href="{% if document and document.file %}{{ document.file.url }}{% else %}#{% endif %}" target="_blank" class="text-[10px] text-violet-400 hover:text-violet-300">
+                            <a id="open-new-tab-btn" href="{% if document %}{% url 'serve_document' document.id %}{% elif workspace %}#{% else %}#{% endif %}" target="_blank" class="text-[10px] text-violet-400 hover:text-violet-300">
                                 Open <i class="fa-solid fa-arrow-up-right-from-square ml-0.5"></i>
                             </a>
                             <button type="button" onclick="switchMobileTab('chat')" class="lg:hidden rounded-full border border-white/10 px-2 py-0.5 text-[10px] font-medium text-zinc-200 hover:bg-white/10">Close</button>
@@ -837,8 +837,8 @@
                     </div>
                     
                     <div class="flex-1 overflow-hidden bg-zinc-900 relative group">
-                        {# PDF: use built-in browser / Cloudinary PDF viewer #}
-                        {% if document.extension == 'pdf' or workspace %}
+                        {# PDF: built-in inline canvas viewer via PDF.js #}
+                        {% if document.is_pdf or document.extension == 'pdf' or workspace %}
                             <div class="absolute inset-0 flex flex-col bg-[#323639]">
                                 <!-- PDF Toolbar -->
                                 <div class="flex items-center justify-between bg-[#2a2e33] px-4 py-2 border-b border-black/20 shrink-0">
@@ -1849,7 +1849,7 @@
         let pdfPagePending = null;
 
         function initPdfViewer(docUrl) {
-            {% if document.extension == 'pdf' or workspace %}
+            {% if document.is_pdf or document.extension == 'pdf' or workspace %}
             const pdfUrl = docUrl || (currentDocument ? currentDocument.url : "{% if document %}{% url 'serve_document' document.id %}{% endif %}");
             if (!pdfUrl) return;
 

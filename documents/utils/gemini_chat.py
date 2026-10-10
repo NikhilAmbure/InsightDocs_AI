@@ -28,7 +28,8 @@ except Exception:
     CrossEncoder = None
 
 _CROSS_ENCODER = None
-_CROSS_ENCODER_DISABLED = False
+# Disabled by default to protect server memory (prevents 800MB-1.2GB PyTorch allocation per worker)
+_CROSS_ENCODER_DISABLED = True
 
 
 
@@ -95,29 +96,40 @@ def _track_usage(usage_acc, response):
     if usage is not None:
         usage_acc.append(getattr(usage, "total_token_count", 0) or 0)
 
-def _hybrid_retrieve(document, query_text, top_k=TOP_K_PER_STEP):
-    result = genai.embed_content(
-        model="models/gemini-embedding-001",
-        content=query_text,
-        task_type="retrieval_query",
-        output_dimensionality=768,
-    )
-    query_embedding = result["embedding"]
+def _hybrid_retrieve(document, query_text, top_k=TOP_K_PER_STEP, query_embedding=None):
+    if query_embedding is None:
+        result = genai.embed_content(
+            model="models/gemini-embedding-001",
+            content=query_text,
+            task_type="retrieval_query",
+            output_dimensionality=768,
+        )
+        query_embedding = result["embedding"]
 
+    # 1. Sub-10ms HNSW approximate nearest neighbor search via pgvector
     vector_candidates = list(
         DocumentChunk.objects.filter(document=document)
         .annotate(distance=L2Distance("embedding", query_embedding))
         .order_by("distance")[: top_k * 2]
     )
 
-    keyword_vector = SearchVector("content")
-    keyword_query = SearchQuery(query_text, search_type="websearch")
-    keyword_candidates = list(
-        DocumentChunk.objects.filter(document=document)
-        .annotate(keyword_rank=SearchRank(keyword_vector, keyword_query))
-        .filter(keyword_rank__gt=0)
-        .order_by("-keyword_rank")[: top_k * 2]
-    )
+    # 2. Fast keyword retrieval
+    keyword_candidates = []
+    try:
+        # Extract keywords longer than 3 characters, filtering out common stop words
+        words = [w for w in re.findall(r'\b\w{3,}\b', query_text) if w.lower() not in {
+            'what', 'when', 'where', 'which', 'that', 'this', 'from', 'with', 'about', 'explain', 'tell', 'show'
+        }]
+        if words:
+            from django.db.models import Q
+            q_filter = Q()
+            for w in words[:3]:
+                q_filter |= Q(content__icontains=w)
+            keyword_candidates = list(
+                DocumentChunk.objects.filter(document=document).filter(q_filter)[: top_k * 2]
+            )
+    except Exception as kw_err:
+        logger.debug(f"Keyword search skipped for doc {document.id}: {kw_err}")
 
     combined = {}
     for chunk in vector_candidates:
@@ -133,11 +145,11 @@ def _hybrid_retrieve(document, query_text, top_k=TOP_K_PER_STEP):
             chunk.id,
             {"chunk": chunk, "vector_score": 0.0, "keyword_score": 0.0},
         )
-        combined[chunk.id]["keyword_score"] = float(getattr(chunk, "keyword_rank", 0.0) or 0.0)
+        combined[chunk.id]["keyword_score"] = 0.5
 
     scored = list(combined.values())
     for row in scored:
-        row["hybrid_score"] = (0.7 * row["vector_score"]) + (0.3 * row["keyword_score"])
+        row["hybrid_score"] = (0.75 * row["vector_score"]) + (0.25 * row["keyword_score"])
 
     scored.sort(key=lambda x: x["hybrid_score"], reverse=True)
     return {
@@ -585,13 +597,25 @@ async def get_workspace_response(user_message, documents, chat_history, progress
             return
 
         def _multi_doc_retrieve():
-            """Retrieve relevant chunks across all workspace documents."""
+            """Retrieve relevant chunks across all workspace documents with a single shared query embedding."""
+            shared_embedding = None
+            try:
+                res = genai.embed_content(
+                    model="models/gemini-embedding-001",
+                    content=user_message,
+                    task_type="retrieval_query",
+                    output_dimensionality=768,
+                )
+                shared_embedding = res.get("embedding")
+            except Exception as emb_err:
+                logger.warning(f"Failed to generate shared embedding for workspace query: {emb_err}")
+
             all_chunks = []
             for doc in documents:
                 if not getattr(doc, "is_processed", False):
                     continue
                 try:
-                    retrieval = _hybrid_retrieve(doc, user_message, top_k=5)
+                    retrieval = _hybrid_retrieve(doc, user_message, top_k=5, query_embedding=shared_embedding)
                     for chunk in retrieval.get("hybrid_chunks", []):
                         all_chunks.append({
                             "chunk": chunk,

@@ -7,7 +7,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
-from django.http import HttpResponse, Http404, JsonResponse
+from django.http import HttpResponse, Http404, JsonResponse, FileResponse
 from django.utils import timezone
 
 from django.urls import reverse
@@ -16,6 +16,7 @@ from .models import Document, ChatSession, ChatMessage, DocumentInsights, Worksp
 from .utils.rate_limit import check_rate_limit
 from .tasks import process_document_task, analyze_document_task
 from .utils.rag import process_document_for_rag
+from .utils.storage import prepare_local_document
 
 logger = logging.getLogger(__name__)
 
@@ -150,11 +151,14 @@ def upload_view(request):
             except Exception:
                 logger.info(f"Celery unavailable, processing doc {doc.id} synchronously.")
                 try:
-                    file_path = doc.file.path
-                except NotImplementedError:
-                    file_path = doc.file.url
-                process_document_for_rag(doc, file_path)
-                analyze_document_task(doc.id)
+                    local_path, cleanup = prepare_local_document(doc)
+                    try:
+                        process_document_for_rag(doc, local_path)
+                        analyze_document_task(doc.id)
+                    finally:
+                        cleanup()
+                except Exception as proc_err:
+                    logger.error(f"Synchronous processing failed for doc {doc.id}: {proc_err}")
 
             ChatSession.objects.get_or_create(document=doc, user=request.user)
 
@@ -297,12 +301,33 @@ def chat_view(request, document_id):
 @login_required(login_url='login')
 def serve_document_view(request, document_id):
     """
-    Redirects to the cloudinary URL to serve the document file. 
-    Since files are hosted externally, we don't serve bytes; we just point the browser to the file.
+    Serves the document file directly (inline streaming for in-browser PDF preview).
+    Streams locally with CORS headers for PDF.js.
     """
     document = get_object_or_404(Document, id=document_id, owner=request.user)
 
-    return redirect(document.file.url)
+    content_type = "application/pdf" if document.is_pdf else "application/octet-stream"
+    
+    # 1. Resolve local disk path
+    from documents.utils.storage import resolve_local_file_path
+    local_path = resolve_local_file_path(document)
+    if local_path and os.path.exists(local_path):
+        response = FileResponse(open(local_path, 'rb'), content_type=content_type)
+        response['Content-Disposition'] = f'inline; filename="{document.original_name}"'
+        response['Access-Control-Allow-Origin'] = '*'
+        return response
+
+    # 2. Try storage backend .open()
+    try:
+        response = FileResponse(document.file.open('rb'), content_type=content_type)
+        response['Content-Disposition'] = f'inline; filename="{document.original_name}"'
+        response['Access-Control-Allow-Origin'] = '*'
+        return response
+    except Exception as e:
+        logger.warning(f"document.file.open streaming failed for doc {document.id}: {e}")
+
+    # 3. Fallback redirect
+    return redirect(document.file.url if document.file else '/')
 
 
 def coming_soon(request):
