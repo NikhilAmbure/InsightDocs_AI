@@ -82,7 +82,7 @@ flowchart TD
     subgraph Storage["💾 Persistence Layer"]
         PG[("PostgreSQL Database")]
         PGVector[("pgvector Extension<br/>HNSW Indexing")]
-        Cloudinary["Cloudinary Storage<br/>(Media Files)"]
+        LocalStorage["Local Media Storage<br/>(media/documents/)"]
     end
 
     subgraph AI["🤖 Inference & LLM Gateways"]
@@ -99,7 +99,7 @@ flowchart TD
 
     DocIngest -->|Raw Text| GeminiEmbed
     GeminiEmbed -->|768d Vector Chunks| PGVector
-    DocIngest --> Cloudinary
+    DocIngest --> LocalStorage
     Auth --> PG
 
     RAGRouter -->|Similarity Search| PGVector
@@ -292,6 +292,7 @@ InsightDocs_AI/
 ├── documents/                 # RAG, document parsing, workspaces & chat
 │   ├── utils/
 │   │   ├── rag.py             # LangChain text splitting & Gemini embeddings
+│   │   ├── storage.py         # Local filesystem storage resolver & inline streaming
 │   │   ├── gemini_chat.py     # Multi-document conversational retrieval
 │   │   └── deepseek_client.py # DeepSeek v4 Flash async queue streaming bridge
 │   ├── views_workspace.py     # Cross-document workspace controllers
