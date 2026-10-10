@@ -49,7 +49,18 @@ def create_order(request):
     except (json.JSONDecodeError, AttributeError):
         return JsonResponse({"error": "Invalid request body."}, status=400)
 
-    plan = get_object_or_404(SubscriptionPlan, id=plan_id, is_active=True)
+    if not plan_id:
+        return JsonResponse({"error": "Plan ID is required."}, status=400)
+
+    from .services import ensure_default_plans
+    try:
+        plan = SubscriptionPlan.objects.get(id=plan_id, is_active=True)
+    except SubscriptionPlan.DoesNotExist:
+        ensure_default_plans()
+        try:
+            plan = SubscriptionPlan.objects.get(id=plan_id, is_active=True)
+        except SubscriptionPlan.DoesNotExist:
+            return JsonResponse({"error": "Selected plan is not available."}, status=404)
 
     if plan.price_inr <= 0:
         return JsonResponse({"error": "Cannot purchase a free plan."}, status=400)
@@ -134,6 +145,11 @@ def verify_payment(request):
     except Payment.DoesNotExist:
         return JsonResponse({"error": "Payment record not found."}, status=404)
 
+    # Idempotency check: if already captured, avoid double-activating / double-crediting
+    if payment.status == "captured":
+        logger.info(f"Payment already captured for order {razorpay_order_id}; skipping re-activation.")
+        return JsonResponse({"status": "success", "message": "Payment verified and subscription activated!"})
+
     # Verify signature
     client = _get_razorpay_client()
     try:
@@ -204,14 +220,16 @@ class RazorpayWebhookView(APIView):
 
         user = None
         plan = None
+        payment = None
 
         if event_type in ["payment.captured", "subscription.charged"]:
             notes = payment_entity.get("notes", {}) or subscription_entity.get("notes", {}) or {}
             user_id = notes.get("user_id")
             plan_id = notes.get("plan_id")
-
             razorpay_order_id = payment_entity.get("order_id")
-            if not user_id and razorpay_order_id:
+
+            # Check if this payment was already processed
+            if razorpay_order_id:
                 try:
                     payment = Payment.objects.get(razorpay_order_id=razorpay_order_id)
                     user = payment.user
@@ -219,12 +237,16 @@ class RazorpayWebhookView(APIView):
                 except Payment.DoesNotExist:
                     pass
 
+            if payment and payment.status == "captured":
+                logger.info(f"Webhook: Payment {razorpay_order_id} already captured and credited. Deduplicating.")
+                return Response({"status": "success", "message": "Payment already processed."}, status=drf_status.HTTP_200_OK)
+
             razorpay_sub_id = subscription_entity.get("id") or payment_entity.get("subscription_id")
             if not user and razorpay_sub_id:
                 try:
-                    subscription = Subscription.objects.get(razorpay_subscription_id=razorpay_sub_id)
-                    user = subscription.user
-                    plan = subscription.plan
+                    sub_record = Subscription.objects.get(razorpay_subscription_id=razorpay_sub_id)
+                    user = sub_record.user
+                    plan = sub_record.plan
                 except Subscription.DoesNotExist:
                     pass
 
@@ -242,59 +264,44 @@ class RazorpayWebhookView(APIView):
                     pass
 
             if user:
-                user.is_premium = True
-                user.save(update_fields=["is_premium"])
-
-                now = timezone.now()
-                from django.db.models import F
-                duration_days = plan.duration_days if plan else 60
-                end_date = now + timedelta(days=duration_days)
-
-                sub, created = Subscription.objects.get_or_create(
-                    user=user,
-                    defaults={
-                        "plan": plan,
-                        "plan_type": plan.slug if plan else "pro",
-                        "status": "active",
-                        "start_date": now,
-                        "end_date": end_date,
-                        "tokens_allocated": 2000000,
-                        "tokens_used": 0,
-                        "tokens_granted_at": now,
-                        "razorpay_subscription_id": razorpay_sub_id or "",
-                    }
-                )
-                if not created:
-                    sub.status = "active"
-                    if plan:
-                        sub.plan = plan
-                        sub.plan_type = plan.slug
-                    sub.end_date = end_date
-                    sub.tokens_allocated = F('tokens_allocated') + 2000000
-                    sub.tokens_granted_at = now
-                    if razorpay_sub_id:
-                        sub.razorpay_subscription_id = razorpay_sub_id
-                    sub.save()
+                # Standardize activation through helper to prevent logic drift
+                sub = _activate_subscription(user, plan)
+                if razorpay_sub_id and not sub.razorpay_subscription_id:
+                    sub.razorpay_subscription_id = razorpay_sub_id
+                    sub.save(update_fields=["razorpay_subscription_id"])
 
                 if razorpay_order_id:
                     Payment.objects.filter(razorpay_order_id=razorpay_order_id).update(
                         status="captured",
-                        razorpay_payment_id=payment_entity.get("id"),
-                        updated_at=now
+                        razorpay_payment_id=payment_entity.get("id") or "",
+                        updated_at=timezone.now()
                     )
 
-                logger.info(f"Webhook success: Added 2,000,000 tokens for user {user.username}")
-                return Response({"status": "success", "message": "Tokens added successfully."}, status=drf_status.HTTP_200_OK)
+                logger.info(f"Webhook success: Activated subscription for user {user.username}")
+                return Response({"status": "success", "message": "Subscription activated successfully."}, status=drf_status.HTTP_200_OK)
             else:
                 logger.warning("Webhook user identification failed.")
                 return Response({"error": "User identification failed."}, status=drf_status.HTTP_400_BAD_REQUEST)
+
+        elif event_type in ["subscription.cancelled", "subscription.halted", "subscription.paused"]:
+            razorpay_sub_id = subscription_entity.get("id") or payment_entity.get("subscription_id")
+            if razorpay_sub_id:
+                sub = Subscription.objects.filter(razorpay_subscription_id=razorpay_sub_id).first()
+                if sub:
+                    sub.status = "cancelled"
+                    sub.save(update_fields=["status", "updated_at"])
+                    if sub.user:
+                        sub.user.is_premium = False
+                        sub.user.save(update_fields=["is_premium"])
+                    logger.info(f"Webhook: Subscription {razorpay_sub_id} marked as cancelled.")
+            return Response({"status": "ok", "message": "Subscription status updated."}, status=drf_status.HTTP_200_OK)
 
         elif event_type == "payment.failed":
             razorpay_order_id = payment_entity.get("order_id")
             if razorpay_order_id:
                 Payment.objects.filter(razorpay_order_id=razorpay_order_id).update(
                     status="failed",
-                    razorpay_payment_id=payment_entity.get("id"),
+                    razorpay_payment_id=payment_entity.get("id") or "",
                     updated_at=timezone.now()
                 )
             return Response({"status": "ok"}, status=drf_status.HTTP_200_OK)
@@ -319,16 +326,21 @@ def payment_failed(request):
 def _activate_subscription(user, plan):
     """Create or update the user's subscription and set is_premium."""
     now = timezone.now()
-    end_date = now + timedelta(days=plan.duration_days)
+    duration_days = plan.duration_days if plan else 30
+    end_date = now + timedelta(days=duration_days)
 
-    tokens_to_allocate = 2000000 if plan.slug == 'pro' else plan.token_quota
+    tokens_to_allocate = plan.token_quota if (plan and plan.token_quota > 0) else 2000000
 
     try:
         subscription = Subscription.objects.get(user=user)
         subscription.plan = plan
-        subscription.plan_type = plan.slug
+        subscription.plan_type = plan.slug if plan else "pro"
         subscription.status = "active"
-        subscription.end_date = end_date
+        if subscription.end_date and subscription.end_date > now:
+            subscription.end_date = subscription.end_date + timedelta(days=duration_days)
+        else:
+            subscription.start_date = now
+            subscription.end_date = end_date
         subscription.tokens_allocated = F("tokens_allocated") + tokens_to_allocate
         subscription.tokens_granted_at = now
         subscription.save()
@@ -336,7 +348,7 @@ def _activate_subscription(user, plan):
         subscription = Subscription.objects.create(
             user=user,
             plan=plan,
-            plan_type=plan.slug,
+            plan_type=plan.slug if plan else "pro",
             status="active",
             start_date=now,
             end_date=end_date,

@@ -85,7 +85,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # Check Limits
         limit_reached = await self.check_chat_limit()
         if limit_reached:
-            await self.send_error("You have reached your chat message limit.")
+            await self.send_error("You have reached your free plan chat limit of 500 messages. Please upgrade to Pro (₹199/mo) or Industry (₹1,999/mo) to continue.")
             return
 
         # Get Document & Session
@@ -114,11 +114,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # Get chat history
         chat_history = await self.get_chat_history(session)
 
-        # Process with Gemini
+        # Process with Gemini / DeepSeek
         await self.process_ai_response(document, session, content, chat_history)
 
     async def process_ai_response(self, document, session, user_message, chat_history):
-        """Process message through Gemini AI using RAG (Streaming)"""
+        """Process message through Gemini AI or DeepSeek AI using RAG (Streaming)"""
         try:
             # Check user token limit before calling Gemini utility
             is_limit_reached = await self.check_token_balance_status()
@@ -136,7 +136,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     return
             
             # 1. Notify client that AI is thinking
-            await self.send(text_data=json.dumps({'type': 'ai_thinking'}))
+            active_model = "DeepSeek v4 Flash" if self.user.is_premium else "Gemini 2.5 Flash"
+            await self.send(text_data=json.dumps({
+                'type': 'ai_thinking',
+                'model': active_model
+            }))
 
             full_response = ""
 
@@ -153,6 +157,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 document,
                 chat_history,
                 usage_callback=_record_usage,
+                user=self.user,
             ):
 
                 full_response += chunk
@@ -450,3 +455,274 @@ class EditorConsumer(AsyncWebsocketConsumer):
         from payments.services import deduct_tokens, get_usage_snapshot
         deduct_tokens(self.user, total_tokens)
         return get_usage_snapshot(self.user)
+
+
+# ─────────────────────────────────────────────────────────────────────
+#  Multi-Document Workspace Chat Consumer
+# ─────────────────────────────────────────────────────────────────────
+
+class WorkspaceChatConsumer(AsyncWebsocketConsumer):
+    """
+    Handles real-time streaming chat across all documents in a workspace.
+    """
+    async def connect(self):
+        self.user = self.scope["user"]
+        self.workspace_id = self.scope['url_route']['kwargs']['workspace_id']
+
+        if not self.user.is_authenticated:
+            await self.close()
+            return
+
+        self.room_group_name = f"workspace_{self.workspace_id}_{self.user.id}"
+
+        has_permission = await self.check_workspace_permission()
+        if not has_permission:
+            await self.close()
+            return
+
+        if self.channel_layer is not None:
+            await self.channel_layer.group_add(
+                self.room_group_name,
+                self.channel_name
+            )
+
+        await self.accept()
+        logger.info(f"Workspace WS connected: {self.user.username} - Workspace {self.workspace_id}")
+
+    async def disconnect(self, close_code):
+        if hasattr(self, "room_group_name") and self.channel_layer is not None:
+            await self.channel_layer.group_discard(
+                self.room_group_name,
+                self.channel_name
+            )
+        logger.info(f"Workspace WS disconnected: {self.user} - Code {close_code}")
+
+    async def receive(self, text_data):
+        try:
+            data = json.loads(text_data)
+            message_type = data.get('type')
+            if message_type == 'chat_message':
+                await self.handle_chat_message(data)
+            elif message_type == 'typing':
+                await self.handle_typing(data)
+        except json.JSONDecodeError:
+            await self.send_error("Invalid JSON format")
+        except Exception as e:
+            logger.error(f"Workspace chat receive error: {e}", exc_info=True)
+            await self.send_error("An unexpected error occurred.")
+
+    async def handle_chat_message(self, data):
+        content = data.get('content', '').strip()
+        if not content:
+            return
+
+        rate_limit_result = await self.is_rate_limited()
+        if rate_limit_result.limited:
+            await self.send_error(f"Rate limit exceeded. Please wait {rate_limit_result.retry_after} seconds.")
+            return
+
+        # Check Limits
+        limit_reached = await self.check_chat_limit()
+        if limit_reached:
+            await self.send_error("You have reached your free plan chat limit of 500 messages. Please upgrade to Pro (₹199/mo) or Industry (₹1,999/mo) to continue.")
+            return
+
+        workspace = await self.get_workspace()
+        if not workspace:
+            await self.send_error("Workspace not found.")
+            return
+
+        has_any_docs = await self.has_any_documents(workspace)
+        if not has_any_docs:
+            await self.send_error("No documents found in this workspace. Please upload or add documents first.")
+            return
+
+        documents = await self.get_workspace_documents(workspace)
+        if not documents:
+            await self.send_error("The documents in this workspace are still being chunked and indexed. Please wait a moment until indexing finishes.")
+            return
+
+        session = await self.get_or_create_workspace_session(workspace)
+        user_msg = await self.save_user_message(session, content)
+
+        await self.send(text_data=json.dumps({
+            'type': 'user_message',
+            'id': user_msg.id,
+            'content': content,
+            'timestamp': user_msg.created_at.isoformat()
+        }))
+
+        chat_history = await self.get_chat_history(session)
+        await self.process_workspace_ai_response(workspace, documents, session, content, chat_history)
+
+    async def process_workspace_ai_response(self, workspace, documents, session, user_message, chat_history):
+        import time
+        start_time = time.time()
+        try:
+            is_limit_reached = await self.check_token_balance_status()
+            if is_limit_reached:
+                await self.send_error("Token limit reached. Please upgrade to continue.")
+                return
+
+            active_model = "DeepSeek v4 Flash" if self.user.is_premium else "Gemini 2.5 Flash"
+            await self.send(text_data=json.dumps({
+                'type': 'ai_thinking',
+                'model': active_model
+            }))
+
+            from .utils.gemini_chat import get_workspace_response
+            full_response = ""
+            total_tokens_used = [0]
+
+            async def _record_usage(total_tokens):
+                total_tokens_used[0] = total_tokens
+                usage = await self.deduct_user_tokens(total_tokens)
+                await self.send(text_data=json.dumps({
+                    'type': 'usage_update',
+                    'usage': usage
+                }))
+
+            async def _progress(stage_text):
+                await self.send(text_data=json.dumps({
+                    'type': 'ai_progress',
+                    'stage': stage_text
+                }))
+
+            async for chunk in get_workspace_response(
+                user_message,
+                documents,
+                chat_history,
+                progress_callback=_progress,
+                usage_callback=_record_usage,
+                user=self.user,
+            ):
+                full_response += chunk
+                await self.send(text_data=json.dumps({
+                    'type': 'ai_stream_chunk',
+                    'content': chunk
+                }))
+
+            latency_ms = int((time.time() - start_time) * 1000)
+            ai_msg = await self.save_ai_message(
+                session,
+                full_response,
+                tokens_used=total_tokens_used[0] if total_tokens_used[0] > 0 else None,
+                latency_ms=latency_ms
+            )
+
+            await self.send(text_data=json.dumps({
+                'type': 'ai_stream_end',
+                'content': full_response,
+                'id': ai_msg.id,
+                'timestamp': ai_msg.created_at.isoformat(),
+                'latency_ms': latency_ms,
+            }))
+
+        except Exception as e:
+            logger.error(f"Workspace RAG Error: {e}", exc_info=True)
+            await self.send_error("An error occurred while generating the multi-document answer.")
+
+    async def handle_typing(self, data):
+        if self.channel_layer:
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'typing_indicator',
+                    'user': self.user.username
+                }
+            )
+
+    async def typing_indicator(self, event):
+        if event['user'] != self.user.username:
+            await self.send(text_data=json.dumps({
+                'type': 'user_typing',
+                'user': event['user']
+            }))
+
+    async def send_error(self, message):
+        await self.send(text_data=json.dumps({'type': 'error', 'message': message}))
+
+    @database_sync_to_async
+    def check_workspace_permission(self):
+        from .models import Workspace
+        try:
+            Workspace.objects.get(id=self.workspace_id, owner=self.user)
+            return True
+        except Workspace.DoesNotExist:
+            return False
+
+    @database_sync_to_async
+    def is_rate_limited(self):
+        from .utils.rate_limit import check_user_rate_limit
+        limit = 60 if self.user.is_premium else 10
+        return check_user_rate_limit(self.user, "workspace_ws", limit, 60)
+
+    @database_sync_to_async
+    def check_token_balance_status(self):
+        from payments.models import Subscription
+        try:
+            sub = Subscription.objects.get(user=self.user)
+            if sub.is_token_metered:
+                return sub.tokens_allocated <= 0
+        except Subscription.DoesNotExist:
+            pass
+        return False
+
+    @database_sync_to_async
+    def deduct_user_tokens(self, total_tokens):
+        from payments.services import deduct_tokens, get_usage_snapshot
+        deduct_tokens(self.user, total_tokens)
+        return get_usage_snapshot(self.user)
+
+    @database_sync_to_async
+    def get_workspace(self):
+        from .models import Workspace
+        try:
+            return Workspace.objects.get(id=self.workspace_id, owner=self.user)
+        except Workspace.DoesNotExist:
+            return None
+
+    @database_sync_to_async
+    def has_any_documents(self, workspace):
+        return workspace.documents.exists()
+
+    @database_sync_to_async
+    def get_workspace_documents(self, workspace):
+        return list(workspace.documents.filter(is_processed=True))
+
+    @database_sync_to_async
+    def get_or_create_workspace_session(self, workspace):
+        session, _ = ChatSession.objects.get_or_create(
+            workspace=workspace,
+            user=self.user,
+            defaults={'title': f'Chat: {workspace.name}'}
+        )
+        return session
+
+    @database_sync_to_async
+    def save_user_message(self, session, content):
+        return ChatMessage.objects.create(session=session, role="user", content=content)
+
+    @database_sync_to_async
+    def save_ai_message(self, session, content, tokens_used=None, latency_ms=None):
+        return ChatMessage.objects.create(
+            session=session,
+            role="assistant",
+            content=content,
+            tokens_used=tokens_used,
+            latency_ms=latency_ms
+        )
+
+    @database_sync_to_async
+    def get_chat_history(self, session):
+        messages = ChatMessage.objects.filter(session=session).order_by('created_at')
+        return [{"role": msg.role, "content": msg.content} for msg in messages]
+
+    @database_sync_to_async
+    def check_chat_limit(self):
+        user_msg_count = ChatMessage.objects.filter(
+            session__user=self.user, 
+            role='user'
+        ).count()
+        limit = 5000 if self.user.is_premium else 500
+        return user_msg_count >= limit

@@ -156,11 +156,19 @@
                 <div class="space-y-1 mb-8">
                     <div class="mb-2 px-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">Menu</div>
                     <a href="{% url 'upload' %}"
-                        class="block rounded-xl px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-white/5 hover:text-white">
+                        class="block rounded-xl px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-white/5 hover:text-white transition-colors">
                         <i class="fa-solid fa-folder-open w-5 text-center mr-2"></i> Documents
                     </a>
+                    <a href="{% url 'workspace_list' %}"
+                        class="block rounded-xl px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-white/5 hover:text-white transition-colors">
+                        <i class="fa-solid fa-layer-group w-5 text-center mr-2"></i> Workspaces
+                    </a>
+                    <a href="{% url 'compare_select' %}"
+                        class="block rounded-xl px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-white/5 hover:text-white transition-colors">
+                        <i class="fa-solid fa-code-compare w-5 text-center mr-2"></i> Compare
+                    </a>
                     <a href="{% url 'subscription' %}"
-                        class="block rounded-xl px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-white/5 hover:text-white">
+                        class="block rounded-xl px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-white/5 hover:text-white transition-colors">
                         <i class="fa-solid fa-credit-card w-5 text-center mr-2"></i> Subscription
                     </a>
                     <a href="{% url 'profile' %}"
@@ -179,8 +187,7 @@
                     <a href="{% url 'chat' doc.id %}"
                         class="group block rounded-xl border border-transparent p-2.5 text-left transition-colors hover:bg-white/5">
                         <div class="flex items-center justify-between">
-                            <span class="truncate text-xs text-zinc-300 group-hover:text-white font-medium">{{ doc.title
-                                }}</span>
+                            <span class="truncate text-xs text-zinc-300 group-hover:text-white font-medium">{{ doc.title }}</span>
                             <span class="text-[9px] text-zinc-500">{{ doc.extension|upper }}</span>
                         </div>
                     </a>
@@ -199,8 +206,12 @@
                         {{ request.user.get_full_name|default:request.user.username|slice:":2"|upper }}
                     </div>
                     <div class="flex-1 overflow-hidden px-1">
-                        <p class="truncate text-xs font-medium text-white">{{
-                            request.user.get_full_name|default:request.user.username }}</p>
+                        <div class="flex items-center gap-1.5">
+                            <p class="truncate text-xs font-medium text-white">{{ request.user.get_full_name|default:request.user.username }}</p>
+                            {% if request.user.is_premium %}
+                                <span class="rounded bg-violet-500/20 px-1 py-0.5 text-[8px] font-bold text-amber-300 border border-violet-500/30">PRO</span>
+                            {% endif %}
+                        </div>
                         <p class="truncate text-[10px] text-zinc-400">{{ request.user.email }}</p>
                     </div>
 
@@ -345,8 +356,7 @@
                                     value="{{ form.first_name.value|default:'' }}"
                                     class="input-glass block w-full rounded-xl px-4 py-2 text-sm placeholder:text-zinc-600"
                                     placeholder="First name" />
-                                {% for error in form.first_name.errors %}<p class="text-[10px] text-red-400 mt-1">{{
-                                    error }}</p>{% endfor %}
+                                {% for error in form.first_name.errors %}<p class="text-[10px] text-red-400 mt-1">{{ error }}</p>{% endfor %}
                             </div>
 
                             <div class="space-y-1.5">
@@ -355,8 +365,7 @@
                                     value="{{ form.last_name.value|default:'' }}"
                                     class="input-glass block w-full rounded-xl px-4 py-2 text-sm placeholder:text-zinc-600"
                                     placeholder="Last name" />
-                                {% for error in form.last_name.errors %}<p class="text-[10px] text-red-400 mt-1">{{
-                                    error }}</p>{% endfor %}
+                                {% for error in form.last_name.errors %}<p class="text-[10px] text-red-400 mt-1">{{ error }}</p>{% endfor %}
                             </div>
 
                             <div class="space-y-1.5">
@@ -365,8 +374,7 @@
                                     value="{{ form.username.value|default:'' }}"
                                     class="input-glass block w-full rounded-xl px-4 py-2 text-sm placeholder:text-zinc-600"
                                     placeholder="Username" />
-                                {% for error in form.username.errors %}<p class="text-[10px] text-red-400 mt-1">{{ error
-                                    }}</p>{% endfor %}
+                                {% for error in form.username.errors %}<p class="text-[10px] text-red-400 mt-1">{{ error }}</p>{% endfor %}
                             </div>
 
                             <div class="space-y-1.5">
@@ -375,8 +383,7 @@
                                     value="{{ form.email.value|default:'' }}"
                                     class="input-glass block w-full rounded-xl px-4 py-2 text-sm placeholder:text-zinc-600"
                                     placeholder="Email" />
-                                {% for error in form.email.errors %}<p class="text-[10px] text-red-400 mt-1">{{ error }}
-                                </p>{% endfor %}
+                                {% for error in form.email.errors %}<p class="text-[10px] text-red-400 mt-1">{{ error }}</p>{% endfor %}
                             </div>
 
                             <div
@@ -393,128 +400,281 @@
                     <div class="grid gap-6 lg:grid-cols-2">
 
                         <!-- ─── Subscription Details Card ─── -->
-                        <div class="glass-card rounded-3xl p-6 sm:p-8">
-                            <div class="flex items-center justify-between mb-5">
-                                <h3 class="text-sm font-semibold text-white">Subscription</h3>
-                                <a href="{% url 'subscription' %}"
-                                    class="text-[10px] font-medium text-violet-400 hover:text-violet-300 transition-colors">
-                                    Manage Plan <i class="fa-solid fa-arrow-right text-[8px] ml-0.5"></i>
-                                </a>
-                            </div>
-
-                            {% if user.is_premium and subscription %}
-                            <!-- ── Active Pro Subscription ── -->
-                            <div
-                                class="rounded-2xl border border-violet-500/20 bg-gradient-to-br from-violet-500/10 to-indigo-500/5 p-5 mb-4">
-                                <div class="flex items-center justify-between mb-3">
+                        <div class="glass-card rounded-3xl p-6 sm:p-8 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between mb-5">
                                     <div class="flex items-center gap-2">
-                                        <div
-                                            class="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/20">
-                                            <i class="fa-solid fa-crown text-violet-400 text-xs"></i>
+                                        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10 text-violet-400">
+                                            <i class="fa-solid fa-bolt text-xs"></i>
                                         </div>
-                                        <div>
-                                            <p class="text-sm font-bold text-white">{{ subscription.plan.name }} Plan
-                                            </p>
-                                            <p class="text-[10px] text-zinc-400">{{ subscription.plan.price_display
-                                                }}/month</p>
-                                        </div>
+                                        <h3 class="text-sm font-semibold text-white">Subscription & Usage</h3>
                                     </div>
-                                    <span
-                                        class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 text-[9px] font-bold text-emerald-400">
-                                        <span class="relative flex h-1.5 w-1.5">
-                                            <span
-                                                class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                            <span
-                                                class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-                                        </span>
-                                        Active
-                                    </span>
+                                    <a href="{% url 'subscription' %}"
+                                        class="text-[10px] font-medium text-violet-400 hover:text-violet-300 transition-colors">
+                                        Manage Plan <i class="fa-solid fa-arrow-right text-[8px] ml-0.5"></i>
+                                    </a>
                                 </div>
-                                {% if subscription.end_date %}
-                                <div class="flex items-center gap-2 text-[10px] text-zinc-400">
-                                    <i class="fa-regular fa-calendar text-zinc-500"></i>
-                                    Renews on {{ subscription.end_date|date:"d M Y" }}
+
+                                {% if user.is_premium %}
+                                <!-- ── Active Pro Subscription ── -->
+                                <div
+                                    class="rounded-2xl border border-violet-500/20 bg-gradient-to-br from-violet-500/10 to-indigo-500/5 p-5 mb-4">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <div class="flex items-center gap-2">
+                                            <div
+                                                class="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/20">
+                                                <i class="fa-solid fa-crown text-violet-400 text-xs"></i>
+                                            </div>
+                                            <div>
+                                                <p class="text-sm font-bold text-white">{{ subscription.plan.name|default:"Pro" }} Plan</p>
+                                                <p class="text-[10px] text-zinc-400">{{ subscription.plan.price_display|default:"₹199" }}/month</p>
+                                            </div>
+                                        </div>
+                                        <span
+                                            class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 text-[9px] font-bold text-emerald-400">
+                                            <span class="relative flex h-1.5 w-1.5">
+                                                <span
+                                                    class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                <span
+                                                    class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                                            </span>
+                                            Active
+                                        </span>
+                                    </div>
+                                    {% if subscription.end_date %}
+                                    <div class="flex items-center gap-2 text-[10px] text-zinc-400">
+                                        <i class="fa-regular fa-calendar text-zinc-500"></i>
+                                        Renews on {{ subscription.end_date|date:"d M Y" }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Token Usage Bar (if token metered) -->
+                                {% if usage.is_token_metered %}
+                                <div class="rounded-xl border border-white/5 bg-white/5 p-3.5 mb-4">
+                                    <div class="flex items-center justify-between text-[11px] mb-2">
+                                        <span class="text-zinc-400 font-medium">AI Token Balance</span>
+                                        <span class="font-bold text-violet-300">{{ usage.tokens_remaining }} left</span>
+                                    </div>
+                                    <div class="w-full bg-zinc-800/80 rounded-full h-2 overflow-hidden mb-2">
+                                        <div class="bg-gradient-to-r from-violet-500 to-indigo-500 h-2 rounded-full transition-all duration-500" style="width: {{ usage.percent_used }}%"></div>
+                                    </div>
+                                    <div class="flex items-center justify-between text-[9px] text-zinc-500">
+                                        <span>Used: {{ usage.tokens_used }}</span>
+                                        <span>Total: {{ usage.total_tokens }}</span>
+                                    </div>
                                 </div>
                                 {% endif %}
-                            </div>
 
-                            <div class="space-y-2">
-                                <div
-                                    class="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 px-4 py-2.5">
-                                    <span class="text-[10px] text-zinc-400">Documents</span>
-                                    <span class="text-[10px] font-semibold text-white">{{ subscription.plan.doc_limit }}
-                                        active</span>
-                                </div>
-                                <div
-                                    class="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 px-4 py-2.5">
-                                    <span class="text-[10px] text-zinc-400">AI Chats</span>
-                                    <span class="text-[10px] font-semibold text-white">{{
-                                        subscription.plan.chat_limit|floatformat:0 }} / month</span>
-                                </div>
-                                <div
-                                    class="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 px-4 py-2.5">
-                                    <span class="text-[10px] text-zinc-400">Max File Size</span>
-                                    <span class="text-[10px] font-semibold text-white">{{
-                                        subscription.plan.max_file_size_mb }} MB</span>
-                                </div>
-                            </div>
-                            {% else %}
-                            <!-- ── Free Plan ── -->
-                            <div class="rounded-2xl border border-white/5 bg-white/5 p-5 mb-4">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-2">
-                                        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-700/50">
-                                            <i class="fa-solid fa-box-open text-zinc-400 text-xs"></i>
-                                        </div>
-                                        <div>
-                                            <p class="text-sm font-bold text-white">Free Plan</p>
-                                            <p class="text-[10px] text-zinc-400">10 docs · 500 chats · 10 MB</p>
-                                        </div>
+                                <div class="space-y-2">
+                                    <div
+                                        class="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 px-4 py-2.5">
+                                        <span class="text-[10px] text-zinc-400">Active Documents</span>
+                                        <span class="text-[10px] font-semibold text-white">{{ doc_count }} / {{ doc_limit }}</span>
+                                    </div>
+                                    <div
+                                        class="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 px-4 py-2.5">
+                                        <span class="text-[10px] text-zinc-400">AI Chats Allowance</span>
+                                        <span class="text-[10px] font-semibold text-white">{{ chat_limit }} / month</span>
+                                    </div>
+                                    <div
+                                        class="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 px-4 py-2.5">
+                                        <span class="text-[10px] text-zinc-400">Max File Size</span>
+                                        <span class="text-[10px] font-semibold text-white">{{ subscription.plan.max_file_size_mb|default:50 }} MB</span>
+                                    </div>
+                                    <div
+                                        class="flex items-center justify-between rounded-xl border border-violet-500/20 bg-violet-500/10 px-4 py-2.5">
+                                        <span class="text-[10px] text-violet-300">AI Model</span>
+                                        <span class="text-[10px] font-semibold text-amber-300 flex items-center gap-1">
+                                            <i class="fa-solid fa-bolt text-[9px]"></i> DeepSeek v4 Flash
+                                        </span>
                                     </div>
                                 </div>
+                                {% else %}
+                                <!-- ── Free Plan ── -->
+                                <div class="rounded-2xl border border-white/5 bg-white/5 p-5 mb-4">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-2">
+                                            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-700/50">
+                                                <i class="fa-solid fa-box-open text-zinc-400 text-xs"></i>
+                                            </div>
+                                            <div>
+                                                <p class="text-sm font-bold text-white">Free Plan</p>
+                                                <p class="text-[10px] text-zinc-400">{{ doc_count }} of 10 documents used</p>
+                                            </div>
+                                        </div>
+                                        <span class="rounded-full bg-zinc-500/10 border border-zinc-500/20 px-2.5 py-1 text-[9px] font-bold text-zinc-400">
+                                            Current
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-2 mb-4">
+                                    <div class="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 px-4 py-2.5">
+                                        <span class="text-[10px] text-zinc-400">Active Documents</span>
+                                        <span class="text-[10px] font-semibold text-white">{{ doc_count }} / 10</span>
+                                    </div>
+                                    <div class="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 px-4 py-2.5">
+                                        <span class="text-[10px] text-zinc-400">AI Chats Allowance</span>
+                                        <span class="text-[10px] font-semibold text-white">500 / month</span>
+                                    </div>
+                                    <div class="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 px-4 py-2.5">
+                                        <span class="text-[10px] text-zinc-400">Max File Size</span>
+                                        <span class="text-[10px] font-semibold text-white">10 MB</span>
+                                    </div>
+                                    <div class="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 px-4 py-2.5">
+                                        <span class="text-[10px] text-zinc-400">AI Model</span>
+                                        <span class="text-[10px] font-semibold text-zinc-300">Gemini 2.5 Flash</span>
+                                    </div>
+                                </div>
+
+                                <a href="{% url 'subscription' %}"
+                                    class="block w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 py-2.5 text-center text-xs font-bold text-white shadow-lg shadow-violet-600/20 hover:shadow-violet-600/40 hover:scale-[1.01] transition-all">
+                                    <i class="fa-solid fa-bolt mr-1"></i> Upgrade to Pro Plan (₹199)
+                                </a>
+                                {% endif %}
                             </div>
-                            <a href="{% url 'subscription' %}"
-                                class="block w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 py-2.5 text-center text-xs font-bold text-white shadow-lg shadow-violet-600/20 hover:shadow-violet-600/40 hover:scale-[1.02] transition-all">
-                                <i class="fa-solid fa-bolt mr-1"></i> Upgrade to Pro
-                            </a>
-                            {% endif %}
                         </div>
 
                         <!-- ─── Security Card ─── -->
-                        <div class="glass-card rounded-3xl p-6 sm:p-8">
-                            <h3 class="text-sm font-semibold text-white mb-5">Security</h3>
-                            <div class="space-y-3">
-                                <div
-                                    class="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-3 hover:bg-white/10 transition-colors cursor-pointer group">
-                                    <div class="flex items-center gap-3">
-                                        <div
-                                            class="flex h-8 w-8 items-center justify-center rounded-lg {% if user.is_2fa_enabled %}bg-emerald-500/20 text-emerald-400{% else %}bg-zinc-700/50 text-zinc-400{% endif %}">
-                                            <i class="fa-solid fa-mobile-screen-button text-xs"></i>
+                        <div class="glass-card rounded-3xl p-6 sm:p-8 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center gap-2 mb-5">
+                                    <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
+                                        <i class="fa-solid fa-shield-halved text-xs"></i>
+                                    </div>
+                                    <h3 class="text-sm font-semibold text-white">Security & Access</h3>
+                                </div>
+
+                                <div class="space-y-3">
+                                    <div
+                                        class="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-4 hover:bg-white/10 transition-colors">
+                                        <div class="flex items-center gap-3">
+                                            <div
+                                                class="flex h-9 w-9 items-center justify-center rounded-lg {% if user.is_2fa_enabled %}bg-emerald-500/20 text-emerald-400{% else %}bg-zinc-700/50 text-zinc-400{% endif %}">
+                                                <i class="fa-solid fa-mobile-screen-button text-sm"></i>
+                                            </div>
+                                            <div>
+                                                <p class="text-xs font-medium text-white">Two-Factor Authentication</p>
+                                                <p class="text-[10px] text-zinc-400">Email OTP verification upon sign in</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p class="text-xs font-medium text-white">2FA Authentication</p>
-                                            <p class="text-[10px] text-zinc-400">Email Verification</p>
+
+                                        {% if user.is_2fa_enabled %}
+                                        <div class="flex items-center gap-3">
+                                            <span class="text-[10px] font-semibold text-emerald-400">Active</span>
+                                            <a href="{% url 'disable_2fa_init' %}"
+                                                class="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-1.5 text-[10px] font-bold text-red-400 hover:bg-red-500/20 transition-colors">
+                                                Disable
+                                            </a>
                                         </div>
+                                        {% else %}
+                                        <a href="{% url 'enable_2fa_init' %}"
+                                            class="rounded-lg bg-violet-600 px-3 py-1.5 text-[10px] font-bold text-white shadow-lg shadow-violet-600/20 hover:bg-violet-500 transition-colors">
+                                            Enable
+                                        </a>
+                                        {% endif %}
                                     </div>
 
-                                    {% if user.is_2fa_enabled %}
-                                    <div class="flex items-center gap-3">
-                                        <span class="text-[10px] font-semibold text-emerald-400">Enabled</span>
-                                        <a href="{% url 'disable_2fa_init' %}"
-                                            class="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-1.5 text-[10px] font-bold text-red-400 hover:bg-red-500/20 transition-colors">
-                                            Disable
-                                        </a>
+                                    <div class="rounded-xl border border-white/5 bg-white/5 p-4">
+                                        <div class="flex items-center justify-between text-xs">
+                                            <div class="flex items-center gap-3">
+                                                <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-700/50 text-zinc-400">
+                                                    <i class="fa-solid fa-key text-sm"></i>
+                                                </div>
+                                                <div>
+                                                    <p class="text-xs font-medium text-white">Account Password</p>
+                                                    <p class="text-[10px] text-zinc-400">Last changed recently</p>
+                                                </div>
+                                            </div>
+                                            <a href="{% url 'password_reset' %}" class="text-[10px] font-medium text-violet-400 hover:text-violet-300 transition-colors">
+                                                Reset
+                                            </a>
+                                        </div>
                                     </div>
-                                    {% else %}
-                                    <a href="{% url 'enable_2fa_init' %}"
-                                        class="rounded-lg bg-violet-600 px-3 py-1.5 text-[10px] font-bold text-white shadow-lg shadow-violet-600/20 hover:bg-violet-500 transition-colors">
-                                        Enable
-                                    </a>
-                                    {% endif %}
                                 </div>
                             </div>
                         </div>
 
+                    </div>
+
+                    <!-- ─── Billing & Payment History ─── -->
+                    <div class="glass-card rounded-3xl p-6 sm:p-8">
+                        <div class="flex items-center justify-between mb-5">
+                            <div class="flex items-center gap-2">
+                                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10 text-violet-400">
+                                    <i class="fa-solid fa-receipt text-xs"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-sm font-semibold text-white">Billing & Payment History</h3>
+                                    <p class="text-[10px] text-zinc-400">Recent transactions powered by Razorpay</p>
+                                </div>
+                            </div>
+                            <a href="{% url 'subscription' %}"
+                                class="text-[10px] font-medium text-violet-400 hover:text-violet-300 transition-colors">
+                                View Plans <i class="fa-solid fa-arrow-right text-[8px] ml-0.5"></i>
+                            </a>
+                        </div>
+
+                        {% if recent_payments %}
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="border-b border-white/5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                                        <th class="pb-3 px-3">Order ID</th>
+                                        <th class="pb-3 px-3">Plan</th>
+                                        <th class="pb-3 px-3">Date</th>
+                                        <th class="pb-3 px-3">Amount</th>
+                                        <th class="pb-3 px-3 text-right">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-white/5 text-xs">
+                                    {% for p in recent_payments %}
+                                    <tr class="hover:bg-white/[0.02] transition-colors">
+                                        <td class="py-3 px-3 font-mono text-[11px] text-zinc-300">
+                                            {{ p.order_id }}
+                                        </td>
+                                        <td class="py-3 px-3 text-white font-medium">
+                                            {{ p.plan.name|default:"Pro" }} Plan
+                                        </td>
+                                        <td class="py-3 px-3 text-zinc-400 text-[11px]">
+                                            {{ p.created_at|date:"d M Y, H:i" }}
+                                        </td>
+                                        <td class="py-3 px-3 text-white font-semibold">
+                                            ₹{{ p.amount }}
+                                        </td>
+                                        <td class="py-3 px-3 text-right">
+                                            {% if p.status == 'captured' %}
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 text-[9px] font-semibold text-emerald-400">
+                                                <i class="fa-solid fa-circle-check text-[8px]"></i> Paid
+                                            </span>
+                                            {% elif p.status == 'created' or p.status == 'authorized' %}
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 text-[9px] font-semibold text-amber-400">
+                                                <i class="fa-solid fa-clock text-[8px]"></i> Pending
+                                            </span>
+                                            {% else %}
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-red-500/10 border border-red-500/20 px-2.5 py-0.5 text-[9px] font-semibold text-red-400">
+                                                <i class="fa-solid fa-circle-xmark text-[8px]"></i> Failed
+                                            </span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="rounded-2xl border border-dashed border-white/5 p-8 text-center">
+                            <div class="flex h-10 w-10 mx-auto items-center justify-center rounded-xl bg-white/5 text-zinc-500 mb-3">
+                                <i class="fa-solid fa-receipt text-lg"></i>
+                            </div>
+                            <p class="text-xs font-medium text-zinc-300">No payment transactions yet</p>
+                            <p class="text-[10px] text-zinc-500 mt-1">When you upgrade or renew your plan, invoices and receipts will appear here.</p>
+                            <a href="{% url 'subscription' %}" class="inline-flex items-center gap-1 mt-4 rounded-xl bg-white/5 border border-white/10 px-3 py-1.5 text-[10px] font-medium text-white hover:bg-white/10 transition-colors">
+                                Explore Plans <i class="fa-solid fa-arrow-right text-[8px]"></i>
+                            </a>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>

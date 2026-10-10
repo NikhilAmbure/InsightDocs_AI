@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>InsightDocs AI · Chat</title>
+    <title>{% if workspace %}InsightDocs AI · Workspace Chat · {{ workspace.name }}{% else %}InsightDocs AI · Chat{% endif %}</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -266,59 +266,180 @@
             </div>
 
             <div class="flex flex-1 flex-col overflow-y-auto px-4 py-6 scrollbar-thin">
-                <div class="mb-6 rounded-2xl border border-violet-500/20 bg-violet-500/5 p-4 shadow-inner shadow-violet-500/5">
-                    <div class="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-violet-400">
-                        <span class="relative flex h-2 w-2">
-                          <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-75"></span>
-                          <span class="relative inline-flex h-2 w-2 rounded-full bg-violet-500"></span>
+                <!-- Active Session Card -->
+                <div class="mb-4 rounded-2xl border border-violet-500/20 bg-violet-500/5 p-4 shadow-inner shadow-violet-500/5">
+                    <div class="mb-2 flex items-center justify-between">
+                        <div class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-violet-400">
+                            <span class="relative flex h-2 w-2">
+                              <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-75"></span>
+                              <span class="relative inline-flex h-2 w-2 rounded-full bg-violet-500"></span>
+                            </span>
+                            Active Session
+                        </div>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-zinc-400 uppercase font-medium">
+                            {% if workspace %}Workspace{% else %}{{ document.extension|default:"PDF" }}{% endif %}
                         </span>
-                        Active Session
                     </div>
-                    <p class="truncate font-semibold text-sm text-white">{{ document.title }}</p>
-                    <p class="text-[10px] text-zinc-400">Updated {{ document.uploaded_at|timesince }} ago</p>
+
+                    {% if workspace %}
+                        <p class="truncate font-semibold text-sm text-white" title="{{ workspace.name }}">{{ workspace.name }}</p>
+                        <p class="text-[10px] text-zinc-400 mt-0.5">{{ workspace_docs.count }} document(s) attached</p>
+                    {% else %}
+                        <p class="truncate font-semibold text-sm text-white" title="{{ document.title }}">{{ document.title }}</p>
+                        <p class="text-[10px] text-zinc-400 mt-0.5">Updated {{ document.uploaded_at|timesince }} ago</p>
+                    {% endif %}
+
+                    <!-- Workspaces / PDF toggle right below the Active Session Name -->
+                    <div class="mt-3.5 pt-3 border-t border-white/5">
+                        <div class="flex items-center p-1 rounded-xl bg-black/40 border border-white/10 text-[11px] font-medium">
+                            <button type="button" onclick="switchSidebarTab('workspaces')" id="sidebar-tab-btn-ws" 
+                                    class="flex-1 py-1.5 px-2 rounded-lg text-center transition-all flex items-center justify-center gap-1.5 {% if workspace %}bg-violet-600 text-white font-semibold shadow-sm{% else %}text-zinc-400 hover:text-white{% endif %}">
+                                <i class="fa-solid fa-folder-tree text-[10px]"></i>
+                                <span>Workspaces</span>
+                                <span id="sidebar-ws-badge" class="ml-1 text-[9px] px-1 py-0.2 rounded-full bg-white/10">{{ recent_workspaces|length }}</span>
+                            </button>
+                            <button type="button" onclick="switchSidebarTab('documents')" id="sidebar-tab-btn-docs" 
+                                    class="flex-1 py-1.5 px-2 rounded-lg text-center transition-all flex items-center justify-center gap-1.5 {% if not workspace %}bg-violet-600 text-white font-semibold shadow-sm{% else %}text-zinc-400 hover:text-white{% endif %}">
+                                <i class="fa-solid fa-file-pdf text-[10px]"></i>
+                                <span>PDFs</span>
+                                <span id="sidebar-docs-badge" class="ml-1 text-[9px] px-1 py-0.2 rounded-full bg-white/10">{{ recent_documents|length }}</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
-                <a href="{% url 'upload' %}" class="group mb-8 flex w-full items-center justify-center gap-2 rounded-xl bg-white py-2.5 text-xs font-semibold text-black transition-all hover:bg-zinc-200 hover:shadow-lg hover:shadow-white/5">
-                    <span>Start new chat</span>
+                <!-- Primary Upload Button (triggers in-chat modal directly, no redirect to upload.html) -->
+                <button type="button" onclick="openQuickUploadModal()" class="group mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-white py-2.5 text-xs font-semibold text-black transition-all hover:bg-zinc-200 hover:shadow-lg hover:shadow-white/5">
+                    <span>Upload new PDF</span>
                     <i class="fa-solid fa-plus text-[10px] transition-transform group-hover:rotate-90"></i>
-                </a>
+                </button>
 
-                <div class="space-y-1">
-                    <div class="mb-2 flex items-center justify-between px-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-                        <span>Recent History</span>
-                    </div>
-                    {% if recent_documents %}
-                        {% for doc in recent_documents %}
-                        <div class="group relative flex items-center rounded-xl border border-transparent hover:bg-white/5 transition-colors">
-                            <a href="{% url 'chat' doc.id %}" class="flex-1 min-w-0 p-2.5 text-left">
-                                <div class="flex items-center justify-between">
-                                    <span class="truncate text-xs text-zinc-300 group-hover:text-white font-medium">{{ doc.title }}</span>
-                                    <span class="ml-2 text-[9px] text-zinc-500">{{ doc.extension|upper }}</span>
+                <!-- Navigation Hub Shortcuts -->
+                <div class="mb-4 space-y-1">
+                    <button type="button" onclick="openQuickUploadModal()" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/5 transition-colors text-left">
+                        <i class="fa-solid fa-cloud-arrow-up text-violet-400 text-sm"></i>
+                        <span>Quick Upload PDF</span>
+                    </button>
+                    <a href="{% url 'compare_select' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/5 transition-colors">
+                        <i class="fa-solid fa-code-compare text-indigo-400 text-sm"></i>
+                        <span>Compare PDFs</span>
+                    </a>
+                    <a href="{% url 'search_chats' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/5 transition-colors">
+                        <i class="fa-solid fa-magnifying-glass text-slate-400 text-sm"></i>
+                        <span>Search Chats</span>
+                    </a>
+                </div>
+
+                {% if workspace %}
+                    <div class="space-y-1 mb-4">
+                        <div class="mb-2 flex items-center justify-between px-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                            <span>Workspace Docs (<span id="workspace-docs-count">{{ workspace_docs.count }}</span>)</span>
+                            <button type="button" onclick="openQuickUploadModal()" class="text-violet-400 hover:text-violet-300 text-[10px] font-semibold flex items-center gap-1">
+                                <i class="fa-solid fa-plus text-[9px]"></i> Add
+                            </button>
+                        </div>
+                        <div id="workspace-docs-sidebar-list" class="space-y-1">
+                            {% for wdoc in workspace_docs %}
+                            <div onclick="selectActiveDocument({{ wdoc.id }})" class="group cursor-pointer flex items-center justify-between rounded-xl border border-transparent hover:bg-white/5 p-2 transition-colors">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <i class="fa-solid fa-file-pdf text-[10px] text-rose-400"></i>
+                                    <span class="truncate text-xs text-zinc-300 group-hover:text-white font-medium">{{ wdoc.title }}</span>
                                 </div>
-                                <p class="mt-0.5 text-[10px] text-zinc-500">{{ doc.uploaded_at|timesince }} ago</p>
+                                <span class="text-[9px] text-zinc-500 uppercase">{{ wdoc.extension }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
+
+                <!-- Tabbed Lists: Workspaces vs PDFs -->
+                <div class="space-y-2">
+
+                    <!-- Tab 1: Workspaces Content -->
+                    <div id="sidebar-tab-content-workspaces" class="space-y-1 {% if not workspace %}hidden{% endif %}">
+                        <div class="mb-2 flex items-center justify-between px-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                            <span>Workspaces ({{ recent_workspaces|length }})</span>
+                            <a href="{% url 'workspace_create' %}" class="text-violet-400 hover:text-violet-300 text-[10px] font-semibold flex items-center gap-1">
+                                <i class="fa-solid fa-plus text-[9px]"></i> New
                             </a>
-                            
-                            <div class="relative px-2">
-                                <button onclick="toggleDocMenu(event, 'menu-{{ doc.id }}')" 
-                                    class="p-1.5 text-zinc-500 hover:text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity rounded-lg hover:bg-white/10"
-                                    title="Options">
-                                    <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
-                                </button>
+                        </div>
+                        {% if recent_workspaces %}
+                            {% for ws in recent_workspaces %}
+                            <a href="{% url 'workspace_chat' ws.id %}" 
+                               class="group block rounded-xl border {% if workspace and workspace.id == ws.id %}border-violet-500/40 bg-violet-600/15 text-white{% else %}border-transparent hover:bg-white/5 text-zinc-300{% endif %} p-2.5 transition-colors">
+                                <div class="flex items-center justify-between">
+                                    <span class="truncate text-xs group-hover:text-white font-medium flex items-center gap-2">
+                                        <i class="fa-solid fa-folder-tree text-[11px] {% if workspace and workspace.id == ws.id %}text-violet-400{% else %}text-zinc-400 group-hover:text-violet-400{% endif %}"></i>
+                                        {{ ws.name }}
+                                    </span>
+                                    <span class="text-[9px] px-1.5 py-0.5 rounded {% if workspace and workspace.id == ws.id %}bg-violet-500/30 text-violet-200{% else %}bg-white/5 text-zinc-500{% endif %} shrink-0 ml-2">
+                                        {{ ws.documents.count }} docs
+                                    </span>
+                                </div>
+                                <p class="mt-1 text-[10px] text-zinc-500 truncate pl-5">
+                                    Updated {{ ws.updated_at|timesince }} ago
+                                </p>
+                            </a>
+                            {% endfor %}
+                        {% else %}
+                            <div class="rounded-xl border border-dashed border-white/5 p-4 text-center">
+                                <p class="text-[11px] text-zinc-400">No workspaces yet.</p>
+                                <a href="{% url 'workspace_create' %}" class="mt-2 inline-flex items-center gap-1 text-[10px] text-violet-400 hover:underline font-medium">
+                                    + Create your first workspace
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Tab 2: Document Chats Content -->
+                    <div id="sidebar-tab-content-documents" class="space-y-1 {% if workspace %}hidden{% endif %}">
+                        <div class="mb-2 flex items-center justify-between px-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                            <span>Document Chats ({{ recent_documents|length }})</span>
+                            <button type="button" onclick="openQuickUploadModal()" class="text-violet-400 hover:text-violet-300 text-[10px] font-semibold flex items-center gap-1">
+                                <i class="fa-solid fa-plus text-[9px]"></i> Upload
+                            </button>
+                        </div>
+                        {% if recent_documents %}
+                            {% for doc in recent_documents %}
+                            <div class="group relative flex items-center rounded-xl border {% if not workspace and document and document.id == doc.id %}border-violet-500/40 bg-violet-600/15 text-white{% else %}border-transparent hover:bg-white/5 text-zinc-300{% endif %} transition-colors">
+                                <a href="{% url 'chat' doc.id %}" class="flex-1 min-w-0 p-2.5 text-left">
+                                    <div class="flex items-center justify-between">
+                                        <span class="truncate text-xs group-hover:text-white font-medium flex items-center gap-2">
+                                            <i class="fa-solid fa-file-pdf text-[11px] {% if not workspace and document and document.id == doc.id %}text-rose-400{% else %}text-zinc-400 group-hover:text-rose-400{% endif %}"></i>
+                                            {{ doc.title }}
+                                        </span>
+                                        <span class="ml-2 text-[9px] text-zinc-500 uppercase">{{ doc.extension }}</span>
+                                    </div>
+                                    <p class="mt-0.5 text-[10px] text-zinc-500 pl-5">{{ doc.uploaded_at|timesince }} ago</p>
+                                </a>
                                 
-                                <div id="menu-{{ doc.id }}" class="hidden absolute right-0 top-8 w-32 bg-zinc-900 border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden">
-                                    <form action="{% url 'delete_document' doc.id %}" method="POST" onsubmit="return confirm('Are you sure? This will delete the document and all chat history permanently.');">
-                                        {% csrf_token %}
-                                        <button type="submit" class="w-full text-left px-4 py-2.5 text-[10px] text-red-400 hover:bg-white/5 hover:text-red-300 flex items-center gap-2 transition-colors">
-                                            <i class="fa-solid fa-trash-can"></i> Delete
-                                        </button>
-                                    </form>
+                                <div class="relative px-2">
+                                    <button onclick="toggleDocMenu(event, 'menu-{{ doc.id }}')" 
+                                        class="p-1.5 text-zinc-500 hover:text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity rounded-lg hover:bg-white/10"
+                                        title="Options">
+                                        <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
+                                    </button>
+                                    
+                                    <div id="menu-{{ doc.id }}" class="hidden absolute right-0 top-8 w-32 bg-zinc-900 border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden">
+                                        <form action="{% url 'delete_document' doc.id %}" method="POST" onsubmit="return confirm('Are you sure? This will delete the document and all chat history permanently.');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="w-full text-left px-4 py-2.5 text-[10px] text-red-400 hover:bg-white/5 hover:text-red-300 flex items-center gap-2 transition-colors">
+                                                <i class="fa-solid fa-trash-can"></i> Delete
+                                            </button>
+                                        </form>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                        <p class="rounded-xl border border-dashed border-white/5 p-3 text-[10px] text-zinc-500">Upload another file to see it here.</p>
-                    {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            <div class="rounded-xl border border-dashed border-white/5 p-4 text-center">
+                                <p class="text-[11px] text-zinc-400">No document chats yet.</p>
+                                <button type="button" onclick="openQuickUploadModal()" class="mt-2 inline-flex items-center gap-1 text-[10px] text-violet-400 hover:underline font-medium">
+                                    + Upload a document
+                                </button>
+                            </div>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
 
@@ -328,7 +449,12 @@
                         {{ request.user.get_full_name|default:request.user.username|slice:":2"|upper }}
                     </div>
                     <div class="flex-1 overflow-hidden px-1">
-                        <p class="truncate text-xs font-medium text-white">{{ request.user.get_full_name|default:request.user.username }}</p>
+                        <div class="flex items-center gap-1.5">
+                            <p class="truncate text-xs font-medium text-white">{{ request.user.get_full_name|default:request.user.username }}</p>
+                            {% if request.user.is_premium %}
+                                <span class="rounded bg-violet-500/20 px-1 py-0.5 text-[8px] font-bold text-amber-300 border border-violet-500/30">PRO</span>
+                            {% endif %}
+                        </div>
                         <p class="truncate text-[10px] text-zinc-400">{{ request.user.email }}</p>
                     </div>
                     
@@ -359,19 +485,37 @@
                     </button>
 
                     <div class="flex flex-col border-l border-white/10 pl-4">
-                        <h1 class="flex flex-wrap items-center gap-2 text-xs font-semibold text-white sm:text-sm">
-                            {{ document.title }}
-                            <span class="hidden rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-zinc-300 sm:inline-block">{{ document.extension|upper }}</span>
-                            {% if document.is_processed %}
-                                <span id="doc-processing-status" class="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> Ready
+                        {% if workspace %}
+                            <h1 class="flex flex-wrap items-center gap-2 text-xs font-semibold text-white sm:text-sm font-display">
+                                {{ workspace.name }}
+                                <span class="rounded-full bg-violet-500/20 border border-violet-500/30 px-2 py-0.5 text-[10px] font-medium text-violet-300">
+                                    {{ workspace_docs.count }} DOCS
                                 </span>
-                            {% else %}
-                                <span id="doc-processing-status" class="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-300 border border-amber-500/30 flex items-center gap-1 animate-pulse">
-                                    <span class="h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping"></span> Processing...
-                                </span>
-                            {% endif %}
-                        </h1>
+                                {% if is_workspace_processed %}
+                                    <span id="doc-processing-status" class="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                                        <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> Multi-Doc Ready
+                                    </span>
+                                {% else %}
+                                    <span id="doc-processing-status" class="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-300 border border-amber-500/30 flex items-center gap-1 animate-pulse">
+                                        <span class="h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping"></span> Indexing {{ processed_docs|default:0 }}/{{ total_docs|default:workspace_docs.count }} Docs...
+                                    </span>
+                                {% endif %}
+                            </h1>
+                        {% else %}
+                            <h1 class="flex flex-wrap items-center gap-2 text-xs font-semibold text-white sm:text-sm">
+                                {{ document.title }}
+                                <span class="hidden rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-zinc-300 sm:inline-block">{{ document.extension|upper }}</span>
+                                {% if document.is_processed %}
+                                    <span id="doc-processing-status" class="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                                        <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> Ready
+                                    </span>
+                                {% else %}
+                                    <span id="doc-processing-status" class="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-300 border border-amber-500/30 flex items-center gap-1 animate-pulse">
+                                        <span class="h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping"></span> Chunking &amp; Indexing...
+                                    </span>
+                                {% endif %}
+                            </h1>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -381,6 +525,18 @@
                         <span class="hidden sm:inline">Connecting...</span>
                     </div>
 
+                    {% if request.user.is_premium %}
+                        <div class="hidden sm:flex items-center gap-1.5 rounded-full border border-violet-500/40 bg-violet-500/10 px-3 py-1 text-[10px] font-semibold text-violet-300 shadow-sm shadow-violet-500/10">
+                            <i class="fa-solid fa-bolt text-amber-400 text-[10px]"></i>
+                            <span>DeepSeek v4 Flash</span>
+                        </div>
+                    {% else %}
+                        <div class="hidden sm:flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-medium text-zinc-400">
+                            <i class="fa-solid fa-sparkles text-zinc-400 text-[10px]"></i>
+                            <span>Gemini 2.5 Flash</span>
+                        </div>
+                    {% endif %}
+
                     {% if request.user.subscription.is_token_metered %}
                         <div id="token-usage-display" class="hidden sm:flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/5 px-3 py-1 text-[10px] text-violet-300 backdrop-blur-md">
                             <i class="fa-solid fa-microchip"></i>
@@ -388,10 +544,24 @@
                         </div>
                     {% endif %}
 
+                    {% if workspace %}
+                        <a href="{% url 'export_workspace_chat' workspace.id %}" class="hidden sm:flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 px-3 py-1 text-[10px] font-medium text-zinc-300 hover:text-white transition-all" title="Export Workspace Chat History">
+                            <i class="fa-solid fa-download text-[9px]"></i>
+                            <span>Export</span>
+                        </a>
+                    {% else %}
+                        <a href="{% url 'export_chat' document.id %}" class="hidden sm:flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 px-3 py-1 text-[10px] font-medium text-zinc-300 hover:text-white transition-all" title="Export Chat History">
+                            <i class="fa-solid fa-download text-[9px]"></i>
+                            <span>Export</span>
+                        </a>
+                    {% endif %}
+
+                    {% if not request.user.is_premium %}
                     <a href="{% url 'subscription' %}" class="flex items-center gap-1.5 sm:gap-2 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-1 sm:px-4 sm:py-1.5 text-[10px] font-bold text-white shadow-lg shadow-violet-500/20 hover:scale-105 hover:shadow-violet-500/30 transition-all">
                         <i class="fa-solid fa-crown text-[9px]"></i>
                         <span><span class="hidden sm:inline">Upgrade</span> Pro</span>
                     </a>
+                    {% endif %}
                 </div>
             </header>
 
@@ -407,19 +577,69 @@
                     <div id="chat-container" class="flex-1 overflow-y-auto px-4 py-6 sm:px-8 scroll-smooth scrollbar-thin">
                         <div class="mx-auto max-w-3xl space-y-8 pb-32">
                             
-                            <div id="ai-chat-readiness" class="flex items-center justify-center pb-2 opacity-80">
-                                {% if document.is_processed %}
+                            <div id="ai-chat-readiness" class="flex flex-col items-center justify-center pb-2 opacity-95">
+                                {% if workspace %}
+                                    {% if is_workspace_processed %}
+                                        <div class="flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-[10px] text-violet-300 backdrop-blur">
+                                            <i class="fa-solid fa-sparkles animate-pulse"></i>
+                                            AI cross-document synthesis active across {{ workspace_docs.count }} documents
+                                        </div>
+                                    {% else %}
+                                        <div id="indexing-banner" class="w-full max-w-xl rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-center backdrop-blur-md shadow-lg shadow-amber-500/5 animate-pulse">
+                                            <div class="flex items-center justify-center gap-2.5 text-xs font-semibold text-amber-300 mb-1">
+                                                <i class="fa-solid fa-circle-notch animate-spin text-sm"></i>
+                                                Chunking &amp; Indexing Workspace Documents...
+                                            </div>
+                                            <p class="text-[11px] text-zinc-300 leading-relaxed">
+                                                Please wait while AI parses and generates vector embeddings for all documents in this workspace. 
+                                                Chat input will automatically unlock once indexing finishes (<span id="indexing-progress-text">{{ processed_docs|default:0 }}/{{ total_docs|default:workspace_docs.count }} ready</span>).
+                                            </p>
+                                        </div>
+                                    {% endif %}
+                                {% elif document.is_processed %}
                                     <div class="flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-[10px] text-violet-300 backdrop-blur">
                                         <i class="fa-solid fa-sparkles animate-pulse"></i>
                                         AI is ready to chat
                                     </div>
                                 {% else %}
-                                    <div class="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[10px] text-amber-300 backdrop-blur">
-                                        <i class="fa-solid fa-circle-notch animate-spin"></i>
-                                        AI is reading and indexing document...
+                                    <div id="indexing-banner" class="w-full max-w-xl rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-center backdrop-blur-md shadow-lg shadow-amber-500/5 animate-pulse">
+                                        <div class="flex items-center justify-center gap-2.5 text-xs font-semibold text-amber-300 mb-1">
+                                            <i class="fa-solid fa-circle-notch animate-spin text-sm"></i>
+                                            Document Chunking &amp; Vector Indexing In Progress...
+                                        </div>
+                                        <p class="text-[11px] text-zinc-300 leading-relaxed">
+                                            Extracting pages, chunking text, and computing hybrid embeddings. 
+                                            Chat is paused until indexing completes so your questions are answered with 100% accurate page citations.
+                                        </p>
                                     </div>
                                 {% endif %}
                             </div>
+
+                            {% if workspace and suggested_questions %}
+                            <div class="rounded-2xl border border-violet-500/20 bg-violet-500/5 p-4 shadow-inner shadow-violet-500/10">
+                                <div class="mb-3 flex items-center justify-between">
+                                    <h3 class="text-[11px] font-semibold uppercase tracking-wider text-violet-300 flex items-center gap-1.5">
+                                        <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
+                                        Synthesize Workspace
+                                    </h3>
+                                    <span class="rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-zinc-300">
+                                        {{ workspace_docs.count }} Documents
+                                    </span>
+                                </div>
+
+                                <div class="flex flex-wrap gap-2">
+                                    {% for sq in suggested_questions %}
+                                    <button
+                                        type="button"
+                                        onclick="document.getElementById('message-input').value='{{ sq|escapejs }}'; document.getElementById('message-input').focus();"
+                                        class="rounded-full border border-violet-400/30 bg-violet-500/10 px-3 py-1 text-[10px] text-violet-200 hover:bg-violet-500/20 hover:text-white transition-colors text-left">
+                                        <i class="fa-regular fa-compass mr-1 text-violet-400"></i>
+                                        {{ sq }}
+                                    </button>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
 
                             {% if document_insights %}
                             <div class="rounded-2xl border border-violet-500/20 bg-violet-500/5 p-4 shadow-inner shadow-violet-500/10">
@@ -530,15 +750,34 @@
                                 
                                 <div id="chat-input-container" class="flex-1 py-2 pl-4 min-h-[44px] max-h-32 overflow-y-auto">
                                     <textarea name="content" id="message-input" rows="1" 
-                                        placeholder="Ask a question about your document..." required 
-                                        class="w-full bg-transparent text-white outline-none border-none text-sm resize-none focus:ring-0 placeholder-zinc-500 leading-relaxed custom-textarea"></textarea>
+                                        {% if workspace and not is_workspace_processed %}
+                                            placeholder="Indexing documents in workspace... Chat will unlock automatically when ready." disabled
+                                        {% elif not workspace and not document.is_processed %}
+                                            placeholder="Chunking &amp; indexing document... Chat will unlock automatically when ready." disabled
+                                        {% else %}
+                                            placeholder="{% if workspace %}Ask a question across all documents in this workspace...{% else %}Ask a question about your document...{% endif %}"
+                                        {% endif %}
+                                        required 
+                                        class="w-full bg-transparent text-white outline-none border-none text-sm resize-none focus:ring-0 placeholder-zinc-500 leading-relaxed custom-textarea disabled:opacity-50 disabled:cursor-not-allowed"></textarea>
                                 </div>
                                 
-                                <button type="submit" id="send-btn" class="mb-1 mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-600 text-white shadow-lg shadow-violet-600/30 transition-all hover:bg-violet-500 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <button type="submit" id="send-btn" 
+                                    {% if workspace and not is_workspace_processed %}disabled{% elif not workspace and not document.is_processed %}disabled{% endif %}
+                                    class="mb-1 mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-600 text-white shadow-lg shadow-violet-600/30 transition-all hover:bg-violet-500 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
                                     <i class="fa-solid fa-paper-plane text-xs translate-x-px translate-y-px"></i>
                                 </button>
                             </form>
-                            <p class="mt-2 text-center text-[10px] font-medium text-zinc-600">InsightDocs AI generated content.</p>
+                            <p id="chat-footer-note" class="mt-2 text-center text-[10px] font-medium text-zinc-500">
+                                {% if workspace and not is_workspace_processed %}
+                                    <span class="text-amber-400"><i class="fa-solid fa-clock-rotate-left mr-1"></i>Indexing in progress. Please wait a moment...</span>
+                                {% elif not workspace and not document.is_processed %}
+                                    <span class="text-amber-400"><i class="fa-solid fa-clock-rotate-left mr-1"></i>Chunking &amp; indexing in progress. Please wait a moment...</span>
+                                {% elif workspace %}
+                                    InsightDocs AI synthesizes answers across {{ workspace_docs.count }} documents with citations.
+                                {% else %}
+                                    InsightDocs AI generated content.
+                                {% endif %}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -548,13 +787,26 @@
                 </div>
 
                 <aside id="doc-view-wrapper" style="width: 450px;" class="hidden relative h-full flex-col bg-gray-950/70 backdrop-blur lg:flex shrink-0 border-l border-white/5">
-                    <div class="flex h-10 shrink-0 items-center justify-between border-b border-white/5 px-4 lg:h-12">
-                        <div class="flex items-center gap-2">
-                            <h3 class="text-[10px] font-semibold text-white lg:text-xs">Document Preview</h3>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <a href="{{ document.file.url }}" target="_blank" class="text-[10px] text-violet-400 hover:text-violet-300">
-                                Open in New Tab <i class="fa-solid fa-arrow-up-right-from-square ml-1"></i>
+                    <div class="flex h-10 shrink-0 items-center justify-between border-b border-white/5 px-4 lg:h-12 bg-zinc-950/80">
+                        {% if workspace %}
+                            <div class="flex items-center gap-2 min-w-0 flex-1 mr-2">
+                                <i class="fa-solid fa-file-pdf text-rose-400 text-xs shrink-0"></i>
+                                <select id="doc-selector" onchange="onDocumentSelected(this.value)" class="bg-slate-900 border border-white/10 text-white text-xs rounded-lg px-2 py-1 outline-none focus:border-violet-500 max-w-[200px] truncate">
+                                    {% for wdoc in workspace_docs %}
+                                        <option value="{{ wdoc.id }}" {% if forloop.first %}selected{% endif %}>
+                                            {{ wdoc.title }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        {% else %}
+                            <div class="flex items-center gap-2 min-w-0">
+                                <h3 class="text-[10px] font-semibold text-white lg:text-xs truncate">Document Preview</h3>
+                            </div>
+                        {% endif %}
+                        <div class="flex items-center gap-2 shrink-0">
+                            <a id="open-new-tab-btn" href="{% if document and document.file %}{{ document.file.url }}{% else %}#{% endif %}" target="_blank" class="text-[10px] text-violet-400 hover:text-violet-300">
+                                Open <i class="fa-solid fa-arrow-up-right-from-square ml-0.5"></i>
                             </a>
                             <button type="button" onclick="switchMobileTab('chat')" class="lg:hidden rounded-full border border-white/10 px-2 py-0.5 text-[10px] font-medium text-zinc-200 hover:bg-white/10">Close</button>
                              <button type="button" onclick="toggleDesktopDocPanel()" class="hidden lg:block rounded-md p-1 text-zinc-400 hover:text-white hover:bg-white/10" title="Collapse Panel">
@@ -565,7 +817,7 @@
                     
                     <div class="flex-1 overflow-hidden bg-zinc-900 relative group">
                         {# PDF: use built-in browser / Cloudinary PDF viewer #}
-                        {% if document.extension == 'pdf' %}
+                        {% if document.extension == 'pdf' or workspace %}
                             <div class="absolute inset-0 flex flex-col bg-[#323639]">
                                 <!-- PDF Toolbar -->
                                 <div class="flex items-center justify-between bg-[#2a2e33] px-4 py-2 border-b border-black/20 shrink-0">
@@ -594,15 +846,17 @@
                             </div>
 
                         {# Images: show contained image, not zoomed #}
-                        {% elif document.extension == 'jpg' or document.extension == 'jpeg' or document.extension == 'png' or document.extension == 'gif' or document.extension == 'webp' %}
+                        {% elif document and document.extension == 'jpg' or document.extension == 'jpeg' or document.extension == 'png' or document.extension == 'gif' or document.extension == 'webp' %}
                             <div class="absolute inset-0 flex items-center justify-center bg-black">
+                                {% if document.file %}
                                 <img src="{{ document.file.url }}" 
                                      alt="{{ document.title }}" 
                                      class="max-h-full max-w-full object-contain shadow-lg shadow-black/40 rounded-lg bg-black" />
+                                {% endif %}
                             </div>
 
                         {# Office docs (DOCX / PPT / PPTX): local-friendly card with open/download actions #}
-                        {% elif document.extension == 'doc' or document.extension == 'docx' or document.extension == 'ppt' or document.extension == 'pptx' %}
+                        {% elif document and document.extension == 'doc' or document.extension == 'docx' or document.extension == 'ppt' or document.extension == 'pptx' %}
                             <div class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-zinc-900">
                                 <div class="h-16 w-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
                                     <i class="fa-regular fa-file-word text-2xl text-zinc-200"></i>
@@ -614,6 +868,7 @@
                                     {{ document.extension|upper }} document preview is limited here.
                                 </p>
                                 <div class="flex items-center gap-3">
+                                    {% if document.file %}
                                     <a href="{{ document.file.url }}" target="_blank"
                                        class="px-4 py-2 bg-violet-600 rounded-lg text-[11px] font-bold text-white hover:bg-violet-500 transition">
                                         Open in New Tab
@@ -622,6 +877,7 @@
                                        class="px-4 py-2 border border-white/10 rounded-lg text-[11px] font-medium text-zinc-200 hover:bg-white/10 transition">
                                         Download
                                     </a>
+                                    {% endif %}
                                 </div>
                             </div>
                         {% endif %}
@@ -631,9 +887,11 @@
                                 <i class="fa-regular fa-file-lines text-2xl text-zinc-500"></i>
                             </div>
                             <p class="text-xs text-zinc-400 mb-2">Preview not available for this file type.</p>
+                            {% if document and document.file %}
                             <a href="{{ document.file.url }}" target="_blank" class="px-4 py-2 bg-violet-600 rounded-lg text-xs font-bold text-white hover:bg-violet-500 transition">
                                 Download to View
                             </a>
+                            {% endif %}
                         </div>
                     </div>
                 </aside>
@@ -646,9 +904,88 @@
         </main>
     </div>
 
+    <!-- Quick Upload Modal -->
+    <div id="quick-upload-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/80 backdrop-blur-md p-4 transition-all">
+        <div class="relative w-full max-w-lg rounded-3xl border border-white/10 bg-gray-950 p-6 shadow-2xl shadow-violet-500/10">
+            <div class="flex items-center justify-between pb-4 border-b border-white/5">
+                <div class="flex items-center gap-2.5">
+                    <div class="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-600/20 text-violet-400">
+                        <i class="fa-solid fa-cloud-arrow-up text-sm"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-semibold text-white">Upload Documents</h3>
+                        <p class="text-[11px] text-zinc-400">{% if workspace %}Add documents directly to <strong>{{ workspace.name }}</strong>{% else %}Upload new PDFs without leaving chat{% endif %}</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeQuickUploadModal()" class="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white transition-colors">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+
+            <form id="quick-upload-form" onsubmit="handleQuickUpload(event)" class="mt-4 space-y-4">
+                <input type="file" id="modal-file-input" name="files" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg" class="hidden" required>
+                
+                <div id="modal-drop-zone" onclick="document.getElementById('modal-file-input').click()" 
+                     class="flex min-h-[160px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-white/[0.02] p-6 text-center hover:border-violet-500/50 hover:bg-violet-500/5 transition-all">
+                    <div class="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-600/10 text-violet-400">
+                        <i class="fa-solid fa-folder-open text-xl"></i>
+                    </div>
+                    <p class="text-xs font-semibold text-white">Click or drag files here to upload</p>
+                    <p class="mt-1 text-[10px] text-zinc-400">Multiple files supported (PDF, DOCX, PPT, Images). Max 50MB each.</p>
+                </div>
+
+                <!-- Selected Files in Modal -->
+                <div id="modal-selected-files-list" class="hidden space-y-2">
+                    <div class="flex items-center justify-between text-[11px] text-zinc-400 px-1 font-medium">
+                        <span id="modal-selected-files-count">0 files selected</span>
+                        <button type="button" onclick="clearModalFiles()" class="text-rose-400 hover:text-rose-300 text-[10px]">Clear</button>
+                    </div>
+                    <div id="modal-files-items-box" class="max-h-36 overflow-y-auto space-y-1.5 p-2 rounded-xl bg-black/40 border border-white/5 scrollbar-thin"></div>
+                </div>
+
+                {% if workspace %}
+                <div class="flex items-center gap-2 px-1 text-xs text-zinc-300">
+                    <input type="checkbox" id="attach-to-workspace-chk" name="attach_workspace" checked class="rounded border-white/20 bg-black/40 text-violet-600 focus:ring-violet-500 h-4 w-4">
+                    <label for="attach-to-workspace-chk" class="text-[11px] text-zinc-300 cursor-pointer">
+                        Attach directly to workspace <strong>{{ workspace.name }}</strong>
+                    </label>
+                </div>
+                {% endif %}
+
+                <!-- Progress / Status Bar -->
+                <div id="modal-upload-progress" class="hidden space-y-1.5">
+                    <div class="flex items-center justify-between text-[11px]">
+                        <span id="modal-progress-text" class="text-violet-300 font-medium">Uploading and extracting...</span>
+                        <span id="modal-progress-pct" class="text-zinc-400 font-bold">0%</span>
+                    </div>
+                    <div class="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
+                        <div id="modal-progress-bar" class="bg-gradient-to-r from-violet-600 to-indigo-600 h-1.5 rounded-full w-0 transition-all duration-300"></div>
+                    </div>
+                </div>
+
+                <div id="modal-error-msg" class="hidden rounded-xl bg-red-500/10 border border-red-500/20 p-2.5 text-xs text-red-300"></div>
+
+                <div class="flex items-center justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeQuickUploadModal()" class="rounded-xl px-4 py-2 text-xs font-medium text-zinc-400 hover:bg-white/5 hover:text-white transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" id="modal-upload-submit-btn" class="flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2 text-xs font-semibold text-white shadow-lg shadow-violet-600/30 hover:bg-violet-500 transition-all">
+                        <i class="fa-solid fa-arrow-up-from-bracket text-[10px]"></i>
+                        <span>Upload Files</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
-        const DOCUMENT_ID = {{ document.id }};
-        const DOCUMENT_TITLE = "{{ document.title|escapejs }}";
+        const IS_WORKSPACE = {% if workspace %}true{% else %}false{% endif %};
+        const WORKSPACE_ID = {% if workspace %}"{{ workspace.id }}"{% else %}null{% endif %};
+        const DOCUMENT_ID = {% if document %}{{ document.id }}{% else %}null{% endif %};
+        const IS_PREMIUM = {% if request.user.is_premium %}true{% else %}false{% endif %};
+        const DOCUMENT_TITLE = "{% if workspace %}{{ workspace.name|escapejs }}{% elif document %}{{ document.title|escapejs }}{% else %}InsightDocs AI{% endif %}";
+        const DOCUMENTS_METADATA = {% if docs_metadata_json %}{{ docs_metadata_json|safe }}{% elif document %}[{ id: {{ document.id }}, title: "{{ document.title|escapejs }}", extension: "{{ document.extension|escapejs }}", url: "{% url 'serve_document' document.id %}" }]{% else %}[]{% endif %};
+        let currentDocument = DOCUMENTS_METADATA.length > 0 ? DOCUMENTS_METADATA[0] : null;
         const AI_LOGO_URL = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23a78bfa;stop-opacity:1'/%3E%3Cstop offset='100%25' style='stop-color:%237c3aed;stop-opacity:1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='0' y='0' width='64' height='64' rx='16' fill='%23020617'/%3E%3Cpath d='M32 14L50 23V41L32 50L14 41V23Z' fill='url(%23g)' stroke='%23ddd6fe' stroke-width='2'/%3E%3Cpath d='M32 50V32M32 32L50 23M32 32L14 23' stroke='%23ddd6fe' stroke-width='2'/%3E%3C/svg%3E";
 
         let chatSocket = null;
@@ -744,7 +1081,9 @@
             if (isConnecting || chatSocket) return;
             isConnecting = true;
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/ws/chat/${DOCUMENT_ID}/`;
+            const wsUrl = IS_WORKSPACE 
+                ? `${protocol}//${window.location.host}/ws/workspace/${WORKSPACE_ID}/`
+                : `${protocol}//${window.location.host}/ws/chat/${DOCUMENT_ID}/`;
             updateStatus('connecting');
             chatSocket = new WebSocket(wsUrl);
             chatSocket.onopen = function(e) { updateStatus('connected'); isConnecting = false; };
@@ -821,8 +1160,20 @@
             return activeAssistantMsgEl;
         }
 
+        function escapeForJs(str) {
+            return (str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+        }
+
         function formatCitations(text) {
-            return text.replace(/\[Page\s+(\d+)\]/gi, '<button onclick="scrollToPage($1, this)" class="text-[10px] ml-1 px-1.5 py-0.5 rounded-md bg-violet-500/20 text-violet-300 hover:bg-violet-500/40 hover:text-white transition-colors cursor-pointer border border-violet-500/30 font-medium align-middle inline-flex items-center gap-1"><i class="fa-solid fa-file-pdf text-[9px]"></i> Page $1</button>');
+            if (!text) return '';
+            // 1. Match [Document Title · Page X] or [Document Title - Page X] or [Document Title: Page X]
+            let formatted = text.replace(/\[([^\]\n]+?)\s*[·\-|:]\s*Page\s*(\d+)\]/gi, (match, docName, pageNum) => {
+                const cleanName = docName.trim().replace(/"/g, '&quot;');
+                return `<button onclick="jumpToWorkspaceDocCitation('${escapeForJs(cleanName)}', ${pageNum}, this)" class="text-[10px] ml-1 px-2 py-0.5 rounded-md bg-violet-500/20 text-violet-300 hover:bg-violet-500/40 hover:text-white transition-colors cursor-pointer border border-violet-500/30 font-medium align-middle inline-flex items-center gap-1 shadow-sm"><i class="fa-solid fa-file-pdf text-[9px] text-rose-400"></i> ${cleanName} · P.${pageNum}</button>`;
+            });
+            // 2. Match standard [Page X]
+            formatted = formatted.replace(/\[Page\s+(\d+)\]/gi, '<button onclick="scrollToPage($1, this)" class="text-[10px] ml-1 px-1.5 py-0.5 rounded-md bg-violet-500/20 text-violet-300 hover:bg-violet-500/40 hover:text-white transition-colors cursor-pointer border border-violet-500/30 font-medium align-middle inline-flex items-center gap-1 shadow-sm"><i class="fa-solid fa-file-pdf text-[9px] text-rose-400"></i> Page $1</button>');
+            return formatted;
         }
 
         function appendAiStreamChunk(chunk) {
@@ -854,7 +1205,8 @@
 
         function handleWebSocketMessage(data) {
             if (data.type === 'user_message') addMessageToUI(data.content, 'user', data.id);
-            else if (data.type === 'ai_thinking') addLoadingIndicator();
+            else if (data.type === 'ai_thinking') addLoadingIndicator(data.model);
+            else if (data.type === 'ai_progress') updateProgressStage(data.stage);
             else if (data.type === 'ai_stream_chunk') appendAiStreamChunk(data.content || '');
             else if (data.type === 'ai_stream_end') finalizeAiStream(data);
             else if (data.type === 'ai_message') { removeLoadingIndicator(); addMessageToUI(data.content, 'assistant', data.id); } // fallback
@@ -1040,11 +1392,12 @@
             scrollToBottom(role === 'user');
         }
 
-        function addLoadingIndicator() {
+        function addLoadingIndicator(modelName) {
             const messagesDiv = document.getElementById('chat-messages');
             const loaderDiv = document.createElement('div');
             loaderDiv.id = 'loading-indicator';
             loaderDiv.className = 'w-full msg-animate flex gap-4 justify-start'; 
+            const modelLabel = modelName || (IS_PREMIUM ? 'DeepSeek v4 Flash' : 'Gemini 2.5 Flash');
             
             loaderDiv.innerHTML = `
                 <div class="flex-shrink-0 mt-1">
@@ -1056,7 +1409,8 @@
                 </div>
                 <div class="max-w-[85%] pt-2 space-y-2">
                     <div class="flex items-center gap-2">
-                        <span class="text-xs font-medium animate-shimmer">Thinking...</span>
+                        <span class="rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30 px-2 py-0.5 text-[10px] font-semibold">${modelLabel}</span>
+                        <span class="text-xs font-medium text-zinc-400 animate-shimmer">Thinking...</span>
                     </div>
                     <div class="rounded-lg border border-white/10 bg-white/5 p-2">
                         <div class="text-[10px] text-zinc-300" id="progress-stage-current">Initializing AI pipeline...</div>
@@ -1091,6 +1445,10 @@
 
         function handleSendMessage(e) {
             e.preventDefault();
+            if (!isIndexingComplete) {
+                showError('Documents are still being chunked and indexed. Please wait until indexing completes.');
+                return;
+            }
             const textarea = document.getElementById('message-input');
             const sendBtn = document.getElementById('send-btn');
             const content = textarea.value.trim();
@@ -1170,6 +1528,29 @@
             document.getElementById('sidebar').classList.toggle('sidebar-collapsed');
         }
 
+        function switchSidebarTab(tabName) {
+            const btnWs = document.getElementById('sidebar-tab-btn-ws');
+            const btnDocs = document.getElementById('sidebar-tab-btn-docs');
+            const contentWs = document.getElementById('sidebar-tab-content-workspaces');
+            const contentDocs = document.getElementById('sidebar-tab-content-documents');
+
+            if (!btnWs || !btnDocs || !contentWs || !contentDocs) return;
+
+            if (tabName === 'workspaces') {
+                contentWs.classList.remove('hidden');
+                contentDocs.classList.add('hidden');
+
+                btnWs.className = 'flex-1 py-1.5 px-2 rounded-lg text-center transition-all flex items-center justify-center gap-1.5 bg-violet-600 text-white font-semibold shadow-sm';
+                btnDocs.className = 'flex-1 py-1.5 px-2 rounded-lg text-center transition-all flex items-center justify-center gap-1.5 text-zinc-400 hover:text-white';
+            } else {
+                contentDocs.classList.remove('hidden');
+                contentWs.classList.add('hidden');
+
+                btnDocs.className = 'flex-1 py-1.5 px-2 rounded-lg text-center transition-all flex items-center justify-center gap-1.5 bg-violet-600 text-white font-semibold shadow-sm';
+                btnWs.className = 'flex-1 py-1.5 px-2 rounded-lg text-center transition-all flex items-center justify-center gap-1.5 text-zinc-400 hover:text-white';
+            }
+        }
+
         function switchMobileTab(tab) {
             const chatView = document.getElementById('chat-view-wrapper');
             const docView = document.getElementById('doc-view-wrapper');
@@ -1217,53 +1598,109 @@
             }
         });
 
-        let isDocumentProcessed = {% if document.is_processed %}true{% else %}false{% endif %};
-        function pollDocumentStatus() {
-            if (isDocumentProcessed) return;
+        let isIndexingComplete = {% if workspace %}{% if is_workspace_processed %}true{% else %}false{% endif %}{% elif document.is_processed %}true{% else %}false{% endif %};
+        let isDocumentProcessed = isIndexingComplete;
+
+        function unlockChatUI() {
+            isIndexingComplete = true;
+            isDocumentProcessed = true;
+
+            // 1. Update text input & send button
+            const textarea = document.getElementById('message-input');
+            const sendBtn = document.getElementById('send-btn');
+            const footerNote = document.getElementById('chat-footer-note');
+
+            if (textarea) {
+                textarea.disabled = false;
+                textarea.placeholder = IS_WORKSPACE 
+                    ? "Ask a question across all documents in this workspace..." 
+                    : "Ask a question about your document...";
+            }
+            if (sendBtn) {
+                sendBtn.disabled = false;
+            }
+            if (footerNote) {
+                footerNote.innerHTML = IS_WORKSPACE
+                    ? `InsightDocs AI synthesizes answers across ${DOCUMENTS_METADATA.length || 1} documents with citations.`
+                    : `InsightDocs AI generated content.`;
+            }
+
+            // 2. Update header status badge
+            const headerStatus = document.getElementById('doc-processing-status');
+            if (headerStatus) {
+                headerStatus.className = "rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-300 border border-emerald-500/30 flex items-center gap-1";
+                headerStatus.innerHTML = '<span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> ' + (IS_WORKSPACE ? 'Multi-Doc Ready' : 'Ready');
+            }
+
+            // 3. Update readiness indicator in chat area
+            const chatReadiness = document.getElementById('ai-chat-readiness');
+            if (chatReadiness) {
+                chatReadiness.innerHTML = `
+                    <div class="flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-[10px] text-violet-300 backdrop-blur animate-in fade-in duration-300">
+                        <i class="fa-solid fa-sparkles animate-pulse"></i>
+                        ${IS_WORKSPACE ? 'AI cross-document synthesis active across ' + (DOCUMENTS_METADATA.length || 1) + ' documents' : 'AI is ready to chat'}
+                    </div>
+                `;
+            }
+
+            // 4. Remove indexing banner if visible
+            const indexingBanner = document.getElementById('indexing-banner');
+            if (indexingBanner) indexingBanner.remove();
+        }
+
+        function pollProcessingStatus() {
+            if (isIndexingComplete) return;
+
+            const pollUrl = IS_WORKSPACE 
+                ? `/workspaces/${WORKSPACE_ID}/status/` 
+                : `/document/${DOCUMENT_ID}/status/`;
+
             const interval = setInterval(async () => {
                 try {
-                    const response = await fetch(`/document/${DOCUMENT_ID}/status/`);
+                    const response = await fetch(pollUrl);
                     if (response.ok) {
                         const data = await response.json();
-                        if (data.is_processed) {
-                            isDocumentProcessed = true;
-                            clearInterval(interval);
-                            
-                            // Update header status badge
+                        
+                        if (IS_WORKSPACE) {
+                            const progressText = document.getElementById('indexing-progress-text');
+                            if (progressText && data.total_docs !== undefined) {
+                                progressText.textContent = `${data.processed_docs}/${data.total_docs} ready`;
+                            }
                             const headerStatus = document.getElementById('doc-processing-status');
-                            if (headerStatus) {
-                                headerStatus.className = "rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-300 border border-emerald-500/30 flex items-center gap-1";
-                                headerStatus.innerHTML = '<span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> Ready';
+                            if (headerStatus && !data.is_processed) {
+                                headerStatus.innerHTML = `<span class="h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping"></span> Indexing ${data.processed_docs}/${data.total_docs} Docs...`;
                             }
-                            
-                            // Update readiness indicator in chat area
-                            const chatReadiness = document.getElementById('ai-chat-readiness');
-                            if (chatReadiness) {
-                                chatReadiness.innerHTML = `
-                                    <div class="flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-[10px] text-violet-300 backdrop-blur">
-                                        <i class="fa-solid fa-sparkles animate-pulse"></i>
-                                        AI is ready to chat
-                                    </div>
-                                `;
-                            }
-                            
-                            // Reload page to display new insights
-                            window.location.reload();
+                        }
+
+                        if (data.is_processed) {
+                            clearInterval(interval);
+                            unlockChatUI();
+                            // Optional: soft reload after 1.5s to load generated suggested questions/insights if available
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1200);
                         }
                     }
                 } catch (err) {
-                    console.error("Error polling document status:", err);
+                    console.error("Error polling processing status:", err);
                 }
-            }, 3000);
+            }, 2500);
         }
 
         document.addEventListener('DOMContentLoaded', function() {
             initWebSocket();
             renderMarkdown();
             scrollToBottom(true);
-            loadEditableDocument();
-            initPdfViewer();
-            pollDocumentStatus();
+            if (!IS_WORKSPACE) {
+                loadEditableDocument();
+            }
+            pollProcessingStatus();
+
+            if (currentDocument) {
+                initPdfViewer(currentDocument.url);
+            } else {
+                initPdfViewer();
+            }
             fetchAndDisplayTokenUsage();
         });
 
@@ -1276,31 +1713,91 @@
         let isPdfRendering = false;
         let pdfPagePending = null;
 
-        function initPdfViewer() {
-            {% if document.extension == 'pdf' %}
-            const pdfUrl = "{% url 'serve_document' document.id %}";
+        function initPdfViewer(docUrl) {
+            {% if document.extension == 'pdf' or workspace %}
+            const pdfUrl = docUrl || (currentDocument ? currentDocument.url : "{% if document %}{% url 'serve_document' document.id %}{% endif %}");
+            if (!pdfUrl) return;
+
             const pdfjsLib = window['pdfjs-dist/build/pdf'];
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
             const container = document.getElementById('pdf-viewer-container');
             const loadingIndicator = document.getElementById('pdf-loading-indicator');
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'flex';
+                loadingIndicator.style.opacity = '1';
+            }
+
             pdfCanvas = document.getElementById('pdf-single-page');
             pdfTextLayer = document.getElementById('pdf-text-layer');
             if (pdfCanvas) pdfCtx = pdfCanvas.getContext('2d');
 
             pdfjsLib.getDocument(pdfUrl).promise.then(function(pdf) {
                 thePdf = pdf;
-                document.getElementById('page-count').textContent = pdf.numPages;
+                const pageCountEl = document.getElementById('page-count');
+                if (pageCountEl) pageCountEl.textContent = pdf.numPages;
                 
-                if(loadingIndicator) loadingIndicator.style.opacity = '0';
-                setTimeout(() => { if(loadingIndicator) loadingIndicator.style.display = 'none'; }, 300);
+                if (loadingIndicator) {
+                    loadingIndicator.style.opacity = '0';
+                    setTimeout(() => { loadingIndicator.style.display = 'none'; }, 300);
+                }
 
+                pdfCurrentPage = 1;
                 renderPage(pdfCurrentPage);
             }).catch(error => {
                 console.error('Error loading PDF:', error);
-                if(loadingIndicator) loadingIndicator.innerHTML = '<p class="text-xs text-red-400">Failed to load PDF viewer. Please download the document instead.</p>';
+                if (loadingIndicator) {
+                    loadingIndicator.innerHTML = '<p class="text-xs text-red-400">Failed to load PDF viewer.</p>';
+                }
             });
             {% endif %}
+        }
+
+        // --- Workspace Multi-Document Switcher & Cross-Document Citation Jump ---
+        function onDocumentSelected(docId) {
+            const found = DOCUMENTS_METADATA.find(d => String(d.id) === String(docId));
+            if (!found) return;
+            currentDocument = found;
+            const openBtn = document.getElementById('open-new-tab-btn');
+            if (openBtn) openBtn.href = found.url;
+            initPdfViewer(found.url);
+        }
+
+        function selectActiveDocument(docId) {
+            const selector = document.getElementById('doc-selector');
+            if (selector) selector.value = docId;
+            onDocumentSelected(docId);
+            if (window.innerWidth < 1024) switchMobileTab('doc');
+            else {
+                const docWrapper = document.getElementById('doc-view-wrapper');
+                if (docWrapper && (docWrapper.style.display === 'none' || docWrapper.classList.contains('hidden'))) {
+                    toggleDesktopDocPanel();
+                }
+            }
+        }
+
+        function jumpToWorkspaceDocCitation(docTitle, pageNum, btnEl) {
+            const search = (docTitle || '').toLowerCase().trim();
+            let matchedDoc = DOCUMENTS_METADATA.find(d => d.title.toLowerCase() === search);
+            if (!matchedDoc) {
+                matchedDoc = DOCUMENTS_METADATA.find(d => d.title.toLowerCase().includes(search) || search.includes(d.title.toLowerCase()));
+            }
+            if (!matchedDoc && DOCUMENTS_METADATA.length > 0) {
+                matchedDoc = DOCUMENTS_METADATA[0];
+            }
+
+            if (matchedDoc) {
+                if (!currentDocument || String(currentDocument.id) !== String(matchedDoc.id)) {
+                    selectActiveDocument(matchedDoc.id);
+                    setTimeout(() => {
+                        scrollToPage(pageNum);
+                    }, 400);
+                } else {
+                    scrollToPage(pageNum);
+                }
+            } else {
+                scrollToPage(pageNum);
+            }
         }
 
         function renderPage(num) {
@@ -1519,6 +2016,261 @@
                 }
             } catch (err) {
                 console.error("Error fetching token usage:", err);
+            }
+        }
+
+        // --- Quick Upload Modal Logic ---
+        function formatBytes(bytes, decimals = 1) {
+            if (!+bytes) return '0 B';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+        }
+
+        const quickUploadModal = document.getElementById('quick-upload-modal');
+        const modalFileInput = document.getElementById('modal-file-input');
+        const modalFilesList = document.getElementById('modal-selected-files-list');
+        const modalFilesCount = document.getElementById('modal-selected-files-count');
+        const modalFilesBox = document.getElementById('modal-files-items-box');
+        const modalProgressBar = document.getElementById('modal-progress-bar');
+        const modalProgressText = document.getElementById('modal-progress-text');
+        const modalProgressPct = document.getElementById('modal-progress-pct');
+        const modalUploadProgress = document.getElementById('modal-upload-progress');
+        const modalErrorMsg = document.getElementById('modal-error-msg');
+        const modalDropZone = document.getElementById('modal-drop-zone');
+
+        function openQuickUploadModal() {
+            if (!quickUploadModal) return;
+            quickUploadModal.classList.remove('hidden');
+            clearModalFiles();
+            if (modalErrorMsg) {
+                modalErrorMsg.classList.add('hidden');
+                modalErrorMsg.textContent = '';
+            }
+        }
+
+        function closeQuickUploadModal() {
+            if (!quickUploadModal) return;
+            quickUploadModal.classList.add('hidden');
+        }
+
+        function clearModalFiles() {
+            if (modalFileInput) modalFileInput.value = '';
+            if (modalFilesList) modalFilesList.classList.add('hidden');
+            if (modalFilesBox) modalFilesBox.innerHTML = '';
+            if (modalUploadProgress) modalUploadProgress.classList.add('hidden');
+            if (modalProgressBar) modalProgressBar.style.width = '0%';
+        }
+
+        function renderModalSelectedFiles() {
+            if (!modalFileInput || !modalFileInput.files || modalFileInput.files.length === 0) {
+                clearModalFiles();
+                return;
+            }
+            const files = Array.from(modalFileInput.files);
+            modalFilesCount.textContent = `${files.length} file${files.length > 1 ? 's' : ''} ready`;
+            modalFilesList.classList.remove('hidden');
+            modalFilesBox.innerHTML = '';
+
+            files.forEach(file => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between text-xs py-1 px-2 rounded-lg bg-white/5 border border-white/5';
+                item.innerHTML = `
+                    <div class="flex items-center gap-2 min-w-0">
+                        <i class="fa-solid fa-file-pdf text-rose-400 text-xs"></i>
+                        <span class="truncate text-zinc-200">${file.name}</span>
+                    </div>
+                    <span class="text-[10px] text-zinc-400 shrink-0 ml-2">${formatBytes(file.size)}</span>
+                `;
+                modalFilesBox.appendChild(item);
+            });
+        }
+
+        if (modalFileInput) {
+            modalFileInput.addEventListener('change', renderModalSelectedFiles);
+        }
+
+        if (modalDropZone) {
+            ['dragenter', 'dragover'].forEach(name => {
+                modalDropZone.addEventListener(name, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    modalDropZone.classList.add('border-violet-500', 'bg-violet-500/10');
+                });
+            });
+            ['dragleave', 'drop'].forEach(name => {
+                modalDropZone.addEventListener(name, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    modalDropZone.classList.remove('border-violet-500', 'bg-violet-500/10');
+                });
+            });
+            modalDropZone.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                if (dt.files && dt.files.length > 0) {
+                    modalFileInput.files = dt.files;
+                    renderModalSelectedFiles();
+                }
+            });
+        }
+
+        // Close modal on escape or click backdrop
+        if (quickUploadModal) {
+            quickUploadModal.addEventListener('click', (e) => {
+                if (e.target === quickUploadModal) closeQuickUploadModal();
+            });
+        }
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && quickUploadModal && !quickUploadModal.classList.contains('hidden')) {
+                closeQuickUploadModal();
+            }
+        });
+
+        async function handleQuickUpload(e) {
+            e.preventDefault();
+            if (!modalFileInput.files || modalFileInput.files.length === 0) {
+                alert('Please select at least one file to upload.');
+                return;
+            }
+
+            modalErrorMsg.classList.add('hidden');
+            modalErrorMsg.textContent = '';
+            modalUploadProgress.classList.remove('hidden');
+            modalProgressBar.style.width = '35%';
+            modalProgressPct.textContent = '35%';
+            modalProgressText.textContent = 'Uploading files...';
+
+            const submitBtn = document.getElementById('modal-upload-submit-btn');
+            if (submitBtn) submitBtn.disabled = true;
+
+            const formData = new FormData();
+            for (let i = 0; i < modalFileInput.files.length; i++) {
+                formData.append('files', modalFileInput.files[i]);
+            }
+            if (IS_WORKSPACE && WORKSPACE_ID) {
+                const attachChk = document.getElementById('attach-to-workspace-chk');
+                if (!attachChk || attachChk.checked) {
+                    formData.append('workspace_id', WORKSPACE_ID);
+                }
+            }
+
+            try {
+                modalProgressBar.style.width = '65%';
+                modalProgressPct.textContent = '65%';
+                modalProgressText.textContent = 'Extracting and parsing text...';
+
+                const response = await fetch('/app/', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': CSRF_TOKEN,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Upload failed. Please check file sizes and formats.');
+                }
+
+                modalProgressBar.style.width = '100%';
+                modalProgressPct.textContent = '100%';
+                modalProgressText.textContent = 'Success! Updating workspace...';
+
+                setTimeout(() => {
+                    closeQuickUploadModal();
+                    if (submitBtn) submitBtn.disabled = false;
+
+                    if (IS_WORKSPACE && data.documents && data.documents.length > 0) {
+                        // Dynamically update workspace metadata without full reload
+                        data.documents.forEach(newDoc => {
+                            if (!DOCUMENTS_METADATA.some(d => d.id === newDoc.id)) {
+                                DOCUMENTS_METADATA.push({
+                                    id: newDoc.id,
+                                    title: newDoc.title,
+                                    extension: newDoc.extension,
+                                    url: newDoc.preview_url
+                                });
+
+                                // Append to doc-selector dropdown if exists
+                                const selector = document.getElementById('doc-selector');
+                                if (selector) {
+                                    const opt = document.createElement('option');
+                                    opt.value = newDoc.id;
+                                    opt.textContent = newDoc.title;
+                                    selector.appendChild(opt);
+                                }
+
+                                // Append to sidebar list
+                                const sidebarList = document.getElementById('workspace-docs-sidebar-list');
+                                if (sidebarList) {
+                                    const row = document.createElement('div');
+                                    row.onclick = () => selectActiveDocument(newDoc.id);
+                                    row.className = 'group cursor-pointer flex items-center justify-between rounded-xl border border-transparent hover:bg-white/5 p-2 transition-colors animate-in fade-in duration-300';
+                                    row.innerHTML = `
+                                        <div class="flex items-center gap-2 min-w-0">
+                                            <i class="fa-solid fa-file-pdf text-[10px] text-rose-400"></i>
+                                            <span class="truncate text-xs text-zinc-300 group-hover:text-white font-medium">${newDoc.title}</span>
+                                        </div>
+                                        <span class="text-[9px] text-zinc-500 uppercase">${newDoc.extension}</span>
+                                    `;
+                                    sidebarList.appendChild(row);
+                                }
+                            }
+                        });
+
+                        const wsCountEl = document.getElementById('workspace-docs-count');
+                        if (wsCountEl) wsCountEl.textContent = DOCUMENTS_METADATA.length;
+
+                        // Switch viewer to the newly uploaded document
+                        const lastDoc = data.documents[data.documents.length - 1];
+                        selectActiveDocument(lastDoc.id);
+
+                        // If newly uploaded docs need chunking/indexing, update UI lock and restart polling
+                        isIndexingComplete = false;
+                        isDocumentProcessed = false;
+                        const textarea = document.getElementById('message-input');
+                        const sendBtn = document.getElementById('send-btn');
+                        if (textarea) {
+                            textarea.disabled = true;
+                            textarea.placeholder = "Indexing newly added documents... Chat will unlock automatically.";
+                        }
+                        if (sendBtn) sendBtn.disabled = true;
+                        const headerStatus = document.getElementById('doc-processing-status');
+                        if (headerStatus) {
+                            headerStatus.className = "rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-300 border border-amber-500/30 flex items-center gap-1 animate-pulse";
+                            headerStatus.innerHTML = '<span class="h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping"></span> Indexing New Docs...';
+                        }
+                        pollProcessingStatus();
+
+                        // Notify chat with an inline system notice
+                        const messagesDiv = document.getElementById('chat-messages');
+                        if (messagesDiv) {
+                            const note = document.createElement('div');
+                            note.className = 'flex justify-center my-3';
+                            note.innerHTML = `
+                                <div class="rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1 text-[11px] text-amber-300 flex items-center gap-1.5 shadow-sm">
+                                    <i class="fa-solid fa-clock-rotate-left text-amber-400"></i>
+                                    Added ${data.documents.length} document(s). Indexing and generating embeddings in the background...
+                                </div>
+                            `;
+                            messagesDiv.appendChild(note);
+                            scrollToBottom(true);
+                        }
+                    } else if (data.redirect_url) {
+                        // In single document mode, redirect to chat with the new document
+                        window.location.href = data.redirect_url;
+                    }
+                }, 600);
+
+            } catch (err) {
+                console.error("Quick upload error:", err);
+                if (submitBtn) submitBtn.disabled = false;
+                modalUploadProgress.classList.add('hidden');
+                modalErrorMsg.textContent = err.message || 'An error occurred during upload.';
+                modalErrorMsg.classList.remove('hidden');
             }
         }
     </script>

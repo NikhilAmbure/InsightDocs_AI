@@ -1,0 +1,233 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Compare Documents · InsightDocs AI</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23a78bfa;stop-opacity:1'/%3E%3Cstop offset='100%25' style='stop-color:%237c3aed;stop-opacity:1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='0' y='0' width='64' height='64' rx='16' fill='%23020617'/%3E%3Cpath d='M32 14L50 23V41L32 50L14 41V23Z' fill='url(%23g)' stroke='%23ddd6fe' stroke-width='2'/%3E%3Cpath d='M32 50V32M32 32L50 23M32 32L14 23' stroke='%23ddd6fe' stroke-width='2'/%3E%3C/svg%3E" type="image/svg+xml">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+        .bg-modern-grid {
+            background-color: #020617;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(124, 58, 237, 0.08) 0px, transparent 50%), 
+                radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.08) 0px, transparent 50%), 
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px), 
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+            background-position: center;
+        }
+        .glass-header {
+            background: rgba(2, 6, 23, 0.7);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .doc-selected {
+            border-color: #8b5cf6 !important;
+            background: rgba(139, 92, 246, 0.15) !important;
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.2);
+        }
+    </style>
+</head>
+<body class="bg-modern-grid text-slate-200 min-h-screen flex flex-col antialiased selection:bg-violet-500 selection:text-white">
+
+    <!-- Header Navigation -->
+    <header class="glass-header sticky top-0 z-40 px-4 lg:px-8 py-3.5">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-6">
+                <a href="{% url 'upload' %}" class="flex items-center gap-3 group">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-violet-500/20 group-hover:scale-105 transition-transform">
+                        <i class="fa-solid fa-cube text-white text-sm"></i>
+                    </div>
+                    <span class="font-bold text-lg text-white font-['Plus_Jakarta_Sans'] tracking-tight">InsightDocs<span class="text-violet-400">.ai</span></span>
+                </a>
+
+                <nav class="hidden md:flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-white/5 text-xs font-medium">
+                    <a href="{% url 'upload' %}" class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+                        <i class="fa-solid fa-file-pdf mr-1.5 text-slate-500"></i> My PDFs
+                    </a>
+                    <a href="{% url 'workspace_list' %}" class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+                        <i class="fa-solid fa-folder-tree mr-1.5 text-slate-500"></i> Workspaces
+                    </a>
+                    <a href="{% url 'compare_select' %}" class="px-3.5 py-1.5 rounded-lg bg-violet-600 text-white shadow-sm shadow-violet-600/30">
+                        <i class="fa-solid fa-code-compare mr-1.5"></i> Compare
+                    </a>
+                    <a href="{% url 'search_chats' %}" class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+                        <i class="fa-solid fa-magnifying-glass mr-1.5 text-slate-500"></i> Search
+                    </a>
+                </nav>
+            </div>
+
+            <div class="flex items-center gap-3">
+                {% if request.user.is_premium %}
+                    <div class="hidden sm:flex items-center gap-1.5 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-1.5 text-[10px] font-bold text-white shadow-lg shadow-violet-500/20">
+                        <i class="fa-solid fa-crown text-[9px]"></i>
+                        <span>Pro Member</span>
+                    </div>
+                {% endif %}
+                <a href="{% url 'profile' %}" class="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-all text-xs" title="Profile">
+                    <i class="fa-solid fa-user"></i>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-8">
+        
+        <!-- Header -->
+        <div class="mb-8 border-b border-white/5 pb-6">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-400 text-xs font-medium mb-3">
+                <i class="fa-solid fa-code-compare"></i> Side-by-Side Analysis
+            </div>
+            <h1 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight font-['Plus_Jakarta_Sans']">
+                Compare Two Documents
+            </h1>
+            <p class="text-sm text-slate-400 mt-1 max-w-2xl">
+                Select two documents below to generate a deep AI-powered comparative evaluation: key differences, unique clauses, methodology differences, and comparison tables.
+            </p>
+        </div>
+
+        {% if documents|length >= 2 %}
+        <form id="compareForm" action="{% url 'compare_view' %}" method="GET" class="space-y-6">
+            
+            <!-- Sticky Comparison Action Bar -->
+            <div class="bg-slate-900/80 border border-white/10 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 sticky top-20 z-30 backdrop-blur-md shadow-2xl">
+                <div class="flex items-center gap-3 text-xs font-medium">
+                    <span class="text-slate-400">Selected:</span>
+                    <span id="doc1Label" class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 border border-white/5">1: None</span>
+                    <span class="text-slate-600">vs</span>
+                    <span id="doc2Label" class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 border border-white/5">2: None</span>
+                </div>
+
+                <input type="hidden" name="doc1" id="doc1Input" value="" />
+                <input type="hidden" name="doc2" id="doc2Input" value="" />
+
+                <button id="submitCompareBtn" type="submit" disabled class="w-full sm:w-auto px-6 py-2.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold shadow-lg shadow-violet-600/30 transition-all flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-bolt"></i>
+                    <span>Generate Comparison</span>
+                </button>
+            </div>
+
+            <!-- Documents Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {% for doc in documents %}
+                <div data-doc-id="{{ doc.id }}" data-doc-title="{{ doc.title }}" onclick="toggleDocSelection('{{ doc.id }}', '{{ doc.title|escapejs }}', this)" class="doc-card cursor-pointer bg-slate-900/50 hover:bg-slate-900/80 border border-white/10 rounded-2xl p-5 transition-all flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-start justify-between gap-3 mb-3">
+                            <div class="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center">
+                                <i class="fa-solid fa-file-pdf"></i>
+                            </div>
+                            <span class="selection-badge text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-800 text-slate-500">
+                                Select
+                            </span>
+                        </div>
+                        <h3 class="text-sm font-bold text-white line-clamp-2">{{ doc.title }}</h3>
+                        <p class="text-xs text-slate-400 mt-1">{{ doc.uploaded_at|date:"M d, Y" }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </form>
+        {% else %}
+        <div class="max-w-md mx-auto text-center py-16 px-4">
+            <div class="w-16 h-16 rounded-2xl bg-violet-500/10 text-violet-400 flex items-center justify-center mx-auto mb-4 text-2xl">
+                <i class="fa-solid fa-code-compare"></i>
+            </div>
+            <h3 class="text-lg font-bold text-white">At least 2 processed documents required</h3>
+            <p class="text-xs text-slate-400 mt-2 leading-relaxed">
+                You currently have {{ documents|length }} processed document(s). Upload more documents to unlock side-by-side AI comparative analysis.
+            </p>
+            <a href="{% url 'upload' %}" class="mt-6 inline-flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-violet-600/30 transition-all">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                <span>Upload Documents</span>
+            </a>
+        </div>
+        {% endif %}
+
+    </main>
+
+    <script>
+        let selected = [];
+
+        function toggleDocSelection(id, title, cardEl) {
+            const index = selected.findIndex(item => item.id === id);
+
+            if (index > -1) {
+                // Deselect
+                selected.splice(index, 1);
+            } else {
+                if (selected.length >= 2) {
+                    // Replace the first selection
+                    selected.shift();
+                }
+                selected.push({ id, title });
+            }
+
+            updateUI();
+        }
+
+        function updateUI() {
+            // Update cards
+            document.querySelectorAll('.doc-card').forEach(card => {
+                const id = card.getAttribute('data-doc-id');
+                const badge = card.querySelector('.selection-badge');
+                const isSelected = selected.some(item => item.id === id);
+
+                if (isSelected) {
+                    const selIndex = selected.findIndex(item => item.id === id) + 1;
+                    card.classList.add('doc-selected');
+                    badge.innerText = `Doc #${selIndex}`;
+                    badge.className = "selection-badge text-[11px] font-bold px-2 py-0.5 rounded-md bg-violet-600 text-white";
+                } else {
+                    card.classList.remove('doc-selected');
+                    badge.innerText = "Select";
+                    badge.className = "selection-badge text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-800 text-slate-500";
+                }
+            });
+
+            // Update top bar labels
+            const doc1Label = document.getElementById('doc1Label');
+            const doc2Label = document.getElementById('doc2Label');
+            const doc1Input = document.getElementById('doc1Input');
+            const doc2Input = document.getElementById('doc2Input');
+            const submitBtn = document.getElementById('submitCompareBtn');
+
+            if (selected[0]) {
+                doc1Label.innerText = "1: " + selected[0].title.slice(0, 20) + "...";
+                doc1Label.className = "px-2.5 py-1 rounded-lg bg-violet-500/20 text-violet-300 border border-violet-500/30";
+                doc1Input.value = selected[0].id;
+            } else {
+                doc1Label.innerText = "1: None";
+                doc1Label.className = "px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 border border-white/5";
+                doc1Input.value = "";
+            }
+
+            if (selected[1]) {
+                doc2Label.innerText = "2: " + selected[1].title.slice(0, 20) + "...";
+                doc2Label.className = "px-2.5 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30";
+                doc2Input.value = selected[1].id;
+            } else {
+                doc2Label.innerText = "2: None";
+                doc2Label.className = "px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 border border-white/5";
+                doc2Input.value = "";
+            }
+
+            submitBtn.disabled = selected.length !== 2;
+        }
+    </script>
+
+</body>
+</html>
+

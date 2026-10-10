@@ -104,12 +104,51 @@ class DocumentInsights(models.Model):
         return f"Insights<{self.document_id}> {self.status}"
 
 
+class Workspace(models.Model):
+    """A workspace groups multiple documents for cross-document chat."""
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, default="")
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="workspaces",
+    )
+    documents = models.ManyToManyField(
+        Document,
+        related_name="workspaces",
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-updated_at",)
+        unique_together = ("name", "owner")
+
+    def __str__(self):
+        return f"{self.name} ({self.owner.username})"
+
+    @property
+    def document_count(self):
+        return self.documents.count()
+
+
 class ChatSession(models.Model):
     document = models.ForeignKey(
         Document,
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         related_name="sessions",
     )
+    workspace = models.ForeignKey(
+        Workspace,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="sessions",
+    )
+    title = models.CharField(max_length=255, blank=True, default="")
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -119,11 +158,11 @@ class ChatSession(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ("document", "user")
         ordering = ("-updated_at",)
 
     def __str__(self) -> str:
-        return f"ChatSession<{self.user} · {self.document}>"
+        target = self.document or self.workspace or "General"
+        return f"ChatSession<{self.user} · {target}>"
 
 
 class ChatMessage(models.Model):
@@ -139,6 +178,8 @@ class ChatMessage(models.Model):
     )
     role = models.CharField(max_length=16, choices=ROLE_CHOICES)
     content = models.TextField()
+    tokens_used = models.IntegerField(null=True, blank=True)
+    latency_ms = models.IntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -146,3 +187,4 @@ class ChatMessage(models.Model):
 
     def __str__(self) -> str:
         return f"{self.role}: {self.content[:40]}..."
+

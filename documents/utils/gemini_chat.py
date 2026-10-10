@@ -313,12 +313,14 @@ async def _yield_in_chunks(text, size=FALLBACK_CHUNK_SIZE):
         yield text[i : i + size]
 
 
-async def get_gemini_response(user_message, document, chat_history, progress_callback=None, usage_callback=None):
+async def get_gemini_response(user_message, document, chat_history, progress_callback=None, usage_callback=None, user=None):
     """
     Async generator that streams response using agentic hybrid RAG.
+    Pro & Industry users are powered by DeepSeek v4 Flash (with seamless Gemini fallback).
+    Free tier users are routed to Gemini 2.5 Flash.
     """
     try:
-        logger.info(f"Starting Gemini generation for doc {document.id}...")
+        logger.info(f"Starting generation for doc {document.id}...")
         model = genai.GenerativeModel("gemini-2.5-flash")
 
         # Detect global query vs local query
@@ -448,6 +450,33 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
             if content:
                 history.append({"role": role, "parts": [content]})
 
+        # PRO & INDUSTRY PLANS: ROUTE TO DEEPSEEK-V4-FLASH
+        if user and getattr(user, 'is_premium', False):
+            if progress_callback:
+                await progress_callback("Synthesizing answer with DeepSeek v4 Flash...")
+            try:
+                system_prompt = f"{base_instruction}\n\nDOCUMENT CONTEXT:\n{context_text}"
+                ds_messages = []
+                for msg in chat_history:
+                    role = "user" if msg.get("role") == "user" else "assistant"
+                    content = msg.get("content", "").strip()
+                    if content:
+                        ds_messages.append({"role": role, "content": content})
+                ds_messages.append({"role": "user", "content": user_message})
+
+                from .deepseek_client import stream_deepseek_chat
+                async for chunk in stream_deepseek_chat(
+                    system_prompt=system_prompt,
+                    messages=ds_messages,
+                    usage_callback=usage_callback,
+                ):
+                    yield chunk
+                return
+            except Exception as ds_err:
+                logger.warning(f"DeepSeek v4 Flash fallback to Gemini for doc {document.id}: {ds_err}")
+                if progress_callback:
+                    await progress_callback("DeepSeek busy, routing to Gemini...")
+
         try:
             if progress_callback:
                 await progress_callback("Generating answer...")
@@ -531,4 +560,155 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
                 yield part
         else:
             yield "An error occurred while processing your request. Please try again later."
+
+
+async def get_workspace_response(user_message, documents, chat_history, progress_callback=None, usage_callback=None, user=None):
+    """
+    Async generator that streams response using multi-document hybrid RAG.
+    Retrieves relevant chunks across ALL documents in the workspace.
+    Pro & Industry users are powered by DeepSeek v4 Flash (with Gemini fallback).
+    """
+    try:
+        logger.info(f"Starting workspace generation across {len(documents)} documents...")
+        model = genai.GenerativeModel("gemini-2.5-flash")
+
+        if progress_callback:
+            await progress_callback("Searching across workspace documents...")
+
+        if _is_gemini_in_cooldown():
+            groq_text = await asyncio.to_thread(_call_groq_fallback, user_message, [""], chat_history)
+            if groq_text:
+                async for part in _yield_in_chunks(groq_text):
+                    yield part
+                return
+            yield "Gemini is temporarily rate-limited. Please try again later."
+            return
+
+        def _multi_doc_retrieve():
+            """Retrieve relevant chunks across all workspace documents."""
+            all_chunks = []
+            for doc in documents:
+                if not getattr(doc, "is_processed", False):
+                    continue
+                try:
+                    retrieval = _hybrid_retrieve(doc, user_message, top_k=5)
+                    for chunk in retrieval.get("hybrid_chunks", []):
+                        all_chunks.append({
+                            "chunk": chunk,
+                            "doc_title": doc.title,
+                            "doc_id": doc.id,
+                        })
+                except Exception as e:
+                    logger.warning(f"Retrieval failed for doc {doc.id}: {e}")
+
+            if not all_chunks:
+                return None
+
+            # Sort and limit to top 15 chunks
+            all_chunks = all_chunks[:15]
+
+            parts = []
+            for item in all_chunks:
+                chunk = item["chunk"]
+                doc_title = item["doc_title"]
+                page_info = f"Page {chunk.page_number}" if chunk.page_number else "No page"
+                parts.append(f"[{doc_title} · {page_info}]: {chunk.content}")
+
+            return "\n\n".join(parts)
+
+        try:
+            if progress_callback:
+                await progress_callback("Retrieving context from multiple sources...")
+            context_text = await asyncio.to_thread(_multi_doc_retrieve)
+        except Exception as e:
+            logger.warning(f"Multi-doc retrieval failed: {e}")
+            context_text = None
+
+        if not context_text:
+            yield "I couldn't find relevant content across the workspace documents. Please make sure the documents are uploaded and indexed."
+            return
+
+        doc_names = ", ".join(d.title for d in documents[:6])
+        base_instruction = (
+            f"You are InsightDocs AI, analyzing multiple documents in this workspace: {doc_names}.\n\n"
+            "Rules:\n"
+            "- Answer using the provided document contexts.\n"
+            "- You MUST cite every source using [Document Title · Page X] format for each factual claim.\n"
+            "- When comparing or synthesizing across documents, clearly state which document each point originates from.\n"
+            "- If a question cannot be answered from the provided documents, state so clearly.\n"
+            "- Format with clean Markdown (headers, bullet points, comparison tables where helpful).\n"
+            "- Be concise, professional, and clear.\n"
+        )
+
+        system_parts = _build_system_parts(base_instruction, context_text)
+        history = [
+            {"role": "user", "parts": system_parts},
+            {"role": "model", "parts": ["Understood. I will answer across the workspace documents with clear citations."]},
+        ]
+        for msg in chat_history:
+            role = "user" if msg.get("role") == "user" else "model"
+            content = msg.get("content", "").strip()
+            if content:
+                history.append({"role": role, "parts": [content]})
+
+        # PRO & INDUSTRY PLANS: ROUTE TO DEEPSEEK-V4-FLASH
+        if user and getattr(user, 'is_premium', False):
+            if progress_callback:
+                await progress_callback("Synthesizing multi-document analysis with DeepSeek v4 Flash...")
+            try:
+                system_prompt = f"{base_instruction}\n\nWORKSPACE DOCUMENT CONTEXTS:\n{context_text}"
+                ds_messages = []
+                for msg in chat_history:
+                    role = "user" if msg.get("role") == "user" else "assistant"
+                    content = msg.get("content", "").strip()
+                    if content:
+                        ds_messages.append({"role": role, "content": content})
+                ds_messages.append({"role": "user", "content": user_message})
+
+                from .deepseek_client import stream_deepseek_chat
+                async for chunk in stream_deepseek_chat(
+                    system_prompt=system_prompt,
+                    messages=ds_messages,
+                    usage_callback=usage_callback,
+                ):
+                    yield chunk
+                return
+            except Exception as ds_err:
+                logger.warning(f"DeepSeek v4 Flash workspace fallback to Gemini: {ds_err}")
+                if progress_callback:
+                    await progress_callback("Routing to Gemini...")
+
+        try:
+            chat = model.start_chat(history=history)
+            response_stream = await chat.send_message_async(user_message, stream=True)
+
+            last_usage = None
+            async for chunk in response_stream:
+                try:
+                    if chunk.text:
+                        yield chunk.text
+                except (ValueError, AttributeError):
+                    pass
+                last_usage = getattr(chunk, "usage_metadata", None) or last_usage
+
+            if usage_callback and last_usage is not None:
+                prompt_tokens = getattr(last_usage, "prompt_token_count", 0) or 0
+                candidates_tokens = getattr(last_usage, "candidates_token_count", 0) or 0
+                total_tokens = prompt_tokens + candidates_tokens
+                if total_tokens > 0:
+                    await usage_callback(total_tokens)
+
+        except ResourceExhausted:
+            _set_gemini_cooldown_from_error("seconds: 60")
+            groq_text = await asyncio.to_thread(_call_groq_fallback, user_message, system_parts, chat_history)
+            if groq_text:
+                async for part in _yield_in_chunks(groq_text):
+                    yield part
+            else:
+                yield "API limit reached. Please try again shortly."
+
+    except Exception as e:
+        logger.error(f"Workspace Gemini Error: {e}", exc_info=True)
+        yield "An error occurred while analyzing the workspace documents. Please try again."
+
 

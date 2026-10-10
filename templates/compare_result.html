@@ -1,0 +1,218 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Comparison: {{ doc1.title }} vs {{ doc2.title }} · InsightDocs AI</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23a78bfa;stop-opacity:1'/%3E%3Cstop offset='100%25' style='stop-color:%237c3aed;stop-opacity:1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='0' y='0' width='64' height='64' rx='16' fill='%23020617'/%3E%3Cpath d='M32 14L50 23V41L32 50L14 41V23Z' fill='url(%23g)' stroke='%23ddd6fe' stroke-width='2'/%3E%3Cpath d='M32 50V32M32 32L50 23M32 32L14 23' stroke='%23ddd6fe' stroke-width='2'/%3E%3C/svg%3E" type="image/svg+xml">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+        .bg-modern-grid {
+            background-color: #020617;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(124, 58, 237, 0.08) 0px, transparent 50%), 
+                radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.08) 0px, transparent 50%), 
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px), 
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+            background-position: center;
+        }
+        .glass-header {
+            background: rgba(2, 6, 23, 0.7);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .markdown-body { font-size: 14px; line-height: 1.6; color: #e4e4e7; }
+        .markdown-body p { margin-bottom: 0.8rem; }
+        .markdown-body h3 { font-size: 1.2rem; font-weight: 700; color: #fff; margin-top: 1.5rem; margin-bottom: 0.6rem; font-family: 'Plus Jakarta Sans', sans-serif; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 0.4rem; }
+        .markdown-body ul { list-style-type: disc; margin-left: 1.3rem; margin-bottom: 1rem; }
+        .markdown-body li { margin-bottom: 0.35rem; }
+        .markdown-body table { width: 100%; border-collapse: collapse; margin-top: 1rem; margin-bottom: 1.5rem; font-size: 13px; }
+        .markdown-body th, .markdown-body td { border: 1px solid rgba(255, 255, 255, 0.1); padding: 8px 12px; }
+        .markdown-body th { background: rgba(139, 92, 246, 0.1); font-weight: 600; text-align: left; color: #ddd6fe; }
+    </style>
+</head>
+<body class="bg-modern-grid text-slate-200 min-h-screen flex flex-col antialiased selection:bg-violet-500 selection:text-white">
+
+    <!-- Header Navigation -->
+    <header class="glass-header sticky top-0 z-40 px-4 lg:px-8 py-3.5">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <a href="{% url 'compare_select' %}" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-all text-xs" title="Select different documents">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </a>
+                <div>
+                    <h1 class="font-bold text-sm text-white font-['Plus_Jakarta_Sans']">
+                        Document Comparison
+                    </h1>
+                    <p class="text-[11px] text-slate-400">AI-Powered Cross-Document Analysis</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <button onclick="window.print()" class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-medium border border-white/10 transition-all flex items-center gap-1.5">
+                    <i class="fa-solid fa-print"></i>
+                    <span>Print / PDF</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-5xl w-full mx-auto px-4 lg:px-8 py-8">
+
+        <!-- Comparison Header Banner -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div class="bg-slate-900/70 border border-violet-500/20 rounded-2xl p-5 shadow-lg">
+                <div class="text-[11px] font-bold text-violet-400 uppercase tracking-wider mb-1">Document 1</div>
+                <h3 class="text-base font-bold text-white line-clamp-1 font-['Plus_Jakarta_Sans']">{{ doc1.title }}</h3>
+                <div class="mt-2 text-xs text-slate-400 flex items-center gap-2">
+                    <i class="fa-solid fa-file-pdf text-rose-400"></i>
+                    <span>Uploaded {{ doc1.uploaded_at|date:"M d, Y" }}</span>
+                </div>
+            </div>
+
+            <div class="bg-slate-900/70 border border-indigo-500/20 rounded-2xl p-5 shadow-lg">
+                <div class="text-[11px] font-bold text-indigo-400 uppercase tracking-wider mb-1">Document 2</div>
+                <h3 class="text-base font-bold text-white line-clamp-1 font-['Plus_Jakarta_Sans']">{{ doc2.title }}</h3>
+                <div class="mt-2 text-xs text-slate-400 flex items-center gap-2">
+                    <i class="fa-solid fa-file-pdf text-rose-400"></i>
+                    <span>Uploaded {{ doc2.uploaded_at|date:"M d, Y" }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Aspect Selection Tabs -->
+        <div class="flex items-center gap-2 overflow-x-auto pb-2 mb-6 border-b border-white/5">
+            <button onclick="fetchComparison('general', this)" class="aspect-tab px-4 py-2 rounded-xl text-xs font-bold transition-all bg-violet-600 text-white shadow-md shadow-violet-600/30 flex items-center gap-2 flex-shrink-0">
+                <i class="fa-solid fa-compass"></i>
+                <span>Executive Overview</span>
+            </button>
+            <button onclick="fetchComparison('key_terms', this)" class="aspect-tab px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-all flex items-center gap-2 flex-shrink-0">
+                <i class="fa-solid fa-tags"></i>
+                <span>Key Terms & Metrics</span>
+            </button>
+            <button onclick="fetchComparison('structure', this)" class="aspect-tab px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-all flex items-center gap-2 flex-shrink-0">
+                <i class="fa-solid fa-layer-group"></i>
+                <span>Structure & Methodology</span>
+            </button>
+            <button onclick="fetchComparison('arguments', this)" class="aspect-tab px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-all flex items-center gap-2 flex-shrink-0">
+                <i class="fa-solid fa-scale-balanced"></i>
+                <span>Arguments & Claims</span>
+            </button>
+        </div>
+
+        <!-- Comparison Output Card -->
+        <div class="bg-slate-900/60 border border-white/10 rounded-2xl p-6 md:p-8 shadow-xl min-h-[400px]">
+            <!-- Loading Spinner -->
+            <div id="loadingState" class="flex flex-col items-center justify-center py-20 text-center">
+                <div class="w-12 h-12 rounded-2xl bg-violet-600/20 text-violet-400 flex items-center justify-center text-xl mb-4 animate-spin">
+                    <i class="fa-solid fa-circle-notch"></i>
+                </div>
+                <h4 class="text-sm font-bold text-white font-['Plus_Jakarta_Sans']">Comparing Documents with AI...</h4>
+                <p class="text-xs text-slate-400 mt-1 max-w-sm">
+                    Analyzing semantic embeddings, extracting clauses, and synthesizing cross-document differences.
+                </p>
+            </div>
+
+            <!-- Rendered Content -->
+            <div id="comparisonContent" class="markdown-body hidden"></div>
+        </div>
+
+    </main>
+
+    <script>
+        const doc1Id = "{{ doc1.id }}";
+        const doc2Id = "{{ doc2.id }}";
+        let currentAspect = 'general';
+
+        async function fetchComparison(aspect, btnEl) {
+            currentAspect = aspect;
+
+            // Update tab styles
+            document.querySelectorAll('.aspect-tab').forEach(tab => {
+                tab.className = "aspect-tab px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-all flex items-center gap-2 flex-shrink-0";
+            });
+            if (btnEl) {
+                btnEl.className = "aspect-tab px-4 py-2 rounded-xl text-xs font-bold transition-all bg-violet-600 text-white shadow-md shadow-violet-600/30 flex items-center gap-2 flex-shrink-0";
+            }
+
+            const loadingState = document.getElementById('loadingState');
+            const comparisonContent = document.getElementById('comparisonContent');
+
+            loadingState.classList.remove('hidden');
+            comparisonContent.classList.add('hidden');
+
+            try {
+                const response = await fetch("{% url 'compare_analyze' %}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    },
+                    body: JSON.stringify({
+                        doc1_id: doc1Id,
+                        doc2_id: doc2Id,
+                        aspect: aspect,
+                    })
+                });
+
+                const data = await response.json();
+                if (data.status === 'success') {
+                    comparisonContent.innerHTML = marked.parse(data.comparison);
+                    comparisonContent.querySelectorAll('pre code').forEach((block) => {
+                        hljs.highlightElement(block);
+                    });
+                    loadingState.classList.add('hidden');
+                    comparisonContent.classList.remove('hidden');
+                } else {
+                    comparisonContent.innerHTML = `<div class="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">${data.error || 'Comparison failed.'}</div>`;
+                    loadingState.classList.add('hidden');
+                    comparisonContent.classList.remove('hidden');
+                }
+            } catch (err) {
+                comparisonContent.innerHTML = `<div class="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">Network error. Please try again.</div>`;
+                loadingState.classList.add('hidden');
+                comparisonContent.classList.remove('hidden');
+            }
+        }
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchComparison('general', document.querySelector('.aspect-tab'));
+        });
+    </script>
+
+</body>
+</html>
+

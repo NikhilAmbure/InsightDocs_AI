@@ -38,13 +38,17 @@ SECRET_KEY = os.environ.get('SECRET_KEY','django-insecure-wf=x56i(l)ng!8z**#1#(5
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = [
-    "localhost",
-    "127.0.0.1",
-    "insightdocs.in",
-    "www.insightdocs.in",
-    ".railway.app",
-]
+_env_allowed_hosts = os.environ.get('ALLOWED_HOSTS')
+if _env_allowed_hosts:
+    ALLOWED_HOSTS = [h.strip() for h in _env_allowed_hosts.split(',') if h.strip()]
+else:
+    ALLOWED_HOSTS = [
+        "localhost",
+        "127.0.0.1",
+        "insightdocs.in",
+        "www.insightdocs.in",
+        ".railway.app",
+    ]
 
 
 # Application definition
@@ -145,12 +149,18 @@ AUTH_USER_MODEL = 'accounts.User'
 
 
 # CSRF Trusted Origins
-CSRF_TRUSTED_ORIGINS = [
-    "https://insightdocs.in",
-    "https://www.insightdocs.in",
-    "https://adventurous-fulfillment-production.up.railway.app",
-    "https://*.railway.app",
-]
+_env_csrf = os.environ.get("CSRF_TRUSTED_ORIGINS")
+if _env_csrf:
+    CSRF_TRUSTED_ORIGINS = [u.strip() for u in _env_csrf.split(",") if u.strip()]
+else:
+    CSRF_TRUSTED_ORIGINS = [
+        "https://insightdocs.in",
+        "https://www.insightdocs.in",
+        "https://adventurous-fulfillment-production.up.railway.app",
+        "https://*.railway.app",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ]
 
 
 # Database
@@ -166,9 +176,9 @@ else:
             "ENGINE": "django.db.backends.postgresql",
             "NAME": os.environ.get("DB_NAME", "insightdocs_db"),
             "USER": os.environ.get("DB_USER", "postgres"),
-            "PASSWORD": os.environ.get("DB_PASSWORD", "postgres"),
+            "PASSWORD": os.environ.get("DB_PASSWORD", "1702"),
             "HOST": os.environ.get("DB_HOST", "localhost"),
-            "PORT": os.environ.get("DB_PORT", "5433"),
+            "PORT": os.environ.get("DB_PORT", "5432"),
         }
     }
 
@@ -192,17 +202,17 @@ else:
 #     }
     
 STORAGES = {
-    # Media files (Images, PDFs) -> Cloudinary
+    # Media files (Images, PDFs) -> Cloudinary / Local
     "default": {
         # "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
         "BACKEND": "django.core.files.storage.FileSystemStorage",
-
     },
-    # Static files (CSS, JS) -> WhiteNoise
+    # Static files (CSS, JS) -> WhiteNoise (non-strict compression prevents missing manifest 500 errors)
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
     },
 }
+WHITENOISE_MANIFEST_STRICT = False
 
 # if DEBUG:
 #     DATABASES = {
@@ -326,9 +336,9 @@ RATE_LIMITS = {
 # Security Settings
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
-SECURE_SSL_REDIRECT = False
+SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "False").lower() == "true"
+CSRF_COOKIE_SECURE = os.environ.get("CSRF_COOKIE_SECURE", "False").lower() == "true"
+SECURE_SSL_REDIRECT = os.environ.get("SECURE_SSL_REDIRECT", "False").lower() == "true"
 
 
 # Cloudinary Configuration
@@ -350,3 +360,9 @@ RAZORPAY_WEBHOOK_SECRET = os.environ.get('RAZORPAY_WEBHOOK_SECRET', '')
 # Google OAuth Credentials
 GOOGLE_OAUTH_CLIENT_ID = os.environ.get('GOOGLE_OAUTH_CLIENT_ID', '')
 GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get('GOOGLE_OAUTH_CLIENT_SECRET', '')
+
+# Anthropic / DeepSeek Gateway Configuration
+ANTHROPIC_AUTH_TOKEN = os.environ.get('ANTHROPIC_AUTH_TOKEN', '')
+ANTHROPIC_BASE_URL = os.environ.get('ANTHROPIC_BASE_URL', 'https://agentrouter.org')
+CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY = os.environ.get('CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY', '1')
+ANTHROPIC_MODEL = os.environ.get('ANTHROPIC_MODEL', 'deepseek-v4-flash')

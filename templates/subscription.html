@@ -133,13 +133,19 @@
 
                 <div class="space-y-1 mb-8">
                     <div class="mb-2 px-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">Menu</div>
-                    <a href="{% url 'upload' %}" class="block rounded-xl px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-white/5 hover:text-white">
+                    <a href="{% url 'upload' %}" class="block rounded-xl px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-white/5 hover:text-white transition-colors">
                         <i class="fa-solid fa-folder-open w-5 text-center mr-2"></i> Documents
+                    </a>
+                    <a href="{% url 'workspace_list' %}" class="block rounded-xl px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-white/5 hover:text-white transition-colors">
+                        <i class="fa-solid fa-layer-group w-5 text-center mr-2"></i> Workspaces
+                    </a>
+                    <a href="{% url 'compare_select' %}" class="block rounded-xl px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-white/5 hover:text-white transition-colors">
+                        <i class="fa-solid fa-code-compare w-5 text-center mr-2"></i> Compare
                     </a>
                     <a href="{% url 'subscription' %}" class="block rounded-xl bg-violet-500/10 border border-violet-500/20 px-3 py-2 text-xs font-medium text-white">
                         <i class="fa-solid fa-credit-card w-5 text-center mr-2"></i> Subscription
                     </a>
-                    <a href="{% url 'profile' %}" class="block rounded-xl px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-white/5 hover:text-white">
+                    <a href="{% url 'profile' %}" class="block rounded-xl px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-white/5 hover:text-white transition-colors">
                         <i class="fa-solid fa-gear w-5 text-center mr-2"></i> Settings
                     </a>
                 </div>
@@ -187,7 +193,13 @@
                 </div>
 
                 <div class="flex items-center gap-3">
-                    <a href="{% url 'coming_soon' %}" class="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-medium text-white hover:bg-white/10">
+                    {% if request.user.is_premium %}
+                        <div class="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-1.5 text-[10px] font-bold text-white shadow-lg shadow-violet-500/20">
+                            <i class="fa-solid fa-crown text-[9px]"></i>
+                            <span>Pro Member</span>
+                        </div>
+                    {% endif %}
+                    <a href="#billing-history" class="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-medium text-white hover:bg-white/10 transition-colors">
                         <i class="fa-solid fa-file-invoice-dollar mr-1.5"></i> Billing History
                     </a>
                 </div>
@@ -238,65 +250,155 @@
                             {% endif %}
                         </div>
 
-                        <!-- ═══════ PRO PLAN (Razorpay) ═══════ -->
+                        <!-- ═══════ PRO PLAN (₹199 / month) ═══════ -->
                         <div class="relative flex flex-col rounded-3xl border border-violet-500/30 bg-violet-500/5 p-6 sm:p-8 transition-all hover:border-violet-500/50 hover:bg-violet-500/10">
                             <div class="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full border border-violet-500 bg-violet-900 px-3 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-lg shadow-violet-500/20">
-                                Recommended
+                                Popular
                             </div>
 
                             <div class="mb-4">
                                 <h3 class="text-base font-semibold text-white">Pro</h3>
                                 <div class="mt-2 flex items-baseline gap-1">
-                                    {% if pro_plan %}
-                                        <span class="text-2xl font-bold text-white">{{ pro_plan.price_display|default:"₹799" }}</span>
-                                    {% else %}
-                                        <span class="text-2xl font-bold text-white">₹799</span>
-                                    {% endif %}
+                                    <span class="text-2xl font-bold text-white">{{ pro_plan.price_display|default:"₹199" }}</span>
                                     <span class="text-xs text-zinc-400">/month</span>
                                 </div>
-                                <p class="mt-2 text-[10px] text-zinc-400">For power users needing more capacity.</p>
+                                <p class="mt-2 text-[10px] text-zinc-400">For power users needing more capacity & fast queries.</p>
                             </div>
                             <ul class="mb-8 space-y-3 text-xs text-zinc-300 flex-1">
+                                <li class="flex gap-3 font-medium text-violet-300"><i class="fa-solid fa-bolt text-violet-400 mt-0.5"></i> <strong>DeepSeek v4 Flash</strong> AI model</li>
                                 <li class="flex gap-3"><i class="fa-solid fa-check text-violet-400 mt-0.5"></i> 50 active documents</li>
                                 <li class="flex gap-3"><i class="fa-solid fa-check text-violet-400 mt-0.5"></i> 5,000 AI chats</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-violet-400 mt-0.5"></i> 2,000,000 AI tokens included</li>
                                 <li class="flex gap-3"><i class="fa-solid fa-check text-violet-400 mt-0.5"></i> 50 MB max file size</li>
                                 <li class="flex gap-3"><i class="fa-solid fa-check text-violet-400 mt-0.5"></i> Priority Support</li>
                             </ul>
 
-                            {% if request.user.is_premium %}
-                                <button class="w-full rounded-xl border border-violet-500 bg-violet-600 py-2.5 text-xs font-semibold text-white cursor-default">
+                            {% if request.user.is_premium and subscription.plan.slug != 'industry' %}
+                                <button class="w-full rounded-xl border border-violet-500 bg-violet-600 py-2.5 text-xs font-semibold text-white cursor-default shadow-lg shadow-violet-600/20">
                                     <i class="fa-solid fa-crown mr-1"></i> Active Plan
                                 </button>
                             {% else %}
                                 <button
                                     id="btn-upgrade-pro"
-                                    onclick="initiatePayment({{ pro_plan.id|default:'null' }})"
+                                    onclick="initiatePayment({{ pro_plan.id|default:'null' }}, 'pro')"
                                     class="w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 py-2.5 text-xs font-bold text-white shadow-lg shadow-violet-600/20 hover:shadow-violet-600/40 hover:scale-[1.02] transition-all"
                                 >
-                                    <i class="fa-solid fa-bolt mr-1"></i> Upgrade to Pro
+                                    <i class="fa-solid fa-bolt mr-1"></i> Upgrade to Pro (₹199)
                                 </button>
                             {% endif %}
                         </div>
 
-                        <!-- ═══════ ENTERPRISE PLAN ═══════ -->
-                        <div class="flex flex-col rounded-3xl border border-white/10 bg-white/5 opacity-60 grayscale-[0.8] p-6 sm:p-8 hover:opacity-100 hover:grayscale-0 transition-all">
+                        <!-- ═══════ INDUSTRY PLAN (₹1,999 / month) ═══════ -->
+                        <div class="relative flex flex-col rounded-3xl border border-indigo-500/30 bg-indigo-500/5 p-6 sm:p-8 transition-all hover:border-indigo-500/50 hover:bg-indigo-500/10">
+                            <div class="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full border border-indigo-500 bg-indigo-900 px-3 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-lg shadow-indigo-500/20">
+                                Industry Grade
+                            </div>
+
                             <div class="mb-4">
-                                <h3 class="text-base font-semibold text-white">Enterprise</h3>
+                                <h3 class="text-base font-semibold text-white">Industry</h3>
                                 <div class="mt-2 flex items-baseline gap-1">
-                                    <span class="text-2xl font-bold text-white">₹8,299</span>
+                                    <span class="text-2xl font-bold text-white">{{ industry_plan.price_display|default:"₹1,999" }}</span>
                                     <span class="text-xs text-zinc-400">/month</span>
                                 </div>
-                                <p class="mt-2 text-[10px] text-zinc-400">For teams and high-volume needs.</p>
+                                <p class="mt-2 text-[10px] text-zinc-400">For teams, researchers & heavy industry workflows.</p>
                             </div>
                             <ul class="mb-8 space-y-3 text-xs text-zinc-300 flex-1">
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-zinc-500 mt-0.5"></i> Unlimited uploads</li>
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-zinc-500 mt-0.5"></i> Unlimited chats</li>
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-zinc-500 mt-0.5"></i> 500 MB max file size</li>
-                                <li class="flex gap-3"><i class="fa-solid fa-check text-zinc-500 mt-0.5"></i> API Access</li>
+                                <li class="flex gap-3 font-medium text-indigo-300"><i class="fa-solid fa-bolt text-indigo-400 mt-0.5"></i> <strong>DeepSeek v4 Flash</strong> AI model</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-indigo-400 mt-0.5"></i> 200 active documents</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-indigo-400 mt-0.5"></i> 25,000 AI chats</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-indigo-400 mt-0.5"></i> 20,000,000 AI tokens included</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-indigo-400 mt-0.5"></i> 100 MB max file size</li>
+                                <li class="flex gap-3"><i class="fa-solid fa-check text-indigo-400 mt-0.5"></i> Dedicated Priority Processing</li>
                             </ul>
-                            <button disabled class="w-full rounded-xl border border-white/5 bg-white/5 py-2.5 text-xs font-semibold text-zinc-500 cursor-not-allowed">Coming Soon</button>
+
+                            {% if request.user.is_premium and subscription.plan.slug == 'industry' %}
+                                <button class="w-full rounded-xl border border-indigo-500 bg-indigo-600 py-2.5 text-xs font-semibold text-white cursor-default">
+                                    <i class="fa-solid fa-crown mr-1"></i> Active Plan
+                                </button>
+                            {% else %}
+                                <button
+                                    id="btn-upgrade-industry"
+                                    onclick="initiatePayment({{ industry_plan.id|default:'null' }}, 'industry')"
+                                    class="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-fuchsia-600 py-2.5 text-xs font-bold text-white shadow-lg shadow-indigo-600/20 hover:shadow-indigo-600/40 hover:scale-[1.02] transition-all"
+                                >
+                                    <i class="fa-solid fa-crown mr-1"></i> Upgrade to Industry (₹1,999)
+                                </button>
+                            {% endif %}
                         </div>
 
+                    </div>
+
+                    <!-- ─── Billing History Section ─── -->
+                    <div id="billing-history" class="glass-card rounded-3xl p-6 sm:p-8">
+                        <div class="flex items-center justify-between mb-5">
+                            <div class="flex items-center gap-2">
+                                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10 text-violet-400">
+                                    <i class="fa-solid fa-receipt text-xs"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-sm font-semibold text-white">Billing History</h3>
+                                    <p class="text-[10px] text-zinc-400">Transactions processed securely via Razorpay</p>
+                                </div>
+                            </div>
+                            <a href="{% url 'profile' %}" class="text-[10px] font-medium text-violet-400 hover:text-violet-300 transition-colors">
+                                View Profile <i class="fa-solid fa-arrow-right text-[8px] ml-0.5"></i>
+                            </a>
+                        </div>
+
+                        {% if recent_payments %}
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="border-b border-white/5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                                        <th class="pb-3 px-3">Order ID</th>
+                                        <th class="pb-3 px-3">Plan</th>
+                                        <th class="pb-3 px-3">Date</th>
+                                        <th class="pb-3 px-3">Amount</th>
+                                        <th class="pb-3 px-3 text-right">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-white/5 text-xs">
+                                    {% for p in recent_payments %}
+                                    <tr class="hover:bg-white/[0.02] transition-colors">
+                                        <td class="py-3 px-3 font-mono text-[11px] text-zinc-300">
+                                            {{ p.order_id }}
+                                        </td>
+                                        <td class="py-3 px-3 text-white font-medium">
+                                            {{ p.plan.name|default:"Pro" }} Plan
+                                        </td>
+                                        <td class="py-3 px-3 text-zinc-400 text-[11px]">
+                                            {{ p.created_at|date:"d M Y, H:i" }}
+                                        </td>
+                                        <td class="py-3 px-3 text-white font-semibold">
+                                            ₹{{ p.amount }}
+                                        </td>
+                                        <td class="py-3 px-3 text-right">
+                                            {% if p.status == 'captured' %}
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 text-[9px] font-semibold text-emerald-400">
+                                                <i class="fa-solid fa-circle-check text-[8px]"></i> Paid
+                                            </span>
+                                            {% elif p.status == 'created' or p.status == 'authorized' %}
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 text-[9px] font-semibold text-amber-400">
+                                                <i class="fa-solid fa-clock text-[8px]"></i> Pending
+                                            </span>
+                                            {% else %}
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-red-500/10 border border-red-500/20 px-2.5 py-0.5 text-[9px] font-semibold text-red-400">
+                                                <i class="fa-solid fa-circle-xmark text-[8px]"></i> Failed
+                                            </span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="rounded-2xl border border-dashed border-white/5 p-6 text-center">
+                            <i class="fa-solid fa-credit-card text-zinc-600 text-xl mb-2"></i>
+                            <p class="text-xs font-medium text-zinc-400">No payment transactions yet</p>
+                            <p class="text-[10px] text-zinc-500 mt-1">Upgrade or subscribe above to see your receipts here.</p>
+                        </div>
+                        {% endif %}
                     </div>
 
                     <!-- ─── Secure Payment Badge ─── -->
@@ -346,16 +448,25 @@
             return '';
         }
 
-        async function initiatePayment(planId) {
+        async function initiatePayment(planId, planType = 'pro') {
             if (!planId) {
-                alert('Payment plans are not configured yet. Please contact the administrator.');
+                alert('Payment plans are initializing. Please refresh the page in a moment or contact support.');
                 return;
             }
 
-            const btn = document.getElementById('btn-upgrade-pro');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Processing...';
-            btn.classList.add('btn-loading');
+            const btn = document.getElementById(`btn-upgrade-${planType}`) || document.getElementById('btn-upgrade-pro');
+            const originalText = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Processing...';
+                btn.classList.add('btn-loading');
+            }
+
+            const resetBtn = () => {
+                if (btn) {
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('btn-loading');
+                }
+            };
 
             try {
                 // Step 1: Create order on the server
@@ -392,13 +503,12 @@
                     },
                     modal: {
                         ondismiss: function () {
-                            btn.innerHTML = originalText;
-                            btn.classList.remove('btn-loading');
+                            resetBtn();
                         }
                     },
                     handler: async function (response) {
                         // Step 3: Verify payment on the backend
-                        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Verifying...';
+                        if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Verifying...';
 
                         try {
                             const verifyRes = await fetch("{% url 'payments:verify_payment' %}", {
@@ -440,8 +550,7 @@
             } catch (err) {
                 console.error('Error:', err);
                 alert(err.message || 'Something went wrong. Please try again.');
-                btn.innerHTML = originalText;
-                btn.classList.remove('btn-loading');
+                resetBtn();
             }
         }
     </script>

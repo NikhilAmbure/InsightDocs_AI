@@ -1,0 +1,237 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>InsightDocs AI · Workspaces</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23a78bfa;stop-opacity:1'/%3E%3Cstop offset='100%25' style='stop-color:%237c3aed;stop-opacity:1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='0' y='0' width='64' height='64' rx='16' fill='%23020617'/%3E%3Cpath d='M32 14L50 23V41L32 50L14 41V23Z' fill='url(%23g)' stroke='%23ddd6fe' stroke-width='2'/%3E%3Cpath d='M32 50V32M32 32L50 23M32 32L14 23' stroke='%23ddd6fe' stroke-width='2'/%3E%3C/svg%3E" type="image/svg+xml">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+        .bg-modern-grid {
+            background-color: #020617;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(124, 58, 237, 0.08) 0px, transparent 50%), 
+                radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.08) 0px, transparent 50%), 
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px), 
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+            background-position: center;
+        }
+        .glass-header {
+            background: rgba(2, 6, 23, 0.7);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+    </style>
+</head>
+<body class="bg-modern-grid text-slate-200 min-h-screen flex flex-col antialiased selection:bg-violet-500 selection:text-white">
+
+    <!-- Header Navigation -->
+    <header class="glass-header sticky top-0 z-40 px-4 lg:px-8 py-3.5">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-6">
+                <a href="{% url 'upload' %}" class="flex items-center gap-3 group">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-violet-500/20 group-hover:scale-105 transition-transform">
+                        <i class="fa-solid fa-cube text-white text-sm"></i>
+                    </div>
+                    <span class="font-bold text-lg text-white font-['Plus_Jakarta_Sans'] tracking-tight">InsightDocs<span class="text-violet-400">.ai</span></span>
+                </a>
+
+                <!-- Navigation Tabs -->
+                <nav class="hidden md:flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-white/5 text-xs font-medium">
+                    <a href="{% url 'upload' %}" class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+                        <i class="fa-solid fa-file-pdf mr-1.5 text-slate-500"></i> My PDFs
+                    </a>
+                    <a href="{% url 'workspace_list' %}" class="px-3.5 py-1.5 rounded-lg bg-violet-600 text-white shadow-sm shadow-violet-600/30">
+                        <i class="fa-solid fa-folder-tree mr-1.5"></i> Workspaces
+                    </a>
+                    <a href="{% url 'compare_select' %}" class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+                        <i class="fa-solid fa-code-compare mr-1.5 text-slate-500"></i> Compare
+                    </a>
+                    <a href="{% url 'search_chats' %}" class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+                        <i class="fa-solid fa-magnifying-glass mr-1.5 text-slate-500"></i> Search
+                    </a>
+                </nav>
+            </div>
+
+            <div class="flex items-center gap-3">
+                {% if request.user.is_premium %}
+                    <div class="hidden sm:flex items-center gap-1.5 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-1.5 text-[10px] font-bold text-white shadow-lg shadow-violet-500/20">
+                        <i class="fa-solid fa-crown text-[9px]"></i>
+                        <span>Pro Member</span>
+                    </div>
+                {% endif %}
+                <button onclick="document.getElementById('createWorkspaceModal').classList.remove('hidden')" class="px-4 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-violet-600/25 transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>New Workspace</span>
+                </button>
+                <a href="{% url 'profile' %}" class="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-all text-xs" title="Profile">
+                    <i class="fa-solid fa-user"></i>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-8">
+        
+        <!-- Messages -->
+        {% if messages %}
+        <div class="mb-6 space-y-2">
+            {% for message in messages %}
+            <div class="p-4 rounded-xl text-xs font-medium border flex items-center justify-between {% if message.tags == 'error' %}bg-rose-500/10 border-rose-500/30 text-rose-300{% elif message.tags == 'success' %}bg-emerald-500/10 border-emerald-500/30 text-emerald-300{% else %}bg-violet-500/10 border-violet-500/30 text-violet-300{% endif %}">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid {% if message.tags == 'error' %}fa-circle-exclamation{% elif message.tags == 'success' %}fa-circle-check{% else %}fa-circle-info{% endif %}"></i>
+                    <span>{{ message }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Hero Section -->
+        <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/5 pb-6">
+            <div>
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-400 text-xs font-medium mb-3">
+                    <i class="fa-solid fa-layer-group"></i> Multi-Document Intelligence
+                </div>
+                <h1 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight font-['Plus_Jakarta_Sans']">Workspaces</h1>
+                <p class="text-sm text-slate-400 mt-1 max-w-2xl">
+                    Group research papers, contracts, textbooks, or project files into knowledge bases and chat across all of them simultaneously with cross-document citations.
+                </p>
+            </div>
+        </div>
+
+        <!-- Workspaces Grid -->
+        {% if workspaces %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {% for ws in workspaces %}
+            <div class="group relative bg-slate-900/60 hover:bg-slate-900/80 border border-white/10 hover:border-violet-500/40 rounded-2xl p-6 transition-all duration-200 flex flex-col justify-between shadow-lg hover:shadow-violet-500/5">
+                <div>
+                    <div class="flex items-start justify-between gap-3 mb-3">
+                        <div class="w-11 h-11 rounded-xl bg-violet-600/15 border border-violet-500/20 flex items-center justify-center text-violet-400 group-hover:scale-105 transition-transform">
+                            <i class="fa-solid fa-folder-tree text-lg"></i>
+                        </div>
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 text-xs font-medium border border-white/5">
+                            <i class="fa-solid fa-file-lines text-slate-400"></i>
+                            {{ ws.documents.count }} {% if ws.documents.count == 1 %}doc{% else %}docs{% endif %}
+                        </span>
+                    </div>
+
+                    <h3 class="text-base font-bold text-white group-hover:text-violet-300 transition-colors line-clamp-1 font-['Plus_Jakarta_Sans']">
+                        {{ ws.name }}
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-1.5 line-clamp-2 min-h-[32px]">
+                        {{ ws.description|default:"No description provided." }}
+                    </p>
+
+                    <!-- Preview of attached documents -->
+                    <div class="mt-4 pt-4 border-t border-white/5">
+                        <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Documents:</div>
+                        <div class="space-y-1.5">
+                            {% for doc in ws.documents.all|slice:":3" %}
+                            <div class="flex items-center gap-2 text-xs text-slate-300">
+                                <i class="fa-solid fa-file-pdf text-rose-400 text-[10px]"></i>
+                                <span class="truncate">{{ doc.title }}</span>
+                            </div>
+                            {% empty %}
+                            <span class="text-xs text-slate-500 italic">No documents added yet.</span>
+                            {% endfor %}
+                            {% if ws.documents.count > 3 %}
+                            <span class="text-[11px] text-violet-400">+{{ ws.documents.count|add:"-3" }} more documents</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-white/5 flex items-center gap-2">
+                    {% if ws.documents.count > 0 %}
+                    <a href="{% url 'workspace_chat' ws.id %}" class="flex-1 py-2 px-3 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-semibold text-center transition-all flex items-center justify-center gap-2 shadow-md shadow-violet-600/20">
+                        <i class="fa-solid fa-comment-dots"></i>
+                        <span>Chat</span>
+                    </a>
+                    {% endif %}
+                    <a href="{% url 'workspace_detail' ws.id %}" class="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-medium text-center transition-all border border-white/5 flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-gear"></i>
+                        <span>Manage</span>
+                    </a>
+                    <form action="{% url 'workspace_delete' ws.id %}" method="POST" onsubmit="return confirm('Delete workspace &quot;{{ ws.name }}&quot;? Documents will not be deleted.');" class="inline">
+                        {% csrf_token %}
+                        <button type="submit" class="p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all" title="Delete workspace">
+                            <i class="fa-regular fa-trash-can text-xs"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <!-- Empty State -->
+        <div class="max-w-md mx-auto text-center py-16 px-4">
+            <div class="w-16 h-16 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center mx-auto text-violet-400 text-2xl mb-4">
+                <i class="fa-solid fa-folder-plus"></i>
+            </div>
+            <h3 class="text-lg font-bold text-white font-['Plus_Jakarta_Sans']">No workspaces created yet</h3>
+            <p class="text-xs text-slate-400 mt-2 leading-relaxed">
+                Workspaces allow you to synthesize, compare, and query multiple PDFs simultaneously — perfect for research projects, contract reviews, and textbook collections.
+            </p>
+            <button onclick="document.getElementById('createWorkspaceModal').classList.remove('hidden')" class="mt-6 px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-violet-600/30 transition-all inline-flex items-center gap-2">
+                <i class="fa-solid fa-plus"></i>
+                <span>Create Your First Workspace</span>
+            </button>
+        </div>
+        {% endif %}
+    </main>
+
+    <!-- Create Workspace Modal -->
+    <div id="createWorkspaceModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+        <div class="bg-slate-900 border border-white/10 rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+            <button onclick="document.getElementById('createWorkspaceModal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-400 hover:text-white p-2 rounded-lg">
+                <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+            <div class="flex items-center gap-3 mb-5">
+                <div class="w-10 h-10 rounded-xl bg-violet-600/20 text-violet-400 flex items-center justify-center">
+                    <i class="fa-solid fa-folder-plus"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-white font-['Plus_Jakarta_Sans']">New Workspace</h3>
+                    <p class="text-xs text-slate-400">Group multiple documents together</p>
+                </div>
+            </div>
+
+            <form action="{% url 'workspace_create' %}" method="POST" class="space-y-4">
+                {% csrf_token %}
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Workspace Name</label>
+                    <input type="text" name="name" required placeholder="e.g. Legal Contracts Q3, ML Papers" class="w-full px-3.5 py-2.5 bg-slate-950 border border-white/10 rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Description (Optional)</label>
+                    <textarea name="description" rows="3" placeholder="Briefly describe what this workspace covers..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-white/10 rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"></textarea>
+                </div>
+                <div class="pt-2 flex items-center justify-end gap-3">
+                    <button type="button" onclick="document.getElementById('createWorkspaceModal').classList.add('hidden')" class="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-violet-600/30 transition-all">
+                        Create Workspace
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</body>
+</html>
+

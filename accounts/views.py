@@ -274,14 +274,48 @@ def profile_view(request):
         
     documents = Document.objects.filter(owner=request.user).order_by('-uploaded_at')
 
-    # Fetch subscription info for the profile page
-    from payments.models import Subscription
+    # Fetch subscription info and usage for the profile page
+    from payments.models import Subscription, Payment
+    from payments.services import get_usage_snapshot, ensure_default_plans
+
+    plans = ensure_default_plans()
     subscription = Subscription.objects.filter(user=request.user).select_related('plan').first()
+    
+    # If user is marked premium but has no subscription record, auto-link to Pro plan
+    if not subscription and request.user.is_premium:
+        pro_plan = plans.get('pro')
+        if pro_plan:
+            subscription, _ = Subscription.objects.get_or_create(
+                user=request.user,
+                defaults={
+                    'plan': pro_plan,
+                    'plan_type': 'pro',
+                    'status': 'active',
+                    'tokens_allocated': pro_plan.token_quota,
+                    'tokens_used': 0,
+                }
+            )
+
+    usage = get_usage_snapshot(request.user)
+    recent_payments = Payment.objects.filter(user=request.user).select_related('plan').order_by('-created_at')[:5]
+
+    doc_count = documents.count()
+    if request.user.is_premium:
+        doc_limit = subscription.plan.doc_limit if (subscription and subscription.plan) else 50
+        chat_limit = subscription.plan.chat_limit if (subscription and subscription.plan) else 5000
+    else:
+        doc_limit = 10
+        chat_limit = 500
 
     return render(request, 'profile.html', {
         'form': form,
         'recent_documents': documents,
         'subscription': subscription,
+        'usage': usage,
+        'recent_payments': recent_payments,
+        'doc_count': doc_count,
+        'doc_limit': doc_limit,
+        'chat_limit': chat_limit,
     })
 
 

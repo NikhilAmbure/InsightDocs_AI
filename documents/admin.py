@@ -1,6 +1,17 @@
 from django.contrib import admin
 
-from .models import ChatMessage, ChatSession, Document
+from .models import ChatMessage, ChatSession, Document, Workspace
+
+
+@admin.register(Workspace)
+class WorkspaceAdmin(admin.ModelAdmin):
+    list_display = ("name", "owner", "document_count", "created_at", "updated_at")
+    search_fields = ("name", "owner__username")
+    list_filter = ("created_at",)
+
+    def document_count(self, obj):
+        return obj.documents.count()
+    document_count.short_description = "Docs"
 
 
 @admin.register(Document)
@@ -18,6 +29,7 @@ class ChatMessageInline(admin.TabularInline):
 
 @admin.register(ChatSession)
 class ChatSessionAdmin(admin.ModelAdmin):
-    list_display = ("document", "user", "updated_at")
-    search_fields = ("document__title", "user__username")
+    list_display = ("id", "user", "document", "workspace", "updated_at")
+    search_fields = ("document__title", "workspace__name", "user__username")
     inlines = (ChatMessageInline,)
+
