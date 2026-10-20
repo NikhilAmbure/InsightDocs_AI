@@ -48,7 +48,7 @@ else:
         "insightdocs.in",
         "www.insightdocs.in",
         ".railway.app",
-        "https://insightdocs-ai.onrender.com/"
+        "insightdocs-ai.onrender.com"
     ]
 
 
