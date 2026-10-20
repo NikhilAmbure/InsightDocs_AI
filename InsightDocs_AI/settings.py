@@ -48,6 +48,7 @@ else:
         "insightdocs.in",
         "www.insightdocs.in",
         ".railway.app",
+        "https://insightdocs-ai.onrender.com/"
     ]
 
 
@@ -89,6 +90,7 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = [
     "https://insightdocs.in",
     "https://www.insightdocs.in",
+    "https://insightdocs-ai.onrender.com"
 ]
 CORS_ALLOW_ALL_ORIGINS = False 
 
