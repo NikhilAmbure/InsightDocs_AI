@@ -120,12 +120,17 @@ ASGI_APPLICATION = 'InsightDocs_AI.asgi.application'
 
 
 
-if os.getenv("REDIS_URL"):
+_redis_env = os.getenv("REDIS_URL", "").strip().rstrip("/")
+if _redis_env:
+    # Upstash Redis strictly requires TLS (rediss://)
+    if "upstash.io" in _redis_env and _redis_env.startswith("redis://"):
+        _redis_env = "rediss://" + _redis_env[len("redis://"):]
+
     CHANNEL_LAYERS = {
         "default": {
             "BACKEND": "channels_redis.core.RedisChannelLayer",
             "CONFIG": {
-                "hosts": [os.getenv("REDIS_URL")],
+                "hosts": [_redis_env],
             },
         },
     }
@@ -280,12 +285,27 @@ USE_TZ = True
 
 
 # Celery Configuration
-CELERY_BROKER_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
-CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
+_celery_redis_url = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0").strip().rstrip("/")
+if "upstash.io" in _celery_redis_url and _celery_redis_url.startswith("redis://"):
+    _celery_redis_url = "rediss://" + _celery_redis_url[len("redis://"):]
+
+CELERY_BROKER_URL = _celery_redis_url
+CELERY_RESULT_BACKEND = _celery_redis_url
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
+# If using TLS/SSL Redis (such as Upstash or cloud Redis), configure SSL parameters
+if CELERY_BROKER_URL.startswith("rediss://"):
+    import ssl
+    CELERY_BROKER_USE_SSL = {
+        'ssl_cert_reqs': ssl.CERT_NONE
+    }
+    CELERY_REDIS_BACKEND_USE_SSL = {
+        'ssl_cert_reqs': ssl.CERT_NONE
+    }
 
 # # Run tasks synchronously in dev (no Celery worker needed)
 # if not DATABASE_URL:
