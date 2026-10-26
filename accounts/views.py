@@ -541,22 +541,83 @@ def reset_password(request):
     return render(request, 'otp_reset_template.html', {'mode': 'password_reset'})
 
 
+def _get_google_redirect_uri(request):
+    """
+    Returns the exact redirect URI configured for Google OAuth.
+    If GOOGLE_OAUTH_REDIRECT_URI is explicitly set in settings/env, use it.
+    Otherwise, builds it dynamically from the current request host and scheme.
+    """
+    from django.conf import settings
+    from django.urls import reverse
+    from urllib.parse import urlparse, urlunparse
+
+    curr_host = request.get_host().split(':')[0].lower()
+    custom_uri = getattr(settings, 'GOOGLE_OAUTH_REDIRECT_URI', '')
+    if custom_uri:
+        custom_host = urlparse(custom_uri).netloc.split(':')[0].lower()
+        # Ignore localhost custom_uri if the application is running on a live public domain (e.g. Railway)
+        if custom_host in ('localhost', '127.0.0.1') and curr_host not in ('localhost', '127.0.0.1'):
+            custom_uri = ''
+        else:
+            return custom_uri.strip()
+
+    redirect_uri = request.build_absolute_uri(reverse('google_callback'))
+    parsed = urlparse(redirect_uri)
+    scheme = parsed.scheme
+    netloc = parsed.netloc
+
+    # Strip default ports (:80, :443) from netloc if added by reverse proxies
+    if ':' in netloc:
+        host_part, port_part = netloc.split(':', 1)
+        if (scheme == 'https' and port_part == '443') or (scheme == 'http' and port_part == '80'):
+            netloc = host_part
+
+    # Ensure https on production / non-localhost
+    if curr_host not in ('localhost', '127.0.0.1'):
+        scheme = 'https'
+
+    redirect_uri = urlunparse((scheme, netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
+    return redirect_uri
+
+
 def google_login(request):
     """
     Redirects the user to Google's OAuth2 authorization page.
     """
     from django.conf import settings
-    from django.urls import reverse
     from django.utils.crypto import get_random_string
+    from urllib.parse import urlparse
 
     client_id = getattr(settings, 'GOOGLE_OAUTH_CLIENT_ID', '')
     if not client_id:
         messages.error(request, "Google OAuth is not configured. Please contact support.")
         return redirect('login')
 
-    redirect_uri = request.build_absolute_uri(reverse('google_callback'))
+    # If an explicit redirect URI is configured on a different host (e.g. localhost vs 127.0.0.1),
+    # redirect to that host first so the session cookie matches the callback host
+    custom_uri = getattr(settings, 'GOOGLE_OAUTH_REDIRECT_URI', '')
+    if custom_uri:
+        target_netloc = urlparse(custom_uri).netloc
+        current_netloc = request.get_host()
+        target_host = target_netloc.split(':')[0].lower()
+        curr_host = current_netloc.split(':')[0].lower()
+        # Only align host if not mixing localhost with public production domains
+        if target_host in ('localhost', '127.0.0.1') and curr_host not in ('localhost', '127.0.0.1'):
+            pass  # Don't redirect production to localhost
+        elif target_netloc and target_netloc.lower() != current_netloc.lower():
+            scheme = 'https' if request.is_secure() else 'http'
+            return redirect(f"{scheme}://{target_netloc}{request.get_full_path()}")
+
+    redirect_uri = _get_google_redirect_uri(request)
+    logger.info(f"Google OAuth initiated. redirect_uri={redirect_uri}")
+
     state = get_random_string(32)
     request.session['google_oauth_state'] = state
+    try:
+        request.session.modified = True
+        request.session.save()
+    except (AttributeError, Exception):
+        pass
 
     auth_url = (
         "https://accounts.google.com/o/oauth2/v2/auth"
@@ -566,7 +627,16 @@ def google_login(request):
         f"&scope=openid%20email%20profile"
         f"&state={state}"
     )
-    return redirect(auth_url)
+    response = redirect(auth_url)
+    response.set_cookie(
+        'google_oauth_state',
+        state,
+        max_age=300,
+        httponly=True,
+        samesite='Lax',
+        secure=request.is_secure(),
+    )
+    return response
 
 
 def google_callback(request):
@@ -576,7 +646,6 @@ def google_callback(request):
     """
     import requests
     from django.conf import settings
-    from django.urls import reverse
     from django.utils.crypto import get_random_string
 
     state = request.GET.get('state')
@@ -585,16 +654,24 @@ def google_callback(request):
 
     if error or not code:
         messages.error(request, f"Google login failed: {error or 'No code provided'}")
-        return redirect('login')
+        response = redirect('login')
+        response.delete_cookie('google_oauth_state')
+        return response
 
     saved_state = request.session.pop('google_oauth_state', None)
+    if not saved_state:
+        saved_state = request.COOKIES.get('google_oauth_state')
+
     if not state or state != saved_state:
+        logger.warning(f"OAuth state mismatch. Received state={state}, Saved state={saved_state}")
         messages.error(request, "Security verification failed (Invalid state). Please try again.")
-        return redirect('login')
+        response = redirect('login')
+        response.delete_cookie('google_oauth_state')
+        return response
 
     client_id = getattr(settings, 'GOOGLE_OAUTH_CLIENT_ID', '')
     client_secret = getattr(settings, 'GOOGLE_OAUTH_CLIENT_SECRET', '')
-    redirect_uri = request.build_absolute_uri(reverse('google_callback'))
+    redirect_uri = _get_google_redirect_uri(request)
 
     token_url = "https://oauth2.googleapis.com/token"
     data = {
@@ -629,8 +706,12 @@ def google_callback(request):
             messages.error(request, "Failed to retrieve email address from Google.")
             return redirect('login')
 
-        if not email.lower().endswith('@gmail.com'):
-            messages.error(request, "Only @gmail.com email addresses are allowed.")
+        from django.core.validators import validate_email
+        from django.core.exceptions import ValidationError
+        try:
+            validate_email(email)
+        except ValidationError:
+            messages.error(request, "Invalid email address returned from Google.")
             return redirect('login')
 
         try:
@@ -654,9 +735,13 @@ def google_callback(request):
 
         login(request, user)
         messages.success(request, f"Welcome, {user.username}! Successfully logged in via Google.")
-        return redirect('upload')
+        response = redirect('upload')
+        response.delete_cookie('google_oauth_state')
+        return response
 
     except Exception as e:
         logger.error(f"Exception during Google callback: {str(e)}", exc_info=True)
         messages.error(request, f"Google login failed due to a server error. Please try again.")
-        return redirect('login')
+        response = redirect('login')
+        response.delete_cookie('google_oauth_state')
+        return response

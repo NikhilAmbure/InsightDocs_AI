@@ -19,12 +19,16 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.static import serve
+from django.views.generic.base import RedirectView
 from django.urls import re_path
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('auth/', include('accounts.urls')),
-    path('', include('app.urls')),
+    # Legacy / convenience shortcuts redirect to canonical /auth/ routes
+    path('login/', RedirectView.as_view(url='/auth/login/', permanent=False)),
+    path('signup/', RedirectView.as_view(url='/auth/signup/', permanent=False)),
+    path('logout/', RedirectView.as_view(url='/auth/logout/', permanent=False)),
     # Document-related pages (upload workspace, subscription, etc.)
     path('', include('documents.urls')),
     # Razorpay Payment Gateway
