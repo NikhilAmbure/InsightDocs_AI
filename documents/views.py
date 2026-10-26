@@ -133,9 +133,15 @@ def upload_view(request):
                 errors.append(f"'{f.name}': Exceeds {max_size_mb} MB limit. Free plan limit is 10 MB. Upgrade to Pro (50 MB) or Industry (100 MB).")
                 continue
 
+            # Read file bytes for cross-container cloud availability (Railway Web <-> Celery)
+            f.seek(0)
+            file_bytes = f.read()
+            f.seek(0)
+
             doc = Document(
                 owner=request.user,
                 file=f,
+                file_content=file_bytes,
                 title=f.name,
                 original_name=f.name,
             )
@@ -326,7 +332,15 @@ def serve_document_view(request, document_id):
     except Exception as e:
         logger.warning(f"document.file.open streaming failed for doc {document.id}: {e}")
 
-    # 3. Fallback redirect
+    # 3. Stream from database blob if disk file is missing (cross-container Railway resilience)
+    if getattr(document, 'file_content', None):
+        import io
+        response = FileResponse(io.BytesIO(document.file_content), content_type=content_type)
+        response['Content-Disposition'] = f'inline; filename="{document.original_name}"'
+        response['Access-Control-Allow-Origin'] = '*'
+        return response
+
+    # 4. Fallback redirect
     return redirect(document.file.url if document.file else '/')
 
 

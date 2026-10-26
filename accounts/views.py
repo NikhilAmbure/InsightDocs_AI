@@ -544,8 +544,9 @@ def reset_password(request):
 def _get_google_redirect_uri(request):
     """
     Returns the exact redirect URI configured for Google OAuth.
-    If GOOGLE_OAUTH_REDIRECT_URI is explicitly set in settings/env, use it.
-    Otherwise, builds it dynamically from the current request host and scheme.
+    If GOOGLE_OAUTH_REDIRECT_URI is explicitly set in settings/env AND matches the current host, use it.
+    Otherwise, builds it dynamically from the current request host and scheme so that
+    it always matches the exact domain and session cookie the user is currently browsing.
     """
     from django.conf import settings
     from django.urls import reverse
@@ -555,11 +556,11 @@ def _get_google_redirect_uri(request):
     custom_uri = getattr(settings, 'GOOGLE_OAUTH_REDIRECT_URI', '')
     if custom_uri:
         custom_host = urlparse(custom_uri).netloc.split(':')[0].lower()
-        # Ignore localhost custom_uri if the application is running on a live public domain (e.g. Railway)
-        if custom_host in ('localhost', '127.0.0.1') and curr_host not in ('localhost', '127.0.0.1'):
-            custom_uri = ''
-        else:
-            return custom_uri.strip()
+        if custom_host == curr_host:
+            uri = custom_uri.strip()
+            if not uri.endswith('/'):
+                uri += '/'
+            return uri
 
     redirect_uri = request.build_absolute_uri(reverse('google_callback'))
     parsed = urlparse(redirect_uri)
@@ -576,7 +577,11 @@ def _get_google_redirect_uri(request):
     if curr_host not in ('localhost', '127.0.0.1'):
         scheme = 'https'
 
-    redirect_uri = urlunparse((scheme, netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
+    path = parsed.path
+    if not path.endswith('/'):
+        path += '/'
+
+    redirect_uri = urlunparse((scheme, netloc, path, parsed.params, parsed.query, parsed.fragment))
     return redirect_uri
 
 
@@ -586,27 +591,12 @@ def google_login(request):
     """
     from django.conf import settings
     from django.utils.crypto import get_random_string
-    from urllib.parse import urlparse
+    from urllib.parse import urlencode
 
     client_id = getattr(settings, 'GOOGLE_OAUTH_CLIENT_ID', '')
     if not client_id:
         messages.error(request, "Google OAuth is not configured. Please contact support.")
         return redirect('login')
-
-    # If an explicit redirect URI is configured on a different host (e.g. localhost vs 127.0.0.1),
-    # redirect to that host first so the session cookie matches the callback host
-    custom_uri = getattr(settings, 'GOOGLE_OAUTH_REDIRECT_URI', '')
-    if custom_uri:
-        target_netloc = urlparse(custom_uri).netloc
-        current_netloc = request.get_host()
-        target_host = target_netloc.split(':')[0].lower()
-        curr_host = current_netloc.split(':')[0].lower()
-        # Only align host if not mixing localhost with public production domains
-        if target_host in ('localhost', '127.0.0.1') and curr_host not in ('localhost', '127.0.0.1'):
-            pass  # Don't redirect production to localhost
-        elif target_netloc and target_netloc.lower() != current_netloc.lower():
-            scheme = 'https' if request.is_secure() else 'http'
-            return redirect(f"{scheme}://{target_netloc}{request.get_full_path()}")
 
     redirect_uri = _get_google_redirect_uri(request)
     logger.info(f"Google OAuth initiated. redirect_uri={redirect_uri}")
@@ -619,14 +609,18 @@ def google_login(request):
     except (AttributeError, Exception):
         pass
 
-    auth_url = (
-        "https://accounts.google.com/o/oauth2/v2/auth"
-        f"?response_type=code"
-        f"&client_id={client_id}"
-        f"&redirect_uri={redirect_uri}"
-        f"&scope=openid%20email%20profile"
-        f"&state={state}"
-    )
+    params = {
+        'response_type': 'code',
+        'client_id': client_id,
+        'redirect_uri': redirect_uri,
+        'scope': 'openid email profile',
+        'state': state,
+    }
+    auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+
+    curr_host = request.get_host().split(':')[0].lower()
+    is_secure = request.is_secure() or (curr_host not in ('localhost', '127.0.0.1'))
+
     response = redirect(auth_url)
     response.set_cookie(
         'google_oauth_state',
@@ -634,7 +628,7 @@ def google_login(request):
         max_age=300,
         httponly=True,
         samesite='Lax',
-        secure=request.is_secure(),
+        secure=is_secure,
     )
     return response
 
