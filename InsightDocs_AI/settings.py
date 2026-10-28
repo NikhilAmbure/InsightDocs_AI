@@ -347,7 +347,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # API Keys and Rate Limits
 GOOGLE_API_KEY= os.environ.get('GOOGLE_API_KEY')
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
 
 RATE_LIMITS = {
     "upload": {

@@ -299,27 +299,48 @@ def _build_history_messages(system_parts, chat_history):
 
 def _call_groq_fallback(user_message, system_parts, chat_history):
     groq_api_key = getattr(settings, "GROQ_API_KEY", "")
-    if not groq_api_key:
+    if not groq_api_key or not groq_api_key.strip():
         return None
 
-    groq_model = getattr(settings, "GROQ_MODEL", "llama-3.3-70b-versatile")
+    groq_model = getattr(settings, "GROQ_MODEL", "openai/gpt-oss-120b")
     url = "https://api.groq.com/openai/v1/chat/completions"
-    payload = {
-        "model": groq_model,
-        "messages": _build_history_messages(system_parts, chat_history) + [{"role": "user", "content": user_message}],
-        "temperature": 0.2,
-    }
     headers = {
-        "Authorization": f"Bearer {groq_api_key}",
+        "Authorization": f"Bearer {groq_api_key.strip()}",
         "Content-Type": "application/json",
     }
-    response = requests.post(url, headers=headers, json=payload, timeout=60)
-    response.raise_for_status()
-    data = response.json()
-    choices = data.get("choices", [])
-    if not choices:
-        return None
-    return choices[0].get("message", {}).get("content", "")
+    messages = _build_history_messages(system_parts, chat_history) + [{"role": "user", "content": user_message}]
+
+    # Primary model followed by active fallbacks in case configured model returns 404 (decommissioned/not found)
+    candidate_models = [groq_model]
+    for fallback_candidate in ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile"]:
+        if fallback_candidate not in candidate_models:
+            candidate_models.append(fallback_candidate)
+
+    for model_name in candidate_models:
+        payload = {
+            "model": model_name,
+            "messages": messages,
+            "temperature": 0.2,
+        }
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=60)
+            if response.status_code == 200:
+                data = response.json()
+                choices = data.get("choices", [])
+                if choices:
+                    return choices[0].get("message", {}).get("content", "")
+            else:
+                logger.warning(
+                    f"Groq API call with model '{model_name}' failed ({response.status_code}): {response.text}"
+                )
+                if response.status_code == 404:
+                    continue
+                break
+        except Exception as e:
+            logger.warning(f"Groq fallback request error with model '{model_name}': {e}")
+            break
+
+    return None
 
 
 async def _yield_in_chunks(text, size=FALLBACK_CHUNK_SIZE):

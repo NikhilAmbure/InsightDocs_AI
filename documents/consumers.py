@@ -100,6 +100,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         session = await self.get_or_create_session(document)
 
+        # Get chat history (prior messages before saving current message)
+        chat_history = await self.get_chat_history(session)
+
         # Save user message
         user_msg = await self.save_user_message(session, content)
 
@@ -110,9 +113,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'content': content,
             'timestamp': user_msg.created_at.isoformat()
         }))
-
-        # Get chat history
-        chat_history = await self.get_chat_history(session)
 
         # Process with Gemini / DeepSeek
         await self.process_ai_response(document, session, content, chat_history)
@@ -559,6 +559,7 @@ class WorkspaceChatConsumer(AsyncWebsocketConsumer):
             return
 
         session = await self.get_or_create_workspace_session(workspace)
+        chat_history = await self.get_chat_history(session)
         user_msg = await self.save_user_message(session, content)
 
         await self.send(text_data=json.dumps({
@@ -568,7 +569,6 @@ class WorkspaceChatConsumer(AsyncWebsocketConsumer):
             'timestamp': user_msg.created_at.isoformat()
         }))
 
-        chat_history = await self.get_chat_history(session)
         await self.process_workspace_ai_response(workspace, documents, session, content, chat_history)
 
     async def process_workspace_ai_response(self, workspace, documents, session, user_message, chat_history):
