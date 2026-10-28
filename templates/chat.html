@@ -227,6 +227,27 @@
             border-radius: 2px;
             box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.4);
         }
+        .custom-textarea {
+            line-height: 24px !important;
+            min-height: 24px !important;
+            max-height: 72px !important; /* at most 3 lines */
+            padding: 0 !important;
+            margin: 0 !important;
+            box-sizing: border-box !important;
+        }
+        .custom-textarea::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-textarea::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-textarea::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+        .custom-textarea::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
     </style>
     <script>
         tailwind.config = {
@@ -640,7 +661,7 @@
                                     {% for sq in suggested_questions %}
                                     <button
                                         type="button"
-                                        onclick="document.getElementById('message-input').value='{{ sq|escapejs }}'; document.getElementById('message-input').focus();"
+                                        onclick="const mi=document.getElementById('message-input'); if(mi){ mi.value='{{ sq|escapejs }}'; if(window.autoResizeChatInput) window.autoResizeChatInput(mi); mi.focus(); }"
                                         class="rounded-full border border-violet-400/30 bg-violet-500/10 px-3 py-1 text-[10px] text-violet-200 hover:bg-violet-500/20 hover:text-white transition-colors text-left">
                                         <i class="fa-regular fa-compass mr-1 text-violet-400"></i>
                                         {{ sq }}
@@ -712,7 +733,7 @@
                                                     {% for suggested_q in document_insights.suggested_questions %}
                                                         <button
                                                             type="button"
-                                                            onclick="document.getElementById('message-input').value='{{ suggested_q|escapejs }}'; document.getElementById('message-input').focus();"
+                                                            onclick="const mi=document.getElementById('message-input'); if(mi){ mi.value='{{ suggested_q|escapejs }}'; if(window.autoResizeChatInput) window.autoResizeChatInput(mi); mi.focus(); }"
                                                             class="rounded-full border border-violet-400/30 bg-violet-500/10 px-3 py-1 text-[10px] text-violet-200 hover:bg-violet-500/20 hover:text-white transition-colors">
                                                             {{ suggested_q }}
                                                         </button>
@@ -764,12 +785,22 @@
                         </div>
                     </div>
 
-                    <div class="absolute bottom-0 left-0 right-0 glass-input-container z-30 px-4 pb-6 pt-10">
-                        <div class="mx-auto max-w-3xl">
+                    <div class="absolute bottom-0 left-0 right-0 glass-input-container z-30 px-4 pb-6 pt-10 pointer-events-none">
+                        <div class="mx-auto max-w-3xl w-full pointer-events-auto">
                             <form id="chat-form" onsubmit="handleSendMessage(event)" 
                                   class="group relative flex items-end gap-2 rounded-[26px] border border-white/10 bg-zinc-900/80 p-2 shadow-2xl shadow-black/50 backdrop-blur-xl transition-all hover:border-white/20 focus-within:border-violet-500/50 focus-within:ring-1 focus-within:ring-violet-500/20">
                                 
-                                <div id="chat-input-container" class="flex-1 py-2 pl-4 min-h-[44px] max-h-32 overflow-y-auto">
+                                <!-- In-input Upload "+" Button -->
+                                <button type="button" 
+                                        id="chat-upload-btn"
+                                        onclick="openQuickUploadModal()" 
+                                        title="Upload new documents"
+                                        class="group/upload mb-0.5 ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/5 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                                        aria-label="Upload document">
+                                    <i class="fa-solid fa-plus text-xs group-hover/upload:rotate-90 transition-transform duration-200"></i>
+                                </button>
+
+                                <div id="chat-input-container" class="flex-1 py-1.5 px-2 min-h-[36px] flex items-center min-w-0">
                                     <textarea name="content" id="message-input" rows="1" 
                                         {% if workspace and not is_workspace_processed %}
                                             placeholder="Indexing documents in workspace... Chat will unlock automatically when ready." disabled
@@ -779,12 +810,13 @@
                                             placeholder="{% if workspace %}Ask a question across all documents in this workspace...{% else %}Ask a question about your document...{% endif %}"
                                         {% endif %}
                                         required 
-                                        class="w-full bg-transparent text-white outline-none border-none text-sm resize-none focus:ring-0 placeholder-zinc-500 leading-relaxed custom-textarea disabled:opacity-50 disabled:cursor-not-allowed"></textarea>
+                                        style="line-height: 24px; min-height: 24px; max-height: 72px;"
+                                        class="w-full bg-transparent text-white outline-none border-none text-sm resize-none focus:ring-0 placeholder-zinc-500 custom-textarea disabled:opacity-50 disabled:cursor-not-allowed p-0 m-0"></textarea>
                                 </div>
                                 
                                 <button type="submit" id="send-btn" 
                                     {% if workspace and not is_workspace_processed %}disabled{% elif not workspace and not document.is_processed %}disabled{% endif %}
-                                    class="mb-1 mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-600 text-white shadow-lg shadow-violet-600/30 transition-all hover:bg-violet-500 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    class="mb-0.5 mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-600 text-white shadow-lg shadow-violet-600/30 transition-all hover:bg-violet-500 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
                                     <i class="fa-solid fa-paper-plane text-xs translate-x-px translate-y-px"></i>
                                 </button>
                             </form>
@@ -969,6 +1001,13 @@
                     <input type="checkbox" id="attach-to-workspace-chk" name="attach_workspace" checked class="rounded border-white/20 bg-black/40 text-violet-600 focus:ring-violet-500 h-4 w-4">
                     <label for="attach-to-workspace-chk" class="text-[11px] text-zinc-300 cursor-pointer">
                         Attach directly to workspace <strong>{{ workspace.name }}</strong>
+                    </label>
+                </div>
+                {% elif document %}
+                <div class="flex items-center gap-2 px-1 text-xs text-zinc-300">
+                    <input type="checkbox" id="attach-to-current-chat-chk" name="attach_current_chat" checked class="rounded border-white/20 bg-black/40 text-violet-600 focus:ring-violet-500 h-4 w-4">
+                    <label for="attach-to-current-chat-chk" class="text-[11px] text-zinc-300 cursor-pointer">
+                        Attach to this current chat (<span class="text-violet-400 font-medium">{{ document.title|truncatechars:30 }}</span>)
                     </label>
                 </div>
                 {% endif %}
@@ -1572,15 +1611,61 @@
             sendBtn.disabled = true;
             chatSocket.send(JSON.stringify({ 'type': 'chat_message', 'content': content }));
             textarea.value = '';
-            textarea.style.height = 'auto'; 
+            autoResizeChatInput(textarea);
             sendBtn.disabled = false;
         }
 
+        function sanitizeAssistantContent(text) {
+            if (!text || typeof text !== 'string') return '';
+            const lower = text.toLowerCase();
+            const leakSignatures = [
+                'groq_api_key',
+                'fallback is not configured',
+                'api limit reached and groq',
+                'add groq_api_key in .env',
+                'agent_router_api_error',
+                'new_api_error',
+                '无可用渠道',
+                '当前分组',
+                'content-blocked',
+                'error code: 503',
+                'error code: 400',
+                'anthropic_auth_token',
+                'traceback (most recent call last)'
+            ];
+            for (const sig of leakSignatures) {
+                if (lower.includes(sig)) {
+                    return "The AI service is currently experiencing high demand. Please wait a moment and try your question again.";
+                }
+            }
+            return text;
+        }
+
+        function sanitizeUserErrorMessage(msg) {
+            if (!msg || typeof msg !== 'string') {
+                return "The AI service is currently experiencing high demand. Please wait a moment and try again.";
+            }
+            const lower = msg.toLowerCase();
+            const technicalPatterns = [
+                'api_key', 'groq', 'anthropic', 'api key', '.env', 'traceback', 'exception',
+                '503', '500', '400', '401', '403', '404', '429', 'agentrouter', 'agent_router',
+                'content-blocked', 'error code', 'rate limit reached and groq',
+                'syntaxerror', 'typeerror', 'failed to fetch', 'undefined', '无可用渠道', '当前分组'
+            ];
+            for (const pat of technicalPatterns) {
+                if (lower.includes(pat)) {
+                    return "The AI service is currently busy or experiencing high demand. Please wait a moment and try again.";
+                }
+            }
+            return msg;
+        }
+
         function showError(message) {
+            const safeMessage = sanitizeUserErrorMessage(message);
             const messagesDiv = document.getElementById('chat-messages');
             const errorDiv = document.createElement('div');
             errorDiv.className = 'mx-auto max-w-3xl mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-xs text-center';
-            errorDiv.textContent = message;
+            errorDiv.textContent = safeMessage;
             messagesDiv.appendChild(errorDiv);
             scrollToBottom(true);
         }
@@ -1594,11 +1679,45 @@
             }
         }
 
+        function autoResizeChatInput(el, forceScrollTop = false) {
+            if (!el) return;
+            el.style.height = 'auto';
+            // Max 3 lines visible: line-height (24px) * 3 = 72px
+            const maxHeight = 72;
+            const scrollH = el.scrollHeight;
+            const newHeight = Math.min(scrollH, maxHeight);
+            el.style.height = (newHeight > 24 ? newHeight : 24) + 'px';
+            if (scrollH > maxHeight) {
+                el.style.overflowY = 'auto';
+            } else {
+                el.style.overflowY = 'hidden';
+                el.scrollTop = 0;
+            }
+            if (forceScrollTop) {
+                el.scrollTop = 0;
+            }
+        }
+        window.autoResizeChatInput = autoResizeChatInput;
+
         const textarea = document.getElementById('message-input');
         if (textarea) {
             textarea.addEventListener('input', function () {
-                this.style.height = 'auto'; 
-                this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+                autoResizeChatInput(this);
+            });
+            textarea.addEventListener('paste', function () {
+                setTimeout(() => {
+                    if (this.value) {
+                        // Trim trailing empty newlines so bottom doesn't show blank lines
+                        this.value = this.value.replace(/[\r\n]+$/, '');
+                    }
+                    autoResizeChatInput(this, true);
+                    this.scrollTop = 0;
+                }, 0);
+            });
+            textarea.addEventListener('cut', function () {
+                setTimeout(() => {
+                    autoResizeChatInput(this);
+                }, 0);
             });
             textarea.addEventListener('keydown', function (e) {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -1606,6 +1725,7 @@
                     document.getElementById('chat-form').dispatchEvent(new Event('submit'));
                 }
             });
+            autoResizeChatInput(textarea);
         }
 
         function toggleDocMenu(event, menuId) {
@@ -1728,6 +1848,7 @@
                 textarea.placeholder = IS_WORKSPACE 
                     ? "Ask a question across all documents in this workspace..." 
                     : "Ask a question about your document...";
+                if (window.autoResizeChatInput) window.autoResizeChatInput(textarea);
             }
             if (sendBtn) {
                 sendBtn.disabled = false;
@@ -2069,7 +2190,8 @@
         }
 
         function renderMarkdownElement(el, rawMarkdown) {
-            el.innerHTML = marked.parse(formatCitations(rawMarkdown || ''));
+            const safeContent = sanitizeAssistantContent(rawMarkdown || '');
+            el.innerHTML = marked.parse(formatCitations(safeContent));
             if (window.renderMathInElement) {
                 renderMathInElement(el, {
                     delimiters: [
@@ -2289,6 +2411,11 @@
                 if (!attachChk || attachChk.checked) {
                     formData.append('workspace_id', WORKSPACE_ID);
                 }
+            } else if (DOCUMENT_ID) {
+                const attachChatChk = document.getElementById('attach-to-current-chat-chk');
+                if (!attachChatChk || attachChatChk.checked) {
+                    formData.append('current_document_id', DOCUMENT_ID);
+                }
             }
 
             try {
@@ -2296,7 +2423,7 @@
                 modalProgressPct.textContent = '65%';
                 modalProgressText.textContent = 'Extracting and parsing text...';
 
-                const response = await fetch('/app/', {
+                const response = await fetch("{% url 'upload' %}", {
                     method: 'POST',
                     headers: {
                         'X-CSRFToken': CSRF_TOKEN,
@@ -2305,8 +2432,15 @@
                     body: formData
                 });
 
-                const data = await response.json();
-                if (!response.ok || !data.success) {
+                let data;
+                try {
+                    data = await response.json();
+                } catch (parseErr) {
+                    console.error("Non-JSON response from upload endpoint:", parseErr);
+                    throw new Error("Unable to complete document upload. Please try again in a moment.");
+                }
+
+                if (!response.ok || (!data.success && data.status !== 'success')) {
                     throw new Error(data.error || 'Upload failed. Please check file sizes and formats.');
                 }
 
@@ -2404,7 +2538,7 @@
                 console.error("Quick upload error:", err);
                 if (submitBtn) submitBtn.disabled = false;
                 modalUploadProgress.classList.add('hidden');
-                modalErrorMsg.textContent = err.message || 'An error occurred during upload.';
+                modalErrorMsg.textContent = sanitizeUserErrorMessage(err.message || 'An error occurred during upload.');
                 modalErrorMsg.classList.remove('hidden');
             }
         }

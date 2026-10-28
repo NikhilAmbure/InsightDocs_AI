@@ -114,11 +114,47 @@ def upload_view(request):
             for ext in getattr(settings, "ALLOWED_UPLOAD_EXTENSIONS", [])
         }
 
-        # Optional workspace association if provided
+        # Optional workspace or current chat document association
         workspace_id = request.POST.get('workspace_id')
+        current_document_id = request.POST.get('current_document_id')
         target_workspace = None
+        current_doc = None
+
         if workspace_id:
             target_workspace = Workspace.objects.filter(id=workspace_id, owner=request.user).first()
+        elif current_document_id:
+            current_doc = Document.objects.filter(id=current_document_id, owner=request.user).first()
+            if current_doc:
+                # Find if current_doc already belongs to an existing workspace for this user
+                existing_ws = current_doc.workspaces.filter(owner=request.user).first()
+                if existing_ws:
+                    target_workspace = existing_ws
+                else:
+                    base_name = (current_doc.title[:45].strip() or "Workspace")
+                    ws_name = base_name
+                    counter = 1
+                    while Workspace.objects.filter(name=ws_name, owner=request.user).exists():
+                        ws_name = f"{base_name} ({counter})"
+                        counter += 1
+                    target_workspace = Workspace.objects.create(
+                        name=ws_name,
+                        owner=request.user,
+                        description=f"Workspace created from {current_doc.title}"
+                    )
+                    target_workspace.documents.add(current_doc)
+
+                # Link current document's existing chat session to the workspace so ALL messages are preserved
+                current_session = ChatSession.objects.filter(document=current_doc, user=request.user).first()
+                if current_session:
+                    ChatSession.objects.filter(workspace=target_workspace, user=request.user).exclude(id=current_session.id).delete()
+                    current_session.workspace = target_workspace
+                    current_session.save(update_fields=['workspace', 'updated_at'])
+                else:
+                    ChatSession.objects.get_or_create(
+                        workspace=target_workspace,
+                        user=request.user,
+                        defaults={'title': f'Chat: {target_workspace.name}'}
+                    )
 
         created_docs = []
         errors = []
@@ -176,15 +212,23 @@ def upload_view(request):
             return redirect("upload")
 
         if is_json:
+            target_redirect_url = (
+                reverse("workspace_chat", kwargs={"workspace_id": target_workspace.id})
+                if target_workspace
+                else (reverse("chat", kwargs={"document_id": created_docs[0].id}) if created_docs else reverse("upload"))
+            )
             return JsonResponse({
                 "status": "success",
+                "success": True,
                 "message": f"{len(created_docs)} file(s) uploaded successfully.",
+                "redirect_url": target_redirect_url,
                 "documents": [
                     {
                         "id": d.id,
                         "title": d.title,
                         "extension": d.extension,
                         "url": reverse("serve_document", kwargs={"document_id": d.id}),
+                        "preview_url": reverse("serve_document", kwargs={"document_id": d.id}),
                         "chat_url": reverse("chat", kwargs={"document_id": d.id}),
                     }
                     for d in created_docs

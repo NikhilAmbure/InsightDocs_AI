@@ -21,6 +21,7 @@ from django.conf.urls.static import static
 from django.views.static import serve
 from django.views.generic.base import RedirectView
 from django.urls import re_path
+from payments import views as payment_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -29,6 +30,11 @@ urlpatterns = [
     path('login/', RedirectView.as_view(url='/auth/login/', permanent=False)),
     path('signup/', RedirectView.as_view(url='/auth/signup/', permanent=False)),
     path('logout/', RedirectView.as_view(url='/auth/logout/', permanent=False)),
+    # Standard Razorpay API routes
+    path('api/create-order', payment_views.create_order, name='api_create_order_noslash'),
+    path('api/create-order/', payment_views.create_order, name='api_create_order'),
+    path('api/verify-payment', payment_views.verify_payment, name='api_verify_payment_noslash'),
+    path('api/verify-payment/', payment_views.verify_payment, name='api_verify_payment'),
     # Document-related pages (upload workspace, subscription, etc.)
     path('', include('documents.urls')),
     # Razorpay Payment Gateway

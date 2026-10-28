@@ -6,6 +6,7 @@ app_name = "payments"
 urlpatterns = [
     path("create-order/", views.create_order, name="create_order"),
     path("verify/", views.verify_payment, name="verify_payment"),
+    path("verify-payment/", views.verify_payment, name="verify_payment_alias"),
     path("webhook/", views.RazorpayWebhookView.as_view(), name="razorpay_webhook"),
     path("success/", views.payment_success, name="payment_success"),
     path("failed/", views.payment_failed, name="payment_failed"),

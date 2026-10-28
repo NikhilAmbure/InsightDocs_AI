@@ -27,13 +27,14 @@ def _get_razorpay_client():
 
 
 # ─────────────────────── Create Razorpay Order ───────────────────────
-@login_required(login_url="login")
+@csrf_exempt
 @require_POST
 def create_order(request):
     """
-    AJAX endpoint — creates a Razorpay order and returns the order details
-    for the frontend checkout.
-    Expects POST JSON: { "plan_id": <int> }
+    Creates a Razorpay order and returns the order details for the frontend checkout.
+    Supports:
+      1. Direct amount: { "amount": <paise (min 100)>, "currency": "INR", "receipt": "..." }
+      2. Plan-based:   { "plan_id": <int> }
     """
     # Validate Razorpay keys are configured
     if not settings.RAZORPAY_KEY_ID or not settings.RAZORPAY_KEY_SECRET:
@@ -44,91 +45,119 @@ def create_order(request):
         )
 
     try:
-        body = json.loads(request.body)
-        plan_id = body.get("plan_id")
+        body = json.loads(request.body) if request.body else {}
     except (json.JSONDecodeError, AttributeError):
         return JsonResponse({"error": "Invalid request body."}, status=400)
 
-    if not plan_id:
-        return JsonResponse({"error": "Plan ID is required."}, status=400)
+    amount = body.get("amount")
+    currency = body.get("currency", "INR")
+    receipt = body.get("receipt")
+    plan_id = body.get("plan_id")
 
-    from .services import ensure_default_plans
-    try:
-        plan = SubscriptionPlan.objects.get(id=plan_id, is_active=True)
-    except SubscriptionPlan.DoesNotExist:
-        ensure_default_plans()
+    plan = None
+    amount_paise = None
+
+    if amount is not None:
+        try:
+            amount_paise = int(amount)
+        except (ValueError, TypeError):
+            return JsonResponse({"error": "Amount must be an integer in paise."}, status=400)
+
+        # Minimum amount validation: at least 100 paise (₹1)
+        if amount_paise < 100:
+            return JsonResponse({"error": "Minimum amount must be at least 100 paise."}, status=400)
+
+    elif plan_id is not None:
+        from .services import ensure_default_plans
         try:
             plan = SubscriptionPlan.objects.get(id=plan_id, is_active=True)
         except SubscriptionPlan.DoesNotExist:
-            return JsonResponse({"error": "Selected plan is not available."}, status=404)
+            ensure_default_plans()
+            try:
+                plan = SubscriptionPlan.objects.get(id=plan_id, is_active=True)
+            except SubscriptionPlan.DoesNotExist:
+                return JsonResponse({"error": "Selected plan is not available."}, status=404)
 
-    if plan.price_inr <= 0:
-        return JsonResponse({"error": "Cannot purchase a free plan."}, status=400)
+        if plan.price_paise < 100:
+            return JsonResponse({"error": "Cannot purchase a plan below 100 paise."}, status=400)
+        amount_paise = plan.price_paise
+    else:
+        return JsonResponse({"error": "Either amount (in paise >= 100) or plan_id is required."}, status=400)
 
     client = _get_razorpay_client()
+    internal_order_id = receipt or f"INS-{uuid.uuid4().hex[:12].upper()}"
 
-    internal_order_id = f"INS-{uuid.uuid4().hex[:12].upper()}"
+    notes = {}
+    if request.user.is_authenticated:
+        notes["user_id"] = str(request.user.id)
+    if plan:
+        notes["plan_id"] = str(plan.id)
+        notes["plan_name"] = plan.name
 
     try:
         razorpay_order = client.order.create(
             {
-                "amount": plan.price_paise,
-                "currency": "INR",
+                "amount": amount_paise,
+                "currency": currency,
                 "receipt": internal_order_id,
-                "notes": {
-                    "user_id": str(request.user.id),
-                    "plan_id": str(plan.id),
-                    "plan_name": plan.name,
-                },
+                "notes": notes,
             }
         )
-    except razorpay.errors.BadRequestError as e:
+    except (razorpay.errors.BadRequestError, razorpay.errors.GatewayError) as e:
+        err_msg = str(e).lower()
         logger.error(f"Razorpay order creation failed: {e}")
-        return JsonResponse(
-            {"error": "Payment gateway authentication failed. Please check your Razorpay API keys."},
-            status=502,
-        )
+        if "auth" in err_msg or "unauthorized" in err_msg or "invalid key" in err_msg:
+            return JsonResponse({"error": "Razorpay authentication failed."}, status=401)
+        return JsonResponse({"error": f"Razorpay API error: {str(e)}"}, status=500)
     except Exception as e:
+        err_msg = str(e).lower()
         logger.error(f"Unexpected error creating Razorpay order: {e}")
-        return JsonResponse(
-            {"error": "Failed to create payment order. Please try again."},
-            status=500,
+        if "auth" in err_msg or "unauthorized" in err_msg:
+            return JsonResponse({"error": "Razorpay authentication failed."}, status=401)
+        return JsonResponse({"error": "Failed to create payment order. Please try again."}, status=500)
+
+    # If associated with a user and plan, persist local Payment record
+    if request.user.is_authenticated and plan:
+        Payment.objects.create(
+            order_id=internal_order_id,
+            user=request.user,
+            plan=plan,
+            razorpay_order_id=razorpay_order["id"],
+            amount=plan.price_inr,
+            currency=currency,
+            status="created",
         )
 
-    # Persist a Payment record with status=created
-    Payment.objects.create(
-        order_id=internal_order_id,
-        user=request.user,
-        plan=plan,
-        razorpay_order_id=razorpay_order["id"],
-        amount=plan.price_inr,
-        currency="INR",
-        status="created",
-    )
+    response_payload = {
+        "order_id": razorpay_order["id"],
+        "amount": razorpay_order["amount"],
+        "currency": razorpay_order["currency"],
+        "key_id": settings.RAZORPAY_KEY_ID,
+    }
 
-    return JsonResponse(
-        {
-            "order_id": razorpay_order["id"],
-            "amount": plan.price_paise,
-            "currency": "INR",
-            "key_id": settings.RAZORPAY_KEY_ID,
-            "plan_name": plan.name,
-            "user_email": request.user.email,
-            "user_name": request.user.get_full_name() or request.user.username,
-        }
-    )
+    if plan:
+        response_payload["plan_name"] = plan.name
+    if request.user.is_authenticated:
+        response_payload["user_email"] = request.user.email
+        response_payload["user_name"] = request.user.get_full_name() or request.user.username
+
+    return JsonResponse(response_payload)
 
 
 # ─────────── Verify Payment (client‑side callback) ──────────────────
-@login_required(login_url="login")
+@csrf_exempt
 @require_POST
 def verify_payment(request):
     """
-    Called from the frontend after Razorpay checkout success.
+    Called from frontend or API after Razorpay checkout success.
     Expects POST JSON with razorpay_order_id, razorpay_payment_id, razorpay_signature.
+    Verifies cryptographic signature: HMAC-SHA256(order_id + "|" + payment_id, KEY_SECRET).
     """
+    import hmac
+    import hashlib
+
     try:
-        body = json.loads(request.body)
+        body = json.loads(request.body) if request.body else {}
     except (json.JSONDecodeError, AttributeError):
         return JsonResponse({"error": "Invalid request body."}, status=400)
 
@@ -137,47 +166,41 @@ def verify_payment(request):
     razorpay_signature = body.get("razorpay_signature")
 
     if not all([razorpay_order_id, razorpay_payment_id, razorpay_signature]):
-        return JsonResponse({"error": "Missing payment parameters."}, status=400)
-
-    # Look up the local Payment record
-    try:
-        payment = Payment.objects.get(razorpay_order_id=razorpay_order_id, user=request.user)
-    except Payment.DoesNotExist:
-        return JsonResponse({"error": "Payment record not found."}, status=404)
-
-    # Idempotency check: if already captured, avoid double-activating / double-crediting
-    if payment.status == "captured":
-        logger.info(f"Payment already captured for order {razorpay_order_id}; skipping re-activation.")
-        return JsonResponse({"status": "success", "message": "Payment verified and subscription activated!"})
-
-    # Verify signature
-    client = _get_razorpay_client()
-    try:
-        client.utility.verify_payment_signature(
-            {
-                "razorpay_order_id": razorpay_order_id,
-                "razorpay_payment_id": razorpay_payment_id,
-                "razorpay_signature": razorpay_signature,
-            }
+        return JsonResponse(
+            {"error": "Missing payment parameters. razorpay_order_id, razorpay_payment_id, and razorpay_signature are required."},
+            status=400,
         )
-    except razorpay.errors.SignatureVerificationError:
-        payment.status = "failed"
-        payment.save(update_fields=["status", "updated_at"])
-        logger.warning(f"Signature verification failed for order {razorpay_order_id}")
-        return JsonResponse({"error": "Payment verification failed."}, status=400)
 
-    # ── Payment is valid ──
-    payment.razorpay_payment_id = razorpay_payment_id
-    payment.razorpay_signature = razorpay_signature
-    payment.status = "captured"
-    payment.save(update_fields=["razorpay_payment_id", "razorpay_signature", "status", "updated_at"])
+    # 1. Cryptographic HMAC-SHA256 signature verification
+    msg = f"{razorpay_order_id}|{razorpay_payment_id}".encode("utf-8")
+    secret = settings.RAZORPAY_KEY_SECRET.encode("utf-8")
+    generated_signature = hmac.new(secret, msg, hashlib.sha256).hexdigest()
 
-    # Activate / update the user's subscription
-    _activate_subscription(request.user, payment.plan)
+    if not hmac.compare_digest(generated_signature, razorpay_signature):
+        logger.warning(f"Signature mismatch for order {razorpay_order_id}")
+        if request.user.is_authenticated:
+            Payment.objects.filter(razorpay_order_id=razorpay_order_id, user=request.user).update(
+                status="failed", updated_at=timezone.now()
+            )
+        return JsonResponse({"error": "Payment verification failed. Signature mismatch.", "status": "failed"}, status=400)
 
-    logger.info(f"Payment captured: {payment.order_id} for user {request.user.username}")
+    # 2. Signature is valid — update local database if Payment record exists
+    if request.user.is_authenticated:
+        payment = Payment.objects.filter(razorpay_order_id=razorpay_order_id, user=request.user).first()
+        if payment:
+            # Idempotency check: if already captured, do not re-credit
+            if payment.status != "captured":
+                payment.razorpay_payment_id = razorpay_payment_id
+                payment.razorpay_signature = razorpay_signature
+                payment.status = "captured"
+                payment.save(update_fields=["razorpay_payment_id", "razorpay_signature", "status", "updated_at"])
 
-    return JsonResponse({"status": "success", "message": "Payment verified and subscription activated!"})
+                # Activate subscription if plan attached
+                if payment.plan:
+                    _activate_subscription(request.user, payment.plan)
+                logger.info(f"Payment captured: {payment.order_id} for user {request.user.username}")
+
+    return JsonResponse({"status": "success", "message": "Payment verified successfully!"})
 
 
 # ─────────── Razorpay Webhook (server‑side verification) ────────────

@@ -22,6 +22,10 @@ MAX_FALLBACK_CHUNKS = 20
 FALLBACK_CHUNK_SIZE = 180
 GEMINI_COOLDOWN_UNTIL = 0.0
 
+# Polished user-facing messages (no leaked developer configs, .env variables, or technical internals)
+USER_FRIENDLY_RATE_LIMIT_MSG = "The AI service is currently experiencing high demand. Please wait a moment and try your question again."
+USER_FRIENDLY_ERROR_MSG = "I was unable to complete this response due to temporary service load. Please try your question again in a moment."
+
 try:
     from sentence_transformers import CrossEncoder  # pyright: ignore[reportMissingImports]
 except Exception:
@@ -357,7 +361,8 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
                 async for part in _yield_in_chunks(groq_text):
                     yield part
                 return
-            yield "Gemini is temporarily rate-limited and Groq fallback is not configured. Set GROQ_API_KEY in .env and retry."
+            logger.warning("Gemini rate limit cooldown active; Groq fallback not configured (set GROQ_API_KEY in .env to enable fallback).")
+            yield USER_FRIENDLY_RATE_LIMIT_MSG
             return
 
         def _retrieve_pipeline():
@@ -536,7 +541,8 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
                 async for part in _yield_in_chunks(groq_text):
                     yield part
                 return
-            yield "API limit reached and Groq fallback is not configured. Add GROQ_API_KEY in .env to enable fallback."
+            logger.warning("Gemini API limit reached; Groq fallback not configured (set GROQ_API_KEY in .env to enable fallback).")
+            yield USER_FRIENDLY_RATE_LIMIT_MSG
         except Exception as model_error:
             err_text = str(model_error).lower()
             fallback_allowed = any(
@@ -563,7 +569,8 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
             async for part in _yield_in_chunks(groq_text):
                 yield part
         else:
-            yield "API limit reached. Configure GROQ_API_KEY in .env for automatic fallback."
+            logger.warning("Gemini API limit exceeded; Groq fallback not configured.")
+            yield USER_FRIENDLY_RATE_LIMIT_MSG
     except Exception as e:
         logger.error(f"Gemini Error: {e}", exc_info=True)
         groq_text = await asyncio.to_thread(_call_groq_fallback, user_message, [""], chat_history)
@@ -571,7 +578,7 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
             async for part in _yield_in_chunks(groq_text):
                 yield part
         else:
-            yield "An error occurred while processing your request. Please try again later."
+            yield USER_FRIENDLY_ERROR_MSG
 
 
 async def get_workspace_response(user_message, documents, chat_history, progress_callback=None, usage_callback=None, user=None):
@@ -593,7 +600,7 @@ async def get_workspace_response(user_message, documents, chat_history, progress
                 async for part in _yield_in_chunks(groq_text):
                     yield part
                 return
-            yield "Gemini is temporarily rate-limited. Please try again later."
+            yield USER_FRIENDLY_RATE_LIMIT_MSG
             return
 
         def _multi_doc_retrieve():
@@ -729,10 +736,10 @@ async def get_workspace_response(user_message, documents, chat_history, progress
                 async for part in _yield_in_chunks(groq_text):
                     yield part
             else:
-                yield "API limit reached. Please try again shortly."
+                yield USER_FRIENDLY_RATE_LIMIT_MSG
 
     except Exception as e:
         logger.error(f"Workspace Gemini Error: {e}", exc_info=True)
-        yield "An error occurred while analyzing the workspace documents. Please try again."
+        yield "I encountered a temporary issue analyzing the workspace documents. Please try asking your question again in a moment."
 
 
