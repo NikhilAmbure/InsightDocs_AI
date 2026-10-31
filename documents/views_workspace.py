@@ -24,9 +24,15 @@ def workspace_list_view(request):
 
 
 @login_required(login_url='login')
-@require_POST
 def workspace_create_view(request):
     """Create a new workspace."""
+    if request.method != 'POST':
+        workspaces = Workspace.objects.filter(owner=request.user).prefetch_related('documents')
+        return render(request, 'workspaces.html', {
+            'workspaces': workspaces,
+            'open_create_modal': True,
+        })
+
     name = request.POST.get('name', '').strip()
     description = request.POST.get('description', '').strip()
 

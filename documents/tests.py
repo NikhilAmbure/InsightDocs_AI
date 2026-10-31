@@ -598,3 +598,53 @@ class MultiDocRetrievalMergeTests(SimpleTestCase):
             # Assert Doc 4's best chunk is included in the prompt context
             self.assertIn("[Doc 4 · Page 1]: Doc 4 best chunk content", system_instruction)
 
+
+class WorkspaceCreateViewTests(SimpleTestCase):
+    databases = []
+
+    def setUp(self):
+        from django.test import RequestFactory
+        self.factory = RequestFactory()
+        self.user = MagicMock(id=1, is_authenticated=True, is_premium=False)
+
+    def test_workspace_create_view_get_renders_modal(self):
+        """
+        Verify GET /workspaces/create/ returns 200 OK and renders workspaces.html with open_create_modal=True.
+        """
+        from documents.views_workspace import workspace_create_view
+        request = self.factory.get("/workspaces/create/")
+        request.user = self.user
+
+        with patch("documents.views_workspace.Workspace.objects.filter") as mock_filter, \
+             patch("documents.views_workspace.render") as mock_render:
+            mock_filter.return_value.prefetch_related.return_value = []
+            mock_render.return_value = MagicMock(status_code=200)
+
+            response = workspace_create_view(request)
+
+            mock_render.assert_called_once()
+            _, template_name, context = mock_render.call_args[0]
+            self.assertEqual(template_name, "workspaces.html")
+            self.assertTrue(context.get("open_create_modal"))
+            self.assertEqual(response.status_code, 200)
+
+    def test_workspace_create_view_post_creates_workspace(self):
+        """
+        Verify POST /workspaces/create/ creates workspace and redirects to workspace_detail.
+        """
+        from documents.views_workspace import workspace_create_view
+        request = self.factory.post("/workspaces/create/", {"name": "New Project", "description": "Notes"})
+        request.user = self.user
+        request._messages = MagicMock()
+
+        mock_workspace = MagicMock(id=42, name="New Project")
+        with patch("documents.views_workspace.Workspace.objects.filter") as mock_filter, \
+             patch("documents.views_workspace.Workspace.objects.get_or_create", return_value=(mock_workspace, True)):
+            mock_filter.return_value.count.return_value = 0
+
+            response = workspace_create_view(request)
+
+            self.assertEqual(response.status_code, 302)
+            self.assertIn("/workspaces/42/", response.url)
+
+
