@@ -25,6 +25,8 @@ GEMINI_COOLDOWN_UNTIL = 0.0
 # Polished user-facing messages (no leaked developer configs, .env variables, or technical internals)
 USER_FRIENDLY_RATE_LIMIT_MSG = "The AI service is currently experiencing high demand. Please wait a moment and try your question again."
 USER_FRIENDLY_ERROR_MSG = "I was unable to complete this response due to temporary service load. Please try your question again in a moment."
+DOCUMENT_UNREADABLE_MSG = "The document could not be read right now. Please try again in a moment."
+WORKSPACE_DOCUMENTS_UNREADABLE_MSG = "The workspace documents could not be read right now. Please try again in a moment."
 
 try:
     from sentence_transformers import CrossEncoder  # pyright: ignore[reportMissingImports]
@@ -160,6 +162,10 @@ def _hybrid_retrieve(document, query_text, top_k=TOP_K_PER_STEP, query_embedding
         "vector_chunks": vector_candidates[:top_k],
         "keyword_chunks": keyword_candidates[:top_k],
         "hybrid_chunks": [row["chunk"] for row in scored[:top_k]],
+        "scored": [
+            {"chunk": row["chunk"], "hybrid_score": row["hybrid_score"]}
+            for row in scored[:top_k]
+        ],
     }
 
 
@@ -297,6 +303,84 @@ def _build_history_messages(system_parts, chat_history):
     return messages
 
 
+def _build_base_instruction(is_global_query=False):
+    base_instruction = (
+        "You are InsightDocs AI, an intelligent document assistant.\n\n"
+        "You may use THREE sources of knowledge in priority order:\n"
+        "1. The provided document context (highest priority)\n"
+        "2. General knowledge (if the document does not contain the answer)\n"
+        "3. Logical reasoning based on the user's question\n\n"
+        "Rules:\n"
+        "- If the answer is found in the document context, answer strictly from it.\n"
+        "- Include inline citations using [Page X] where applicable.\n"
+        "- If the document does NOT contain the answer, answer using general knowledge.\n"
+        "- If using general knowledge, explicitly say: "
+        "'This answer is based on general knowledge, not the document.'\n"
+        "- Do NOT hallucinate document-specific facts.\n\n"
+        "Formatting & Structure Guidelines:\n"
+        "- Structure your answers using clean, readable Markdown layout.\n"
+        "- Use relevant level-3 headers (###) to separate distinct topics, sections, or categories. Do not use H1 or H2.\n"
+        "- Use bolding (**word**) to highlight critical names, terms, metrics, numbers, or section labels.\n"
+        "- Present lists using bullet points (- ) or numbered lists (1. ) instead of dense, multi-sentence paragraphs.\n"
+        "- When comparing data, key parameters, or presenting structured lists of metrics/properties, organize them in a clean Markdown table.\n"
+        "- Wrap direct quotes or critical definitions from the document in blockquotes (> quote).\n"
+        "- For programming code, commands, database queries, or structured JSON configurations, wrap them in code blocks specifying the language name (e.g. ```python, ```sql).\n"
+        "- Keep paragraphs short and concise (2-3 sentences max) to improve readability.\n"
+    )
+    if is_global_query:
+        base_instruction += (
+            "- The user is asking for a comprehensive list or summary. "
+            "You must be EXHAUSTIVE and list EVERY single item, question, or detail found in the context. "
+            "Do NOT truncate the list, omit items, or skip numbers. List all of them completely.\n"
+        )
+    else:
+        base_instruction += "- Be concise, clear, and helpful.\n"
+    return base_instruction
+
+
+def _get_document_fallback_context(document):
+    if not getattr(document, "is_processed", False):
+        return None
+    chunks = DocumentChunk.objects.filter(document=document).order_by("chunk_index")[:MAX_FALLBACK_CHUNKS]
+    if chunks.exists():
+        parts = []
+        for c in chunks:
+            if c.page_number is not None:
+                parts.append(f"[Page {c.page_number}]: {c.content}")
+            else:
+                parts.append(c.content)
+        return "\n\n".join(parts)
+    return None
+
+
+def _build_workspace_base_instruction(documents):
+    doc_names = ", ".join(str(getattr(d, "title", "Document")) for d in documents[:6])
+    return (
+        f"You are InsightDocs AI, analyzing multiple documents in this workspace: {doc_names}.\n\n"
+        "Rules:\n"
+        "- Answer using the provided document contexts.\n"
+        "- You MUST cite every source using [Document Title · Page X] format for each factual claim.\n"
+        "- When comparing or synthesizing across documents, clearly state which document each point originates from.\n"
+        "- If a question cannot be answered from the provided documents, state so clearly.\n"
+        "- Format with clean Markdown (headers, bullet points, comparison tables where helpful).\n"
+        "- Be concise, professional, and clear.\n"
+    )
+
+
+def _get_workspace_fallback_context(documents, chunks_per_doc=3):
+    parts = []
+    for doc in documents:
+        if not getattr(doc, "is_processed", False):
+            continue
+        chunks = DocumentChunk.objects.filter(document=doc).order_by("chunk_index")[:chunks_per_doc]
+        for c in chunks:
+            page_info = f"Page {c.page_number}" if c.page_number else "No page"
+            parts.append(f"[{doc.title} · {page_info}]: {c.content}")
+    if parts:
+        return "\n\n".join(parts)
+    return None
+
+
 def _call_groq_fallback(user_message, system_parts, chat_history):
     groq_api_key = getattr(settings, "GROQ_API_KEY", "")
     if not groq_api_key or not groq_api_key.strip():
@@ -356,6 +440,9 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
     Pro & Industry users are powered by DeepSeek v4 Flash (with seamless Gemini fallback).
     Free tier users are routed to Gemini 2.5 Flash.
     """
+    context_text = None
+    system_parts = None
+    base_instruction = None
     try:
         logger.info(f"Starting generation for doc {document.id}...")
         model = genai.GenerativeModel("gemini-2.5-flash")
@@ -368,6 +455,7 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
             "all the questions", "list questions", "list the questions"
         ]
         is_global_query = any(w in query_lower for w in global_keywords)
+        base_instruction = _build_base_instruction(is_global_query)
 
         if progress_callback:
             await progress_callback("Analyzing question intent...")
@@ -377,7 +465,12 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
             logger.warning("Gemini is in cooldown, attempting Groq fallback directly.")
             if progress_callback:
                 await progress_callback("Gemini limited, switching model...")
-            groq_text = await asyncio.to_thread(_call_groq_fallback, user_message, [""], chat_history)
+            context_text = await asyncio.to_thread(_get_document_fallback_context, document)
+            if not context_text:
+                yield DOCUMENT_UNREADABLE_MSG
+                return
+            system_parts = _build_system_parts(base_instruction, context_text)
+            groq_text = await asyncio.to_thread(_call_groq_fallback, user_message, system_parts, chat_history)
             if groq_text:
                 async for part in _yield_in_chunks(groq_text):
                     yield part
@@ -425,55 +518,14 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
 
         if not context_text:
             logger.info("RAG pipeline returned no context. Falling back to first chunks.")
+            context_text = await asyncio.to_thread(_get_document_fallback_context, document)
 
-            def _fallback_chunks():
-                chunks = DocumentChunk.objects.filter(document=document).order_by("chunk_index")[:MAX_FALLBACK_CHUNKS]
-                if chunks.exists():
-                    parts = []
-                    for c in chunks:
-                        if c.page_number is not None:
-                            parts.append(f"[Page {c.page_number}]: {c.content}")
-                        else:
-                            parts.append(c.content)
-                    return "\n\n".join(parts)
-                return None
-
-            context_text = await asyncio.to_thread(_fallback_chunks)
+        if not context_text:
+            yield DOCUMENT_UNREADABLE_MSG
+            return
 
         if progress_callback:
             await progress_callback("Refining context for final answer...")
-
-        base_instruction = (
-            "You are InsightDocs AI, an intelligent document assistant.\n\n"
-            "You may use THREE sources of knowledge in priority order:\n"
-            "1. The provided document context (highest priority)\n"
-            "2. General knowledge (if the document does not contain the answer)\n"
-            "3. Logical reasoning based on the user's question\n\n"
-            "Rules:\n"
-            "- If the answer is found in the document context, answer strictly from it.\n"
-            "- Include inline citations using [Page X] where applicable.\n"
-            "- If the document does NOT contain the answer, answer using general knowledge.\n"
-            "- If using general knowledge, explicitly say: "
-            "'This answer is based on general knowledge, not the document.'\n"
-            "- Do NOT hallucinate document-specific facts.\n\n"
-            "Formatting & Structure Guidelines:\n"
-            "- Structure your answers using clean, readable Markdown layout.\n"
-            "- Use relevant level-3 headers (###) to separate distinct topics, sections, or categories. Do not use H1 or H2.\n"
-            "- Use bolding (**word**) to highlight critical names, terms, metrics, numbers, or section labels.\n"
-            "- Present lists using bullet points (- ) or numbered lists (1. ) instead of dense, multi-sentence paragraphs.\n"
-            "- When comparing data, key parameters, or presenting structured lists of metrics/properties, organize them in a clean Markdown table.\n"
-            "- Wrap direct quotes or critical definitions from the document in blockquotes (> quote).\n"
-            "- For programming code, commands, database queries, or structured JSON configurations, wrap them in code blocks specifying the language name (e.g. ```python, ```sql).\n"
-            "- Keep paragraphs short and concise (2-3 sentences max) to improve readability.\n"
-        )
-        if is_global_query:
-            base_instruction += (
-                "- The user is asking for a comprehensive list or summary. "
-                "You must be EXHAUSTIVE and list EVERY single item, question, or detail found in the context. "
-                "Do NOT truncate the list, omit items, or skip numbers. List all of them completely.\n"
-            )
-        else:
-            base_instruction += "- Be concise, clear, and helpful.\n"
 
         system_parts = _build_system_parts(base_instruction, context_text)
 
@@ -585,7 +637,17 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
     except ResourceExhausted:
         _set_gemini_cooldown_from_error("seconds: 60")
         logger.warning(f"Gemini API limit exceeded for doc {document.id}.")
-        groq_text = await asyncio.to_thread(_call_groq_fallback, user_message, [""], chat_history)
+        if not system_parts:
+            if not context_text:
+                context_text = await asyncio.to_thread(_get_document_fallback_context, document)
+            if context_text:
+                if not base_instruction:
+                    base_instruction = _build_base_instruction(is_global_query=False)
+                system_parts = _build_system_parts(base_instruction, context_text)
+        if not system_parts:
+            yield DOCUMENT_UNREADABLE_MSG
+            return
+        groq_text = await asyncio.to_thread(_call_groq_fallback, user_message, system_parts, chat_history)
         if groq_text:
             async for part in _yield_in_chunks(groq_text):
                 yield part
@@ -594,7 +656,17 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
             yield USER_FRIENDLY_RATE_LIMIT_MSG
     except Exception as e:
         logger.error(f"Gemini Error: {e}", exc_info=True)
-        groq_text = await asyncio.to_thread(_call_groq_fallback, user_message, [""], chat_history)
+        if not system_parts:
+            if not context_text:
+                context_text = await asyncio.to_thread(_get_document_fallback_context, document)
+            if context_text:
+                if not base_instruction:
+                    base_instruction = _build_base_instruction(is_global_query=False)
+                system_parts = _build_system_parts(base_instruction, context_text)
+        if not system_parts:
+            yield DOCUMENT_UNREADABLE_MSG
+            return
+        groq_text = await asyncio.to_thread(_call_groq_fallback, user_message, system_parts, chat_history)
         if groq_text:
             async for part in _yield_in_chunks(groq_text):
                 yield part
@@ -602,12 +674,73 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
             yield USER_FRIENDLY_ERROR_MSG
 
 
-async def get_workspace_response(user_message, documents, chat_history, progress_callback=None, usage_callback=None, user=None):
+def _multi_doc_retrieve(documents, user_message, query_embedding=None):
+    """Retrieve relevant chunks across all workspace documents with a single shared query embedding."""
+    shared_embedding = query_embedding
+    if shared_embedding is None:
+        try:
+            res = genai.embed_content(
+                model="models/gemini-embedding-001",
+                content=user_message,
+                task_type="retrieval_query",
+                output_dimensionality=768,
+            )
+            shared_embedding = res.get("embedding")
+        except Exception as emb_err:
+            logger.warning(f"Failed to generate shared embedding for workspace query: {emb_err}")
+
+    all_scored = []
+    for doc in documents:
+        if not getattr(doc, "is_processed", False):
+            continue
+        try:
+            retrieval = _hybrid_retrieve(doc, user_message, top_k=5, query_embedding=shared_embedding)
+            scored_items = retrieval.get("scored")
+            if scored_items is not None:
+                for item in scored_items:
+                    all_scored.append({
+                        "hybrid_score": item.get("hybrid_score", 0.0),
+                        "chunk": item["chunk"],
+                        "doc_title": getattr(doc, "title", "Document"),
+                        "doc_id": getattr(doc, "id", None),
+                    })
+            else:
+                for chunk in retrieval.get("hybrid_chunks", []):
+                    all_scored.append({
+                        "hybrid_score": 0.0,
+                        "chunk": chunk,
+                        "doc_title": getattr(doc, "title", "Document"),
+                        "doc_id": getattr(doc, "id", None),
+                    })
+        except Exception as e:
+            logger.warning(f"Retrieval failed for doc {getattr(doc, 'id', None)}: {e}")
+
+    if not all_scored:
+        return None
+
+    # Sort all candidates across documents by hybrid_score descending and keep global top 15
+    all_scored.sort(key=lambda x: x["hybrid_score"], reverse=True)
+    all_chunks = all_scored[:15]
+
+    parts = []
+    for item in all_chunks:
+        chunk = item["chunk"]
+        doc_title = item["doc_title"]
+        page_info = f"Page {chunk.page_number}" if getattr(chunk, "page_number", None) else "No page"
+        parts.append(f"[{doc_title} · {page_info}]: {chunk.content}")
+
+    return "\n\n".join(parts)
+
+
+async def get_workspace_response(user_message, documents, chat_history, progress_callback=None, usage_callback=None, user=None, query_embedding=None):
     """
     Async generator that streams response using multi-document hybrid RAG.
     Retrieves relevant chunks across ALL documents in the workspace.
     Pro & Industry users are powered by DeepSeek v4 Flash (with Gemini fallback).
     """
+    context_text = None
+    system_parts = None
+    base_instruction = _build_workspace_base_instruction(documents)
     try:
         logger.info(f"Starting workspace generation across {len(documents)} documents...")
         model = genai.GenerativeModel("gemini-2.5-flash")
@@ -616,7 +749,12 @@ async def get_workspace_response(user_message, documents, chat_history, progress
             await progress_callback("Searching across workspace documents...")
 
         if _is_gemini_in_cooldown():
-            groq_text = await asyncio.to_thread(_call_groq_fallback, user_message, [""], chat_history)
+            context_text = await asyncio.to_thread(_get_workspace_fallback_context, documents)
+            if not context_text:
+                yield WORKSPACE_DOCUMENTS_UNREADABLE_MSG
+                return
+            system_parts = _build_system_parts(base_instruction, context_text)
+            groq_text = await asyncio.to_thread(_call_groq_fallback, user_message, system_parts, chat_history)
             if groq_text:
                 async for part in _yield_in_chunks(groq_text):
                     yield part
@@ -624,73 +762,19 @@ async def get_workspace_response(user_message, documents, chat_history, progress
             yield USER_FRIENDLY_RATE_LIMIT_MSG
             return
 
-        def _multi_doc_retrieve():
-            """Retrieve relevant chunks across all workspace documents with a single shared query embedding."""
-            shared_embedding = None
-            try:
-                res = genai.embed_content(
-                    model="models/gemini-embedding-001",
-                    content=user_message,
-                    task_type="retrieval_query",
-                    output_dimensionality=768,
-                )
-                shared_embedding = res.get("embedding")
-            except Exception as emb_err:
-                logger.warning(f"Failed to generate shared embedding for workspace query: {emb_err}")
-
-            all_chunks = []
-            for doc in documents:
-                if not getattr(doc, "is_processed", False):
-                    continue
-                try:
-                    retrieval = _hybrid_retrieve(doc, user_message, top_k=5, query_embedding=shared_embedding)
-                    for chunk in retrieval.get("hybrid_chunks", []):
-                        all_chunks.append({
-                            "chunk": chunk,
-                            "doc_title": doc.title,
-                            "doc_id": doc.id,
-                        })
-                except Exception as e:
-                    logger.warning(f"Retrieval failed for doc {doc.id}: {e}")
-
-            if not all_chunks:
-                return None
-
-            # Sort and limit to top 15 chunks
-            all_chunks = all_chunks[:15]
-
-            parts = []
-            for item in all_chunks:
-                chunk = item["chunk"]
-                doc_title = item["doc_title"]
-                page_info = f"Page {chunk.page_number}" if chunk.page_number else "No page"
-                parts.append(f"[{doc_title} · {page_info}]: {chunk.content}")
-
-            return "\n\n".join(parts)
-
         try:
             if progress_callback:
                 await progress_callback("Retrieving context from multiple sources...")
-            context_text = await asyncio.to_thread(_multi_doc_retrieve)
+            context_text = await asyncio.to_thread(_multi_doc_retrieve, documents, user_message, query_embedding=query_embedding)
         except Exception as e:
             logger.warning(f"Multi-doc retrieval failed: {e}")
             context_text = None
 
         if not context_text:
-            yield "I couldn't find relevant content across the workspace documents. Please make sure the documents are uploaded and indexed."
+            context_text = await asyncio.to_thread(_get_workspace_fallback_context, documents)
+        if not context_text:
+            yield WORKSPACE_DOCUMENTS_UNREADABLE_MSG
             return
-
-        doc_names = ", ".join(d.title for d in documents[:6])
-        base_instruction = (
-            f"You are InsightDocs AI, analyzing multiple documents in this workspace: {doc_names}.\n\n"
-            "Rules:\n"
-            "- Answer using the provided document contexts.\n"
-            "- You MUST cite every source using [Document Title · Page X] format for each factual claim.\n"
-            "- When comparing or synthesizing across documents, clearly state which document each point originates from.\n"
-            "- If a question cannot be answered from the provided documents, state so clearly.\n"
-            "- Format with clean Markdown (headers, bullet points, comparison tables where helpful).\n"
-            "- Be concise, professional, and clear.\n"
-        )
 
         system_parts = _build_system_parts(base_instruction, context_text)
         history = [
@@ -752,6 +836,14 @@ async def get_workspace_response(user_message, documents, chat_history, progress
 
         except ResourceExhausted:
             _set_gemini_cooldown_from_error("seconds: 60")
+            if not system_parts:
+                if not context_text:
+                    context_text = await asyncio.to_thread(_get_workspace_fallback_context, documents)
+                if context_text:
+                    system_parts = _build_system_parts(base_instruction, context_text)
+            if not system_parts:
+                yield WORKSPACE_DOCUMENTS_UNREADABLE_MSG
+                return
             groq_text = await asyncio.to_thread(_call_groq_fallback, user_message, system_parts, chat_history)
             if groq_text:
                 async for part in _yield_in_chunks(groq_text):
