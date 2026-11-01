@@ -394,4 +394,9 @@ ENABLE_FLASHRANK_RERANK = os.environ.get('ENABLE_FLASHRANK_RERANK', 'False').low
 RERANK_CANDIDATES = int(os.environ.get('RERANK_CANDIDATES', '20'))
 RERANK_TOP_N = int(os.environ.get('RERANK_TOP_N', '5'))
 FLASHRANK_CACHE_DIR = os.environ.get('FLASHRANK_CACHE_DIR', str(BASE_DIR / '.flashrank_cache'))
+RERANK_MIN_RELATIVE_SCORE = float(os.environ.get('RERANK_MIN_RELATIVE_SCORE', '0.01'))
+
+# Parent-Child Chunking Configuration
+ENABLE_PARENT_CHILD = os.environ.get('ENABLE_PARENT_CHILD', 'False').lower() == 'true'
+
 

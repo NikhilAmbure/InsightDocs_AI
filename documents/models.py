@@ -61,7 +61,7 @@ class DocumentChunk(models.Model):
     )
     content = models.TextField()
     # gemini-embedding-001 default 768 dimensions — optimal for retrieval
-    embedding = VectorField(dimensions=768) 
+    embedding = VectorField(dimensions=768, null=True, blank=True) 
     chunk_index = models.IntegerField()
 
     page_number = models.IntegerField(null=True, blank=True)
@@ -76,6 +76,33 @@ class DocumentChunk(models.Model):
 
     def __str__(self):
         return f"Chunk {self.chunk_index} for {self.document.title}"
+
+
+class ChildChunk(models.Model):
+    document = models.ForeignKey(
+        Document,
+        on_delete=models.CASCADE,
+        related_name="child_chunks",
+    )
+    parent = models.ForeignKey(
+        DocumentChunk,
+        on_delete=models.CASCADE,
+        related_name="children",
+    )
+    content = models.TextField()
+    child_index = models.IntegerField()
+    page_number = models.IntegerField(null=True, blank=True)
+    embedding = VectorField(dimensions=768)
+    search_vector = SearchVectorField(null=True)
+
+    class Meta:
+        ordering = ("child_index",)
+        indexes = [
+            GinIndex(fields=["search_vector"], name="childchunk_search_vector_gin"),
+        ]
+
+    def __str__(self):
+        return f"Child {self.child_index} of Chunk {self.parent_id} ({self.document.title})"
 
 
 class DocumentInsights(models.Model):

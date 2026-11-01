@@ -1,4 +1,5 @@
 import logging
+import time
 import fitz  # PyMuPDF (PDF)
 import pytesseract  # OCR for images
 import google.generativeai as genai
@@ -10,7 +11,7 @@ from PIL import Image  # Images
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from django.conf import settings
 from django.contrib.postgres.search import SearchVector
-from ..models import DocumentChunk
+from ..models import DocumentChunk, ChildChunk
 
 logger = logging.getLogger(__name__)
 
@@ -83,21 +84,36 @@ def extract_text_from_file(file_path, mime_type):
     return pages
 
 
-def _batch_embed(texts):
+def _batch_embed(texts, max_retries=5, initial_delay=2.0):
     """
     Embed a list of texts in batches using the Gemini embedding API.
+    Includes retry loop and exponential backoff for rate limits.
     Returns a flat list of embedding vectors (one per input text).
     """
     all_embeddings = []
 
     for i in range(0, len(texts), EMBEDDING_BATCH_SIZE):
         batch = texts[i : i + EMBEDDING_BATCH_SIZE]
-        result = genai.embed_content(
-            model="models/gemini-embedding-001",
-            content=batch,
-            task_type="retrieval_document",
-            output_dimensionality=768,
-        )
+        delay = initial_delay
+        result = None
+        for attempt in range(max_retries):
+            try:
+                result = genai.embed_content(
+                    model="models/gemini-embedding-001",
+                    content=batch,
+                    task_type="retrieval_document",
+                    output_dimensionality=768,
+                )
+                break
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    logger.error(f"Embedding batch failed after {max_retries} attempts: {e}")
+                    raise
+                logger.warning(
+                    f"Embedding batch attempt {attempt + 1}/{max_retries} failed: {e}. Retrying in {delay:.1f}s..."
+                )
+                time.sleep(delay)
+                delay *= 2.0
 
         # result["embedding"] is a list of embeddings when content is a list
         if isinstance(result, dict):
@@ -112,6 +128,74 @@ def _batch_embed(texts):
         all_embeddings.extend(embeddings)
 
     return all_embeddings
+
+
+def create_children_for_document(document):
+    """
+    Split existing DocumentChunk parents into ~350-character children with 50 overlap,
+    embed only children using gemini-embedding-001 (768d), bulk create ChildChunk records,
+    and populate search_vector with SEARCH_CONFIG.
+    Idempotent on retries: deletes any existing ChildChunk records for document first.
+    """
+    parents = list(DocumentChunk.objects.filter(document=document).order_by("chunk_index"))
+    if not parents:
+        logger.warning(f"No parent chunks found for doc {document.id} when creating children.")
+        return 0
+
+    child_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=350,
+        chunk_overlap=50,
+        separators=["\n\n", "\n", ".", " ", ""],
+    )
+
+    child_data = []  # list of (parent, child_text, child_idx, page_number)
+    global_child_idx = 0
+    for parent in parents:
+        if not parent.content or not parent.content.strip():
+            continue
+        sub_chunks = child_splitter.split_text(parent.content)
+        for sub_text in sub_chunks:
+            if sub_text.strip():
+                child_data.append((parent, sub_text, global_child_idx, parent.page_number))
+                global_child_idx += 1
+
+    if not child_data:
+        logger.warning(f"No non-empty children generated for doc {document.id}")
+        return 0
+
+    child_texts = [item[1] for item in child_data]
+    logger.info(f"Embedding {len(child_texts)} child chunks for doc {document.id} in batches...")
+    embeddings = _batch_embed(child_texts)
+
+    if len(embeddings) != len(child_data):
+        raise ValueError(
+            f"Embedding count mismatch for doc {document.id}: got {len(embeddings)} embeddings "
+            f"for {len(child_data)} child chunks"
+        )
+
+    child_objs = []
+    for (parent, text, c_idx, page_num), embedding in zip(child_data, embeddings):
+        child_objs.append(
+            ChildChunk(
+                document=document,
+                parent=parent,
+                content=text,
+                child_index=c_idx,
+                page_number=page_num,
+                embedding=list(embedding),
+            )
+        )
+
+    # Idempotent cleanup before bulk insert
+    ChildChunk.objects.filter(document=document).delete()
+    ChildChunk.objects.bulk_create(child_objs)
+
+    search_config = getattr(settings, "SEARCH_CONFIG", "english")
+    ChildChunk.objects.filter(document=document).update(
+        search_vector=SearchVector("content", config=search_config)
+    )
+    logger.info(f"Successfully created and indexed {len(child_objs)} child chunks for doc {document.id}")
+    return len(child_objs)
 
 
 def process_document_for_rag(document, file_path):
@@ -160,38 +244,65 @@ def process_document_for_rag(document, file_path):
             logger.warning(f"No non-empty chunks for doc {document.id}")
             return
 
-        # Phase 2: Batch embed all chunks in one (or few) API call(s)
-        chunk_texts = [text for text, _ in chunk_data]
-        logger.info(f"Embedding {len(chunk_texts)} chunks for doc {document.id} in batch...")
-        embeddings = _batch_embed(chunk_texts)
+        enable_parent_child = getattr(settings, "ENABLE_PARENT_CHILD", False)
+        search_config = getattr(settings, 'SEARCH_CONFIG', 'english')
 
-        if len(embeddings) != len(chunk_data):
-            raise ValueError(
-                f"Embedding count mismatch: got {len(embeddings)} embeddings "
-                f"for {len(chunk_data)} chunks"
-            )
-
-        # Phase 3: Build ORM objects and bulk insert
-        objs = []
-        for idx, ((chunk_text, page_num), embedding) in enumerate(zip(chunk_data, embeddings)):
-            objs.append(
-                DocumentChunk(
-                    document=document,
-                    content=chunk_text,
-                    embedding=list(embedding),
-                    chunk_index=idx,
-                    page_number=page_num,
+        if enable_parent_child:
+            # Phase 2 & 3: Save parents with embedding=None, then generate and embed children only
+            DocumentChunk.objects.filter(document=document).delete()
+            objs = []
+            for idx, (chunk_text, page_num) in enumerate(chunk_data):
+                objs.append(
+                    DocumentChunk(
+                        document=document,
+                        content=chunk_text,
+                        embedding=None,
+                        chunk_index=idx,
+                        page_number=page_num,
+                    )
                 )
-            )
 
-        logger.info(f"Generated {len(objs)} chunks for doc {document.id}")
+            logger.info(f"Generated {len(objs)} parent chunks for doc {document.id} (embedding=None)")
+            if objs:
+                DocumentChunk.objects.bulk_create(objs)
+                DocumentChunk.objects.filter(document=document).update(
+                    search_vector=SearchVector('content', config=search_config)
+                )
+                create_children_for_document(document)
 
-        if objs:
-            DocumentChunk.objects.bulk_create(objs)
-            search_config = getattr(settings, 'SEARCH_CONFIG', 'english')
-            DocumentChunk.objects.filter(document=document).update(
-                search_vector=SearchVector('content', config=search_config)
-            )
+        else:
+            # Phase 2: Batch embed all chunks in one (or few) API call(s)
+            chunk_texts = [text for text, _ in chunk_data]
+            logger.info(f"Embedding {len(chunk_texts)} chunks for doc {document.id} in batch...")
+            embeddings = _batch_embed(chunk_texts)
+
+            if len(embeddings) != len(chunk_data):
+                raise ValueError(
+                    f"Embedding count mismatch: got {len(embeddings)} embeddings "
+                    f"for {len(chunk_data)} chunks"
+                )
+
+            # Phase 3: Build ORM objects and bulk insert
+            DocumentChunk.objects.filter(document=document).delete()
+            objs = []
+            for idx, ((chunk_text, page_num), embedding) in enumerate(zip(chunk_data, embeddings)):
+                objs.append(
+                    DocumentChunk(
+                        document=document,
+                        content=chunk_text,
+                        embedding=list(embedding),
+                        chunk_index=idx,
+                        page_number=page_num,
+                    )
+                )
+
+            logger.info(f"Generated {len(objs)} chunks for doc {document.id}")
+
+            if objs:
+                DocumentChunk.objects.bulk_create(objs)
+                DocumentChunk.objects.filter(document=document).update(
+                    search_vector=SearchVector('content', config=search_config)
+                )
         
         document.is_processed = True
         document.save()
