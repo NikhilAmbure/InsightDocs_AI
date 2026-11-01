@@ -86,3 +86,6 @@ python-pptx==1.0.2
 Pillow==11.3.0
 anthropic>=0.40.0
 flashrank>=0.2.10
+langgraph>=0.2.0
+google-genai>=2.0.0
+

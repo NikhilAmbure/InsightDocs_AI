@@ -914,9 +914,23 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
             return "\n\n".join(parts)
 
         try:
-            if progress_callback:
-                await progress_callback("Retrieving and ranking sources...")
-            context_text = await asyncio.to_thread(_retrieve_pipeline)
+            enable_agentic = getattr(settings, "ENABLE_AGENTIC_RETRIEVAL", False)
+            if enable_agentic and chat_history and not is_global_query:
+                if progress_callback:
+                    await progress_callback("Analyzing query intent and rewriting with context...")
+                from .agentic_retrieval import run_agentic_retrieval
+                agentic_res = await run_agentic_retrieval(user_message, [document], chat_history)
+                context_text = agentic_res.get("context_text")
+                tokens_used = agentic_res.get("tokens_used", 0)
+                if tokens_used > 0 and usage_callback:
+                    try:
+                        await usage_callback(tokens_used)
+                    except Exception as u_err:
+                        logger.warning(f"Failed to record agentic rewrite tokens: {u_err}")
+            else:
+                if progress_callback:
+                    await progress_callback("Retrieving and ranking sources...")
+                context_text = await asyncio.to_thread(_retrieve_pipeline)
         except Exception as retrieval_error:
             logger.warning(f"Retrieval pipeline failed, using chunk fallback: {retrieval_error}")
             err_text = str(retrieval_error).lower()
@@ -1082,20 +1096,26 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
             yield USER_FRIENDLY_ERROR_MSG
 
 
+def _generate_shared_query_embedding(query: str):
+    """Generate embedding for workspace query to share across all documents."""
+    try:
+        res = genai.embed_content(
+            model="models/gemini-embedding-001",
+            content=query,
+            task_type="retrieval_query",
+            output_dimensionality=768,
+        )
+        return res.get("embedding")
+    except Exception as emb_err:
+        logger.warning(f"Failed to generate shared embedding for workspace query: {emb_err}")
+        return None
+
+
 def _multi_doc_retrieve(documents, user_message, query_embedding=None, return_details=False):
     """Retrieve relevant chunks across all workspace documents with a single shared query embedding."""
     shared_embedding = query_embedding
     if shared_embedding is None:
-        try:
-            res = genai.embed_content(
-                model="models/gemini-embedding-001",
-                content=user_message,
-                task_type="retrieval_query",
-                output_dimensionality=768,
-            )
-            shared_embedding = res.get("embedding")
-        except Exception as emb_err:
-            logger.warning(f"Failed to generate shared embedding for workspace query: {emb_err}")
+        shared_embedding = _generate_shared_query_embedding(user_message)
 
     enable_rerank = getattr(settings, "ENABLE_FLASHRANK_RERANK", False)
     processed_docs = [doc for doc in documents if getattr(doc, "is_processed", False)]
@@ -1226,9 +1246,23 @@ async def get_workspace_response(user_message, documents, chat_history, progress
             return
 
         try:
-            if progress_callback:
-                await progress_callback("Retrieving context from multiple sources...")
-            context_text = await asyncio.to_thread(_multi_doc_retrieve, documents, user_message, query_embedding=query_embedding)
+            enable_agentic = getattr(settings, "ENABLE_AGENTIC_RETRIEVAL", False)
+            if enable_agentic:
+                if progress_callback:
+                    await progress_callback("Analyzing query intent and routing retrieval...")
+                from .agentic_retrieval import run_agentic_retrieval
+                agentic_res = await run_agentic_retrieval(user_message, documents, chat_history)
+                context_text = agentic_res.get("context_text")
+                tokens_used = agentic_res.get("tokens_used", 0)
+                if tokens_used > 0 and usage_callback:
+                    try:
+                        await usage_callback(tokens_used)
+                    except Exception as u_err:
+                        logger.warning(f"Failed to record agentic rewrite tokens: {u_err}")
+            else:
+                if progress_callback:
+                    await progress_callback("Retrieving context from multiple sources...")
+                context_text = await asyncio.to_thread(_multi_doc_retrieve, documents, user_message, query_embedding=query_embedding)
         except Exception as e:
             logger.warning(f"Multi-doc retrieval failed: {e}")
             context_text = None

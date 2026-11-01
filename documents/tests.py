@@ -1,5 +1,6 @@
 import asyncio
 import math
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from django.test import SimpleTestCase, override_settings
 from google.api_core.exceptions import ResourceExhausted
@@ -13,6 +14,7 @@ from documents.utils.gemini_chat import (
 )
 
 
+@override_settings(ENABLE_AGENTIC_RETRIEVAL=False)
 class ChatMessageDuplicateTests(SimpleTestCase):
     databases = []
 
@@ -624,7 +626,7 @@ class MultiDocRetrievalMergeTests(SimpleTestCase):
             self.assertEqual(len(fallback), 1)
             self.assertEqual(fallback[0].id, 1)
 
-    @override_settings(ENABLE_RRF_HYBRID_SEARCH=False, ENABLE_FLASHRANK_RERANK=False)
+    @override_settings(ENABLE_RRF_HYBRID_SEARCH=False, ENABLE_FLASHRANK_RERANK=False, ENABLE_AGENTIC_RETRIEVAL=False)
     async def test_get_workspace_response_integration_includes_top_scored_chunk(self):
         """
         Assert get_workspace_response passes the globally ranked top-15 context to the model prompt.
@@ -931,6 +933,438 @@ class ParentChildRetrievalTests(SimpleTestCase):
             context_text = details["context_text"]
             self.assertIn("[ReindexedDoc · Page 1]: Reindexed doc parent text", context_text)
             self.assertIn("[LegacyDoc · Page 2]: Legacy doc chunk text", context_text)
+
+
+class AgenticRetrievalTests(SimpleTestCase):
+    databases = []
+
+    def setUp(self):
+        from types import SimpleNamespace
+        self.doc1 = SimpleNamespace(id=1, title="Doc 1", is_processed=True)
+        self.doc2 = SimpleNamespace(id=2, title="Doc 2", is_processed=True)
+        self.doc3 = SimpleNamespace(id=3, title="Doc 3", is_processed=True)
+        self.chunk1 = SimpleNamespace(id=101, page_number=1, content="Doc 1 content")
+        self.chunk2 = SimpleNamespace(id=102, page_number=2, content="Doc 2 content")
+        self.chunk3 = SimpleNamespace(id=103, page_number=3, content="Doc 3 content")
+
+    async def test_direct_route_with_rewrite(self):
+        """Verify rewrite_and_route parses direct route and standalone query."""
+        import json
+        from documents.utils.agentic_retrieval import run_agentic_retrieval
+
+        mock_resp = MagicMock()
+        mock_resp.text = json.dumps({
+            "standalone_query": "What are the key findings of the report?",
+            "route": "direct",
+            "sub_queries": []
+        })
+        mock_resp.usage_metadata = MagicMock(total_token_count=45)
+
+        mock_model = MagicMock()
+        mock_model.generate_content_async = AsyncMock(return_value=mock_resp)
+
+        history = [{"role": "user", "content": "Tell me about the report"}]
+
+        with patch("google.generativeai.GenerativeModel", return_value=mock_model), \
+             patch("documents.utils.agentic_retrieval._hybrid_retrieve", return_value={"hybrid_chunks": [self.chunk1]}):
+
+            result = await run_agentic_retrieval("What are its key findings?", [self.doc1], chat_history=history)
+
+            self.assertEqual(result["route"], "direct")
+            self.assertEqual(result["standalone_query"], "What are the key findings of the report?")
+            self.assertEqual(result["tokens_used"], 45)
+            self.assertIn("Doc 1 content", result["context_text"])
+
+    async def test_decompose_route_and_no_document_starvation(self):
+        """
+        Verify decompose route runs concurrent retrieval per document and guarantees
+        every selected document appears in results (even if not explicitly in sub_queries).
+        """
+        import json
+        from documents.utils.agentic_retrieval import run_agentic_retrieval
+
+        mock_resp = MagicMock()
+        # Sub-queries only explicitly mention doc 1 and doc 2, but doc 3 is also selected
+        mock_resp.text = json.dumps({
+            "standalone_query": "Compare technical requirements across all documents",
+            "route": "decompose",
+            "sub_queries": [
+                {"document_id": 1, "query": "Doc 1 architecture"},
+                {"document_id": 2, "query": "Doc 2 architecture"},
+            ]
+        })
+        mock_resp.usage_metadata = MagicMock(total_token_count=80)
+
+        mock_model = MagicMock()
+        mock_model.generate_content_async = AsyncMock(return_value=mock_resp)
+
+        def fake_hybrid_retrieve(doc, query, top_k=2):
+            if doc.id == 1:
+                return {"hybrid_chunks": [self.chunk1]}
+            elif doc.id == 2:
+                return {"hybrid_chunks": [self.chunk2]}
+            else:
+                return {"hybrid_chunks": [self.chunk3]}
+
+        with patch("google.generativeai.GenerativeModel", return_value=mock_model), \
+             patch("documents.utils.agentic_retrieval._hybrid_retrieve", side_effect=fake_hybrid_retrieve):
+
+            docs = [self.doc1, self.doc2, self.doc3]
+            result = await run_agentic_retrieval("Compare the documents", docs, chat_history=[])
+
+            self.assertEqual(result["route"], "decompose")
+            self.assertEqual(result["tokens_used"], 80)
+
+            # Assert every selected document has retrieved chunks (no starvation)
+            retrieved = result["retrieved_parents"]
+            self.assertIn(1, retrieved)
+            self.assertIn(2, retrieved)
+            self.assertIn(3, retrieved)
+            self.assertEqual(len(retrieved[1]), 1)
+            self.assertEqual(len(retrieved[2]), 1)
+            self.assertEqual(len(retrieved[3]), 1)
+
+            context = result["context_text"]
+            self.assertIn("[Doc 1 · Page 1]: Doc 1 content", context)
+            self.assertIn("[Doc 2 · Page 2]: Doc 2 content", context)
+            self.assertIn("[Doc 3 · Page 3]: Doc 3 content", context)
+
+    async def test_fallback_on_bad_json_or_exception(self):
+        """Verify rewrite_and_route falls back to direct route on malformed JSON or error."""
+        from documents.utils.agentic_retrieval import run_agentic_retrieval
+
+        mock_resp = MagicMock()
+        mock_resp.text = "NOT JSON RESPONSE"
+        mock_resp.usage_metadata = None
+
+        mock_model = MagicMock()
+        mock_model.generate_content_async = AsyncMock(return_value=mock_resp)
+
+        with patch("google.generativeai.GenerativeModel", return_value=mock_model), \
+             patch("documents.utils.agentic_retrieval._hybrid_retrieve", return_value={"hybrid_chunks": [self.chunk1]}), \
+             patch("documents.utils.agentic_retrieval._generate_shared_query_embedding", return_value=[0.1] * 768), \
+             patch("documents.utils.agentic_retrieval._multi_doc_retrieve", return_value={"final_items": [{"doc_id": 1, "chunk": self.chunk1}]}):
+
+            result = await run_agentic_retrieval(
+                "Compare things",
+                [self.doc1, self.doc2],
+                chat_history=[{"role": "user", "content": "Previous topic"}]
+            )
+
+            # Falls back to direct with original message
+            self.assertEqual(result["route"], "direct")
+            self.assertEqual(result["standalone_query"], "Compare things")
+
+    async def test_skip_rule_no_history_single_document(self):
+        """Verify LLM call is skipped when no chat history and only one document is selected."""
+        from documents.utils.agentic_retrieval import run_agentic_retrieval
+
+        mock_model = MagicMock()
+        mock_model.generate_content_async = AsyncMock()
+
+        with patch("google.generativeai.GenerativeModel", return_value=mock_model), \
+             patch("documents.utils.agentic_retrieval._hybrid_retrieve", return_value={"hybrid_chunks": [self.chunk1]}):
+
+            result = await run_agentic_retrieval("Explain section 2", [self.doc1], chat_history=[])
+
+            # LLM must not be called
+            mock_model.generate_content_async.assert_not_called()
+            self.assertEqual(result["route"], "direct")
+            self.assertEqual(result["standalone_query"], "Explain section 2")
+            self.assertEqual(result["tokens_used"], 0)
+
+    async def test_skip_rule_summary_queries(self):
+        """Verify LLM call is skipped for summarize / list all bypass queries."""
+        from documents.utils.agentic_retrieval import run_agentic_retrieval
+
+        mock_model = MagicMock()
+        mock_model.generate_content_async = AsyncMock()
+
+        with patch("google.generativeai.GenerativeModel", return_value=mock_model), \
+             patch("documents.utils.agentic_retrieval._hybrid_retrieve", return_value={"hybrid_chunks": [self.chunk1]}), \
+             patch("documents.utils.agentic_retrieval._generate_shared_query_embedding", return_value=[0.1] * 768), \
+             patch("documents.utils.agentic_retrieval._multi_doc_retrieve", return_value={"final_items": [{"doc_id": 1, "chunk": self.chunk1}]}):
+
+            result = await run_agentic_retrieval(
+                "Please summarize the full document",
+                [self.doc1, self.doc2],
+                chat_history=[{"role": "user", "content": "Hello"}]
+            )
+
+            mock_model.generate_content_async.assert_not_called()
+            self.assertEqual(result["route"], "direct")
+            self.assertEqual(result["standalone_query"], "Please summarize the full document")
+            self.assertEqual(result["tokens_used"], 0)
+
+    @override_settings(
+        ENABLE_CORRECTIVE_RETRY=True,
+        ENABLE_FLASHRANK_RERANK=True,
+        RETRY_MIN_TOP_SCORE=0.001,
+    )
+    async def test_retry_fires_below_threshold_and_improves(self):
+        """Verify corrective retry fires when top score is below RETRY_MIN_TOP_SCORE and keeps better pass."""
+        import json
+        from documents.utils.agentic_retrieval import run_agentic_retrieval
+
+        c_poor = SimpleNamespace(id=1, rerank_score=0.0002, page_number=1, content="Vague poor content")
+        c_improved = SimpleNamespace(id=2, rerank_score=0.88, page_number=2, content="Specific relevant content")
+
+        # Mock rewrite LLM returning direct, and retry LLM returning alternative query
+        mock_rewrite_resp = MagicMock(text=json.dumps({"standalone_query": "vague query", "route": "direct", "sub_queries": []}), usage_metadata=MagicMock(total_token_count=30))
+        mock_retry_resp = MagicMock(text=json.dumps({"alternative_query": "specific domain keyword query"}), usage_metadata=MagicMock(total_token_count=40))
+
+        mock_model = MagicMock()
+        mock_model.generate_content_async = AsyncMock(side_effect=[mock_rewrite_resp, mock_retry_resp])
+
+        call_count = 0
+        def fake_hybrid_retrieve(doc, query, top_k=5, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if "specific" in query:
+                return {"hybrid_chunks": [c_improved], "scored": [{"chunk": c_improved, "hybrid_score": 0.88}]}
+            return {"hybrid_chunks": [c_poor], "scored": [{"chunk": c_poor, "hybrid_score": 0.0002}]}
+
+        with patch("google.generativeai.GenerativeModel", return_value=mock_model), \
+             patch("documents.utils.agentic_retrieval._hybrid_retrieve", side_effect=fake_hybrid_retrieve), \
+             patch("documents.utils.agentic_retrieval._rerank_chunks_flashrank", side_effect=lambda q, ch, top_n: ch):
+
+            result = await run_agentic_retrieval(
+                "vague query",
+                [self.doc1],
+                chat_history=[{"role": "user", "content": "hello"}]
+            )
+
+            self.assertTrue(result["retry_fired"])
+            self.assertEqual(result["alternative_query"], "specific domain keyword query")
+            self.assertEqual(result["retry_winner"], "retry")
+            self.assertAlmostEqual(result["first_pass_score"], 0.0002, places=4)
+            self.assertAlmostEqual(result["retry_pass_score"], 0.88, places=4)
+            self.assertAlmostEqual(result["top_parent_score"], 0.88, places=4)
+            self.assertIn("Specific relevant content", result["context_text"])
+            self.assertEqual(result["tokens_used"], 70)  # 30 + 40
+
+    @override_settings(
+        ENABLE_CORRECTIVE_RETRY=True,
+        ENABLE_FLASHRANK_RERANK=True,
+        RETRY_MIN_TOP_SCORE=0.001,
+    )
+    async def test_retry_does_not_fire_above_threshold(self):
+        """Verify corrective retry does NOT fire when initial top score is above RETRY_MIN_TOP_SCORE."""
+        import json
+        from documents.utils.agentic_retrieval import run_agentic_retrieval
+
+        c_good = SimpleNamespace(id=1, rerank_score=0.92, page_number=1, content="Excellent match content")
+        mock_rewrite_resp = MagicMock(text=json.dumps({"standalone_query": "good query", "route": "direct", "sub_queries": []}), usage_metadata=MagicMock(total_token_count=35))
+
+        mock_model = MagicMock()
+        mock_model.generate_content_async = AsyncMock(return_value=mock_rewrite_resp)
+
+        with patch("google.generativeai.GenerativeModel", return_value=mock_model), \
+             patch("documents.utils.agentic_retrieval._hybrid_retrieve", return_value={"hybrid_chunks": [c_good], "scored": [{"chunk": c_good, "hybrid_score": 0.92}]}), \
+             patch("documents.utils.agentic_retrieval._rerank_chunks_flashrank", side_effect=lambda q, ch, top_n: ch):
+
+            result = await run_agentic_retrieval(
+                "good query",
+                [self.doc1],
+                chat_history=[{"role": "user", "content": "hello"}]
+            )
+
+            self.assertFalse(result["retry_fired"])
+            self.assertIsNone(result["alternative_query"])
+            self.assertIsNone(result["retry_winner"])
+            self.assertAlmostEqual(result["top_parent_score"], 0.92, places=4)
+            # Only rewrite call was made
+            mock_model.generate_content_async.assert_called_once()
+
+    @override_settings(
+        ENABLE_CORRECTIVE_RETRY=True,
+        ENABLE_FLASHRANK_RERANK=True,
+        RETRY_MIN_TOP_SCORE=0.001,
+    )
+    async def test_retry_does_not_fire_for_summary_bypass(self):
+        """Verify corrective retry never fires for summarize / list all bypass queries."""
+        from documents.utils.agentic_retrieval import run_agentic_retrieval
+
+        c_low = SimpleNamespace(id=1, rerank_score=0.00001, page_number=1, content="TOC summary")
+        mock_model = MagicMock()
+        mock_model.generate_content_async = AsyncMock()
+
+        with patch("google.generativeai.GenerativeModel", return_value=mock_model), \
+             patch("documents.utils.agentic_retrieval._hybrid_retrieve", return_value={"hybrid_chunks": [c_low], "scored": [{"chunk": c_low, "hybrid_score": 0.00001}]}):
+
+            result = await run_agentic_retrieval(
+                "Summarize all points in the document",
+                [self.doc1],
+                chat_history=[]
+            )
+
+            self.assertFalse(result["retry_fired"])
+            mock_model.generate_content_async.assert_not_called()
+
+    @override_settings(
+        ENABLE_CORRECTIVE_RETRY=True,
+        ENABLE_FLASHRANK_RERANK=True,
+        RETRY_MIN_TOP_SCORE=0.001,
+    )
+    async def test_retry_keeps_first_pass_if_retry_does_not_improve(self):
+        """Verify that when retry does not yield a higher score, the first pass results are preserved."""
+        import json
+        from documents.utils.agentic_retrieval import run_agentic_retrieval
+
+        c_pass1 = SimpleNamespace(id=1, rerank_score=0.0005, page_number=1, content="Pass 1 content")
+        c_pass2 = SimpleNamespace(id=2, rerank_score=0.0001, page_number=2, content="Pass 2 worse content")
+
+        mock_rewrite_resp = MagicMock(text=json.dumps({"standalone_query": "query", "route": "direct", "sub_queries": []}), usage_metadata=MagicMock(total_token_count=20))
+        mock_retry_resp = MagicMock(text=json.dumps({"alternative_query": "alt query"}), usage_metadata=MagicMock(total_token_count=25))
+
+        mock_model = MagicMock()
+        mock_model.generate_content_async = AsyncMock(side_effect=[mock_rewrite_resp, mock_retry_resp])
+
+        def fake_hybrid_retrieve(doc, query, top_k=5, **kwargs):
+            if "alt" in query:
+                return {"hybrid_chunks": [c_pass2], "scored": [{"chunk": c_pass2, "hybrid_score": 0.0001}]}
+            return {"hybrid_chunks": [c_pass1], "scored": [{"chunk": c_pass1, "hybrid_score": 0.0005}]}
+
+        with patch("google.generativeai.GenerativeModel", return_value=mock_model), \
+             patch("documents.utils.agentic_retrieval._hybrid_retrieve", side_effect=fake_hybrid_retrieve), \
+             patch("documents.utils.agentic_retrieval._rerank_chunks_flashrank", side_effect=lambda q, ch, top_n: ch):
+
+            result = await run_agentic_retrieval(
+                "query",
+                [self.doc1],
+                chat_history=[{"role": "user", "content": "hi"}]
+            )
+
+            self.assertTrue(result["retry_fired"])
+            self.assertEqual(result["retry_winner"], "first")
+            self.assertAlmostEqual(result["first_pass_score"], 0.0005, places=4)
+            self.assertAlmostEqual(result["retry_pass_score"], 0.0001, places=4)
+            self.assertAlmostEqual(result["top_parent_score"], 0.0005, places=4)
+            # Must keep pass 1 content
+            self.assertIn("Pass 1 content", result["context_text"])
+            self.assertNotIn("Pass 2 worse content", result["context_text"])
+
+    @override_settings(
+        ENABLE_CORRECTIVE_RETRY=True,
+        ENABLE_FLASHRANK_RERANK=True,
+        RETRY_MIN_TOP_SCORE=0.001,
+    )
+    async def test_retry_falls_back_when_llm_fails(self):
+        """Verify that when alternative query generation fails, retry is silently skipped and first pass is kept."""
+        import json
+        from documents.utils.agentic_retrieval import run_agentic_retrieval
+
+        c_pass1 = SimpleNamespace(id=1, rerank_score=0.0003, page_number=1, content="Pass 1 fallback content")
+
+        mock_rewrite_resp = MagicMock(text=json.dumps({"standalone_query": "query", "route": "direct", "sub_queries": []}), usage_metadata=MagicMock(total_token_count=20))
+        mock_retry_bad = MagicMock(text="INVALID NON JSON", usage_metadata=None)
+
+        mock_model = MagicMock()
+        mock_model.generate_content_async = AsyncMock(side_effect=[mock_rewrite_resp, mock_retry_bad])
+
+        with patch("google.generativeai.GenerativeModel", return_value=mock_model), \
+             patch("documents.utils.agentic_retrieval._hybrid_retrieve", return_value={"hybrid_chunks": [c_pass1], "scored": [{"chunk": c_pass1, "hybrid_score": 0.0003}]}), \
+             patch("documents.utils.agentic_retrieval._rerank_chunks_flashrank", side_effect=lambda q, ch, top_n: ch):
+
+            result = await run_agentic_retrieval(
+                "query",
+                [self.doc1],
+                chat_history=[{"role": "user", "content": "hi"}]
+            )
+
+            self.assertTrue(result["retry_fired"])
+            self.assertIsNone(result["alternative_query"])
+            self.assertEqual(result["retry_winner"], "first")
+            self.assertAlmostEqual(result["top_parent_score"], 0.0003, places=4)
+            self.assertIn("Pass 1 fallback content", result["context_text"])
+
+    @override_settings(
+        ENABLE_CORRECTIVE_RETRY=True,
+        ENABLE_FLASHRANK_RERANK=True,
+        RETRY_MIN_TOP_SCORE=0.001,
+    )
+    async def test_retry_strips_document_title_from_alternative_query(self):
+        """Verify alternative query containing a document title is stripped of the title."""
+        import json
+        from documents.utils.agentic_retrieval import run_agentic_retrieval
+
+        c_pass1 = SimpleNamespace(id=1, rerank_score=0.0002, page_number=1, content="Low score content")
+        c_pass2 = SimpleNamespace(id=2, rerank_score=0.85, page_number=2, content="High score content")
+
+        mock_rewrite_resp = MagicMock(text=json.dumps({"standalone_query": "search query", "route": "direct", "sub_queries": []}), usage_metadata=MagicMock(total_token_count=20))
+        # LLM includes document title "Doc 1" and quotes in the alternative query
+        mock_retry_resp = MagicMock(text=json.dumps({"alternative_query": "'Doc 1' profit margin revenue growth"}), usage_metadata=MagicMock(total_token_count=25))
+
+        mock_model = MagicMock()
+        mock_model.generate_content_async = AsyncMock(side_effect=[mock_rewrite_resp, mock_retry_resp])
+
+        retrieval_queries = []
+        def fake_hybrid_retrieve(doc, query, top_k=5, **kwargs):
+            retrieval_queries.append(query)
+            if "profit margin" in query:
+                return {"hybrid_chunks": [c_pass2], "scored": [{"chunk": c_pass2, "hybrid_score": 0.85}]}
+            return {"hybrid_chunks": [c_pass1], "scored": [{"chunk": c_pass1, "hybrid_score": 0.0002}]}
+
+        with patch("google.generativeai.GenerativeModel", return_value=mock_model), \
+             patch("documents.utils.agentic_retrieval._hybrid_retrieve", side_effect=fake_hybrid_retrieve), \
+             patch("documents.utils.agentic_retrieval._rerank_chunks_flashrank", side_effect=lambda q, ch, top_n: ch):
+
+            result = await run_agentic_retrieval(
+                "search query",
+                [self.doc1],
+                chat_history=[{"role": "user", "content": "hi"}]
+            )
+
+            self.assertTrue(result["retry_fired"])
+            # Assert "Doc 1" and quotes were stripped from alternative query
+            self.assertEqual(result["alternative_query"], "profit margin revenue growth")
+            self.assertIn("profit margin revenue growth", retrieval_queries)
+            self.assertEqual(result["retry_winner"], "retry")
+            self.assertAlmostEqual(result["top_parent_score"], 0.85, places=4)
+
+    @override_settings(
+        ENABLE_CORRECTIVE_RETRY=True,
+        ENABLE_FLASHRANK_RERANK=True,
+        RETRY_MIN_TOP_SCORE=0.001,
+    )
+    async def test_retry_skips_when_query_unchanged_or_empty(self):
+        """Verify that when alternative query equals original query or becomes empty, re-retrieval is skipped."""
+        import json
+        from documents.utils.agentic_retrieval import run_agentic_retrieval
+
+        c_pass1 = SimpleNamespace(id=1, rerank_score=0.0002, page_number=1, content="Original content")
+
+        mock_rewrite_resp = MagicMock(text=json.dumps({"standalone_query": "Explain section 2", "route": "direct", "sub_queries": []}), usage_metadata=MagicMock(total_token_count=15))
+        # LLM returns identical query because it was ambiguous
+        mock_retry_resp = MagicMock(text=json.dumps({"alternative_query": "Explain section 2"}), usage_metadata=MagicMock(total_token_count=15))
+
+        mock_model = MagicMock()
+        mock_model.generate_content_async = AsyncMock(side_effect=[mock_rewrite_resp, mock_retry_resp])
+
+        retrieve_call_count = 0
+        def fake_hybrid_retrieve(doc, query, top_k=5, **kwargs):
+            nonlocal retrieve_call_count
+            retrieve_call_count += 1
+            return {"hybrid_chunks": [c_pass1], "scored": [{"chunk": c_pass1, "hybrid_score": 0.0002}]}
+
+        with patch("google.generativeai.GenerativeModel", return_value=mock_model), \
+             patch("documents.utils.agentic_retrieval._hybrid_retrieve", side_effect=fake_hybrid_retrieve), \
+             patch("documents.utils.agentic_retrieval._rerank_chunks_flashrank", side_effect=lambda q, ch, top_n: ch):
+
+            result = await run_agentic_retrieval(
+                "Explain section 2",
+                [self.doc1],
+                chat_history=[{"role": "user", "content": "hi"}]
+            )
+
+            self.assertTrue(result["retry_fired"])
+            self.assertEqual(result["alternative_query"], "Explain section 2")
+            self.assertEqual(result["retry_winner"], "first")
+            self.assertAlmostEqual(result["top_parent_score"], 0.0002, places=4)
+            # Re-retrieval was skipped: retrieve was called only once (for pass 1)
+            self.assertEqual(retrieve_call_count, 1)
+            self.assertIn("Original content", result["context_text"])
+
 
 
 

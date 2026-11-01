@@ -399,4 +399,13 @@ RERANK_MIN_RELATIVE_SCORE = float(os.environ.get('RERANK_MIN_RELATIVE_SCORE', '0
 # Parent-Child Chunking Configuration
 ENABLE_PARENT_CHILD = os.environ.get('ENABLE_PARENT_CHILD', 'False').lower() == 'true'
 
+# Agentic Retrieval Configuration (Phase 2a)
+ENABLE_AGENTIC_RETRIEVAL = os.environ.get('ENABLE_AGENTIC_RETRIEVAL', 'False').lower() == 'true'
+
+# Corrective Retry Configuration (Phase 2b)
+ENABLE_CORRECTIVE_RETRY = os.environ.get('ENABLE_CORRECTIVE_RETRY', 'False').lower() == 'true'
+RETRY_MIN_TOP_SCORE = float(os.environ.get('RETRY_MIN_TOP_SCORE', '0.001'))
+
+
+
 
