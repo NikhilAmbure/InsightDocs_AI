@@ -5,6 +5,8 @@ from django.db import models
 from django.utils.text import slugify
 import uuid
 from pgvector.django import VectorField
+from django.contrib.postgres.search import SearchVectorField
+from django.contrib.postgres.indexes import GinIndex
 
 
 
@@ -64,9 +66,13 @@ class DocumentChunk(models.Model):
 
     page_number = models.IntegerField(null=True, blank=True)
     coordinates = models.JSONField(null=True, blank=True)
+    search_vector = SearchVectorField(null=True)
 
     class Meta:
         ordering = ("chunk_index",)
+        indexes = [
+            GinIndex(fields=["search_vector"], name="docchunk_search_vector_gin"),
+        ]
 
     def __str__(self):
         return f"Chunk {self.chunk_index} for {self.document.title}"

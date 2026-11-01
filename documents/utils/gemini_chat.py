@@ -1,13 +1,18 @@
 import asyncio
 import json
 import logging
+import math
+import os
 import re
 import requests
+import sys
+import threading
 import time
 
 import google.generativeai as genai
 from django.conf import settings
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
+from django.db.models import F
 from google.api_core.exceptions import ResourceExhausted
 from pgvector.django import L2Distance
 
@@ -102,15 +107,19 @@ def _track_usage(usage_acc, response):
     if usage is not None:
         usage_acc.append(getattr(usage, "total_token_count", 0) or 0)
 
-def _hybrid_retrieve(document, query_text, top_k=TOP_K_PER_STEP, query_embedding=None):
+def _get_query_embedding(query_text):
+    result = genai.embed_content(
+        model="models/gemini-embedding-001",
+        content=query_text,
+        task_type="retrieval_query",
+        output_dimensionality=768,
+    )
+    return result["embedding"]
+
+
+def _hybrid_retrieve_legacy(document, query_text, top_k=TOP_K_PER_STEP, query_embedding=None):
     if query_embedding is None:
-        result = genai.embed_content(
-            model="models/gemini-embedding-001",
-            content=query_text,
-            task_type="retrieval_query",
-            output_dimensionality=768,
-        )
-        query_embedding = result["embedding"]
+        query_embedding = _get_query_embedding(query_text)
 
     # 1. Sub-10ms HNSW approximate nearest neighbor search via pgvector
     vector_candidates = list(
@@ -167,6 +176,171 @@ def _hybrid_retrieve(document, query_text, top_k=TOP_K_PER_STEP, query_embedding
             for row in scored[:top_k]
         ],
     }
+
+
+def _hybrid_retrieve_rrf(document, query_text, top_k=TOP_K_PER_STEP, query_embedding=None):
+    if query_embedding is None:
+        query_embedding = _get_query_embedding(query_text)
+
+    # 1. Dense branch: L2Distance on HNSW vector index
+    vector_candidates = list(
+        DocumentChunk.objects.filter(document=document)
+        .annotate(distance=L2Distance("embedding", query_embedding))
+        .order_by("distance")[: top_k * 2]
+    )
+
+    # 2. Lexical branch: PostgreSQL full-text search with OR-combined terms
+    words = [w for w in re.findall(r'\b\w{3,}\b', query_text) if w.lower() not in {
+        'what', 'when', 'where', 'which', 'that', 'this', 'from', 'with', 'about', 'explain', 'tell', 'show'
+    }]
+    keyword_candidates = []
+    if words:
+        try:
+            search_config = getattr(settings, "SEARCH_CONFIG", "english")
+            combined_query = None
+            for w in words:
+                sq = SearchQuery(w, config=search_config)
+                combined_query = sq if combined_query is None else combined_query | sq
+
+            if combined_query is not None:
+                keyword_candidates = list(
+                    DocumentChunk.objects.filter(document=document)
+                    .filter(search_vector=combined_query)
+                    .annotate(rank=SearchRank(F("search_vector"), combined_query))
+                    .order_by("-rank")[: top_k * 2]
+                )
+        except Exception as lex_err:
+            logger.warning(f"PostgreSQL FTS search skipped for doc {document.id}: {lex_err}")
+
+    # 3. Plain unweighted RRF: 1 / (RRF_K + rank)
+    rrf_k = getattr(settings, "RRF_K", 60)
+    scores = {}
+
+    for rank, chunk in enumerate(vector_candidates, start=1):
+        scores.setdefault(
+            chunk.id,
+            {"chunk": chunk, "dense_rank": None, "lexical_rank": None, "rrf_score": 0.0},
+        )
+        scores[chunk.id]["dense_rank"] = rank
+        scores[chunk.id]["rrf_score"] += 1.0 / (rrf_k + rank)
+
+    for rank, chunk in enumerate(keyword_candidates, start=1):
+        scores.setdefault(
+            chunk.id,
+            {"chunk": chunk, "dense_rank": None, "lexical_rank": None, "rrf_score": 0.0},
+        )
+        scores[chunk.id]["lexical_rank"] = rank
+        scores[chunk.id]["rrf_score"] += 1.0 / (rrf_k + rank)
+
+    scored = list(scores.values())
+    scored.sort(key=lambda x: x["rrf_score"], reverse=True)
+
+    return {
+        "vector_chunks": vector_candidates[:top_k],
+        "keyword_chunks": keyword_candidates[:top_k],
+        "hybrid_chunks": [row["chunk"] for row in scored[:top_k]],
+        "scored": [
+            {
+                "chunk": row["chunk"],
+                "hybrid_score": row["rrf_score"],
+                "dense_rank": row["dense_rank"],
+                "lexical_rank": row["lexical_rank"],
+            }
+            for row in scored[:top_k]
+        ],
+    }
+
+
+def _hybrid_retrieve(document, query_text, top_k=TOP_K_PER_STEP, query_embedding=None):
+    if getattr(settings, "ENABLE_RRF_HYBRID_SEARCH", False):
+        return _hybrid_retrieve_rrf(document, query_text, top_k=top_k, query_embedding=query_embedding)
+    return _hybrid_retrieve_legacy(document, query_text, top_k=top_k, query_embedding=query_embedding)
+
+
+_FLASHRANK_LOCK = threading.Lock()
+_FLASHRANK_RANKER = None
+
+
+def _is_celery_process():
+    if not sys.argv:
+        return False
+    binary = os.path.basename(sys.argv[0]).lower()
+    if "celery" in binary:
+        return True
+    if len(sys.argv) > 1 and sys.argv[1].lower() == "worker" and "celery" in "".join(sys.argv[:3]).lower():
+        return True
+    return False
+
+
+def _get_flashrank_ranker():
+    global _FLASHRANK_RANKER
+    if _is_celery_process():
+        return None
+    if _FLASHRANK_RANKER is not None:
+        return _FLASHRANK_RANKER
+    with _FLASHRANK_LOCK:
+        if _FLASHRANK_RANKER is not None:
+            return _FLASHRANK_RANKER
+        try:
+            from flashrank import Ranker
+            base_dir = getattr(settings, "BASE_DIR", None)
+            default_cache = os.path.join(str(base_dir), ".flashrank_cache") if base_dir else ".flashrank_cache"
+            cache_dir = getattr(settings, "FLASHRANK_CACHE_DIR", default_cache)
+            os.makedirs(cache_dir, exist_ok=True)
+            _FLASHRANK_RANKER = Ranker(
+                model_name="ms-marco-MiniLM-L-12-v2",
+                cache_dir=str(cache_dir),
+            )
+            return _FLASHRANK_RANKER
+        except Exception as e:
+            logger.warning(f"FlashRank Ranker initialization failed: {e}")
+            return None
+
+
+def _rerank_chunks_flashrank(query, chunks, top_n=5):
+    """
+    Rerank chunks using FlashRank local cross-encoder (ms-marco-MiniLM-L-12-v2).
+    Returns up to top_n chunks, each carrying its rerank_score attribute.
+    Falls back to original order on error or unavailability.
+    """
+    if not chunks:
+        return []
+
+    ranker = _get_flashrank_ranker()
+    if ranker is None:
+        logger.warning("FlashRank Ranker unavailable, falling back to original retrieval order.")
+        return chunks[:top_n]
+
+    try:
+        from flashrank import RerankRequest
+        t0 = time.time()
+        passages = [
+            {"id": idx, "text": chunk.content}
+            for idx, chunk in enumerate(chunks)
+        ]
+        request = RerankRequest(query=query, passages=passages)
+        results = ranker.rerank(request)
+        latency_ms = (time.time() - t0) * 1000
+
+        id_to_chunk = {idx: chunk for idx, chunk in enumerate(chunks)}
+        reranked_chunks = []
+        scores_for_log = []
+
+        for item in results[:top_n]:
+            idx = item["id"]
+            chunk = id_to_chunk[idx]
+            score = float(item["score"])
+            setattr(chunk, "rerank_score", score)
+            reranked_chunks.append(chunk)
+            scores_for_log.append(f"chunk_{getattr(chunk, 'id', idx)}: {score:.4f}")
+
+        logger.debug(
+            f"FlashRank rerank completed in {latency_ms:.2f}ms for {len(chunks)} candidates -> top {len(reranked_chunks)}. Scores: {', '.join(scores_for_log)}"
+        )
+        return reranked_chunks
+    except Exception as e:
+        logger.warning(f"FlashRank rerank error, falling back to original retrieval order: {e}")
+        return chunks[:top_n]
 
 
 def _get_cross_encoder():
@@ -489,9 +663,17 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
                 chunks_to_use = list(DocumentChunk.objects.filter(document=document).order_by("chunk_index")[:60])
             else:
                 # Normal local query: retrieve top hybrid chunks.
-                # Bypassing the slow LLM planner, LLM rerankers, and LLM compressor.
-                retrieval = _hybrid_retrieve(document, user_message, top_k=10)
-                chunks_to_use = retrieval["hybrid_chunks"]
+                enable_rerank = getattr(settings, "ENABLE_FLASHRANK_RERANK", False)
+                if enable_rerank:
+                    rerank_candidates_k = getattr(settings, "RERANK_CANDIDATES", 20)
+                    rerank_top_n = getattr(settings, "RERANK_TOP_N", 5)
+                    retrieval = _hybrid_retrieve(document, user_message, top_k=rerank_candidates_k)
+                    chunks_to_use = _rerank_chunks_flashrank(
+                        user_message, retrieval["hybrid_chunks"], top_n=rerank_top_n
+                    )
+                else:
+                    retrieval = _hybrid_retrieve(document, user_message, top_k=10)
+                    chunks_to_use = retrieval["hybrid_chunks"]
 
             if not chunks_to_use:
                 return None
@@ -689,12 +871,21 @@ def _multi_doc_retrieve(documents, user_message, query_embedding=None):
         except Exception as emb_err:
             logger.warning(f"Failed to generate shared embedding for workspace query: {emb_err}")
 
+    enable_rerank = getattr(settings, "ENABLE_FLASHRANK_RERANK", False)
+    processed_docs = [doc for doc in documents if getattr(doc, "is_processed", False)]
+    doc_count = max(len(processed_docs), 1)
+
+    if enable_rerank:
+        rerank_candidates_k = getattr(settings, "RERANK_CANDIDATES", 20)
+        rerank_top_n = getattr(settings, "RERANK_TOP_N", 5)
+        per_doc_top_k = max(5, int(math.ceil(rerank_candidates_k / doc_count)))
+    else:
+        per_doc_top_k = 5
+
     all_scored = []
-    for doc in documents:
-        if not getattr(doc, "is_processed", False):
-            continue
+    for doc in processed_docs:
         try:
-            retrieval = _hybrid_retrieve(doc, user_message, top_k=5, query_embedding=shared_embedding)
+            retrieval = _hybrid_retrieve(doc, user_message, top_k=per_doc_top_k, query_embedding=shared_embedding)
             scored_items = retrieval.get("scored")
             if scored_items is not None:
                 for item in scored_items:
@@ -718,12 +909,20 @@ def _multi_doc_retrieve(documents, user_message, query_embedding=None):
     if not all_scored:
         return None
 
-    # Sort all candidates across documents by hybrid_score descending and keep global top 15
+    # Sort all candidates across documents by hybrid_score descending
     all_scored.sort(key=lambda x: x["hybrid_score"], reverse=True)
-    all_chunks = all_scored[:15]
+
+    if enable_rerank:
+        candidate_items = all_scored[:rerank_candidates_k]
+        candidate_chunks = [item["chunk"] for item in candidate_items]
+        chunk_id_to_item = {item["chunk"].id: item for item in candidate_items}
+        reranked_chunks = _rerank_chunks_flashrank(user_message, candidate_chunks, top_n=rerank_top_n)
+        final_items = [chunk_id_to_item[c.id] for c in reranked_chunks if c.id in chunk_id_to_item]
+    else:
+        final_items = all_scored[:15]
 
     parts = []
-    for item in all_chunks:
+    for item in final_items:
         chunk = item["chunk"]
         doc_title = item["doc_title"]
         page_info = f"Page {chunk.page_number}" if getattr(chunk, "page_number", None) else "No page"

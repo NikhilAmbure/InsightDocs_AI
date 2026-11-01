@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'crispy_bootstrap5',
     'channels',
     'corsheaders',
+    'django.contrib.postgres',
 
     'accounts',
     'documents',
@@ -382,3 +383,15 @@ ANTHROPIC_AUTH_TOKEN = os.environ.get('ANTHROPIC_AUTH_TOKEN', '')
 ANTHROPIC_BASE_URL = os.environ.get('ANTHROPIC_BASE_URL', 'https://agentrouter.org')
 CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY = os.environ.get('CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY', '1')
 ANTHROPIC_MODEL = os.environ.get('ANTHROPIC_MODEL', 'deepseek-v4-flash')
+
+# Hybrid Search & RRF Configuration
+ENABLE_RRF_HYBRID_SEARCH = os.environ.get('ENABLE_RRF_HYBRID_SEARCH', 'False').lower() == 'true'
+SEARCH_CONFIG = os.environ.get('SEARCH_CONFIG', 'english')
+RRF_K = int(os.environ.get('RRF_K', '60'))
+
+# FlashRank Local Cross-Encoder Reranking Configuration
+ENABLE_FLASHRANK_RERANK = os.environ.get('ENABLE_FLASHRANK_RERANK', 'False').lower() == 'true'
+RERANK_CANDIDATES = int(os.environ.get('RERANK_CANDIDATES', '20'))
+RERANK_TOP_N = int(os.environ.get('RERANK_TOP_N', '5'))
+FLASHRANK_CACHE_DIR = os.environ.get('FLASHRANK_CACHE_DIR', str(BASE_DIR / '.flashrank_cache'))
+

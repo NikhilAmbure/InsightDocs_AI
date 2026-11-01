@@ -491,9 +491,48 @@ class MultiDocRetrievalMergeTests(SimpleTestCase):
                 res_mock.order_by.return_value.__getitem__.side_effect = lambda s: sorted_c[s]
                 return res_mock
             mock_qs.annotate.side_effect = fake_annotate
-            mock_qs.filter.return_value.__getitem__.side_effect = lambda s: []
+
+            # Lexical branch mocks (both legacy icontains and new SearchVector)
+            lexical_mock = MagicMock()
+            lexical_mock.__getitem__.side_effect = lambda s: doc_chunks[s]
+            lexical_annotate = MagicMock()
+            lexical_annotate.order_by.return_value.__getitem__.side_effect = lambda s: doc_chunks[s]
+            lexical_mock.annotate.return_value = lexical_annotate
+            mock_qs.filter.return_value = lexical_mock
             return mock_qs
         return fake_filter
+
+    @override_settings(ENABLE_RRF_HYBRID_SEARCH=False)
+    def test_hybrid_retrieve_flag_off_preserves_legacy_behavior(self):
+        """With ENABLE_RRF_HYBRID_SEARCH=False, verify legacy retrieval return shape and ordering."""
+        with patch("documents.utils.gemini_chat.DocumentChunk.objects.filter", side_effect=self._get_fake_filter()):
+            result = _hybrid_retrieve(self.docs[0], "test message", top_k=5, query_embedding=self.fake_query_embedding)
+            self.assertIn("vector_chunks", result)
+            self.assertIn("keyword_chunks", result)
+            self.assertIn("hybrid_chunks", result)
+            self.assertIn("scored", result)
+            self.assertEqual(len(result["hybrid_chunks"]), 5)
+            self.assertEqual(result["hybrid_chunks"], [r["chunk"] for r in result["scored"]])
+            scores = [row["hybrid_score"] for row in result["scored"]]
+            self.assertEqual(scores, sorted(scores, reverse=True))
+
+    @override_settings(ENABLE_RRF_HYBRID_SEARCH=True)
+    def test_hybrid_retrieve_flag_on_returns_rrf_shape_and_ordering(self):
+        """With ENABLE_RRF_HYBRID_SEARCH=True, verify RRF retrieval return shape and ordering."""
+        with patch("documents.utils.gemini_chat.DocumentChunk.objects.filter", side_effect=self._get_fake_filter()):
+            result = _hybrid_retrieve(self.docs[0], "test message", top_k=5, query_embedding=self.fake_query_embedding)
+            self.assertIn("vector_chunks", result)
+            self.assertIn("keyword_chunks", result)
+            self.assertIn("hybrid_chunks", result)
+            self.assertIn("scored", result)
+            self.assertEqual(len(result["hybrid_chunks"]), 5)
+            self.assertEqual(result["hybrid_chunks"], [r["chunk"] for r in result["scored"]])
+            scores = [row["hybrid_score"] for row in result["scored"]]
+            self.assertEqual(scores, sorted(scores, reverse=True))
+            # Each scored item in RRF path also exposes ranks
+            for row in result["scored"]:
+                self.assertIn("dense_rank", row)
+                self.assertIn("lexical_rank", row)
 
     def test_hybrid_retrieve_preserves_original_keys_and_adds_scored(self):
         """
@@ -524,6 +563,7 @@ class MultiDocRetrievalMergeTests(SimpleTestCase):
             scores = [row["hybrid_score"] for row in result["scored"]]
             self.assertEqual(scores, sorted(scores, reverse=True))
 
+    @override_settings(ENABLE_RRF_HYBRID_SEARCH=False, ENABLE_FLASHRANK_RERANK=False)
     def test_multi_doc_retrieve_merge_sort_and_limit(self):
         """
         Assert:
@@ -563,6 +603,28 @@ class MultiDocRetrievalMergeTests(SimpleTestCase):
             self.assertNotIn("D3 chunk 4", context)
             self.assertNotIn("D4 chunk 1", context)
 
+    def test_rerank_chunks_flashrank_ordering_and_score(self):
+        """Verify _rerank_chunks_flashrank orders chunks and assigns rerank_score."""
+        from documents.utils.gemini_chat import _rerank_chunks_flashrank
+        c1 = MagicMock(id=1, content="Bananas and apples are fruits.")
+        c2 = MagicMock(id=2, content="Python is a popular programming language for AI.")
+        reranked = _rerank_chunks_flashrank("What programming language is used for artificial intelligence?", [c1, c2], top_n=2)
+        self.assertEqual(len(reranked), 2)
+        self.assertEqual(reranked[0].id, 2)
+        self.assertTrue(hasattr(reranked[0], "rerank_score"))
+        self.assertGreater(reranked[0].rerank_score, reranked[1].rerank_score)
+
+    def test_rerank_chunks_flashrank_fallback_on_error(self):
+        """Verify fallback to original order if FlashRank raises an exception."""
+        from documents.utils.gemini_chat import _rerank_chunks_flashrank
+        c1 = MagicMock(id=1, content="Chunk 1")
+        c2 = MagicMock(id=2, content="Chunk 2")
+        with patch("documents.utils.gemini_chat._get_flashrank_ranker", return_value=None):
+            fallback = _rerank_chunks_flashrank("query", [c1, c2], top_n=1)
+            self.assertEqual(len(fallback), 1)
+            self.assertEqual(fallback[0].id, 1)
+
+    @override_settings(ENABLE_RRF_HYBRID_SEARCH=False, ENABLE_FLASHRANK_RERANK=False)
     async def test_get_workspace_response_integration_includes_top_scored_chunk(self):
         """
         Assert get_workspace_response passes the globally ranked top-15 context to the model prompt.

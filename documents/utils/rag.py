@@ -9,6 +9,7 @@ from PIL import Image  # Images
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from django.conf import settings
+from django.contrib.postgres.search import SearchVector
 from ..models import DocumentChunk
 
 logger = logging.getLogger(__name__)
@@ -187,6 +188,10 @@ def process_document_for_rag(document, file_path):
 
         if objs:
             DocumentChunk.objects.bulk_create(objs)
+            search_config = getattr(settings, 'SEARCH_CONFIG', 'english')
+            DocumentChunk.objects.filter(document=document).update(
+                search_vector=SearchVector('content', config=search_config)
+            )
         
         document.is_processed = True
         document.save()
