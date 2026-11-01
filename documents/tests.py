@@ -933,5 +933,166 @@ class ParentChildRetrievalTests(SimpleTestCase):
             self.assertIn("[LegacyDoc · Page 2]: Legacy doc chunk text", context_text)
 
 
+class AgenticRetrievalTests(SimpleTestCase):
+    databases = []
+
+    def setUp(self):
+        from types import SimpleNamespace
+        self.doc1 = SimpleNamespace(id=1, title="Doc 1", is_processed=True)
+        self.doc2 = SimpleNamespace(id=2, title="Doc 2", is_processed=True)
+        self.doc3 = SimpleNamespace(id=3, title="Doc 3", is_processed=True)
+        self.chunk1 = SimpleNamespace(id=101, page_number=1, content="Doc 1 content")
+        self.chunk2 = SimpleNamespace(id=102, page_number=2, content="Doc 2 content")
+        self.chunk3 = SimpleNamespace(id=103, page_number=3, content="Doc 3 content")
+
+    async def test_direct_route_with_rewrite(self):
+        """Verify rewrite_and_route parses direct route and standalone query."""
+        import json
+        from documents.utils.agentic_retrieval import run_agentic_retrieval
+
+        mock_resp = MagicMock()
+        mock_resp.text = json.dumps({
+            "standalone_query": "What are the key findings of the report?",
+            "route": "direct",
+            "sub_queries": []
+        })
+        mock_resp.usage_metadata = MagicMock(total_token_count=45)
+
+        mock_model = MagicMock()
+        mock_model.generate_content_async = AsyncMock(return_value=mock_resp)
+
+        history = [{"role": "user", "content": "Tell me about the report"}]
+
+        with patch("google.generativeai.GenerativeModel", return_value=mock_model), \
+             patch("documents.utils.agentic_retrieval._hybrid_retrieve", return_value={"hybrid_chunks": [self.chunk1]}):
+
+            result = await run_agentic_retrieval("What are its key findings?", [self.doc1], chat_history=history)
+
+            self.assertEqual(result["route"], "direct")
+            self.assertEqual(result["standalone_query"], "What are the key findings of the report?")
+            self.assertEqual(result["tokens_used"], 45)
+            self.assertIn("Doc 1 content", result["context_text"])
+
+    async def test_decompose_route_and_no_document_starvation(self):
+        """
+        Verify decompose route runs concurrent retrieval per document and guarantees
+        every selected document appears in results (even if not explicitly in sub_queries).
+        """
+        import json
+        from documents.utils.agentic_retrieval import run_agentic_retrieval
+
+        mock_resp = MagicMock()
+        # Sub-queries only explicitly mention doc 1 and doc 2, but doc 3 is also selected
+        mock_resp.text = json.dumps({
+            "standalone_query": "Compare technical requirements across all documents",
+            "route": "decompose",
+            "sub_queries": [
+                {"document_id": 1, "query": "Doc 1 architecture"},
+                {"document_id": 2, "query": "Doc 2 architecture"},
+            ]
+        })
+        mock_resp.usage_metadata = MagicMock(total_token_count=80)
+
+        mock_model = MagicMock()
+        mock_model.generate_content_async = AsyncMock(return_value=mock_resp)
+
+        def fake_hybrid_retrieve(doc, query, top_k=2):
+            if doc.id == 1:
+                return {"hybrid_chunks": [self.chunk1]}
+            elif doc.id == 2:
+                return {"hybrid_chunks": [self.chunk2]}
+            else:
+                return {"hybrid_chunks": [self.chunk3]}
+
+        with patch("google.generativeai.GenerativeModel", return_value=mock_model), \
+             patch("documents.utils.agentic_retrieval._hybrid_retrieve", side_effect=fake_hybrid_retrieve):
+
+            docs = [self.doc1, self.doc2, self.doc3]
+            result = await run_agentic_retrieval("Compare the documents", docs, chat_history=[])
+
+            self.assertEqual(result["route"], "decompose")
+            self.assertEqual(result["tokens_used"], 80)
+
+            # Assert every selected document has retrieved chunks (no starvation)
+            retrieved = result["retrieved_parents"]
+            self.assertIn(1, retrieved)
+            self.assertIn(2, retrieved)
+            self.assertIn(3, retrieved)
+            self.assertEqual(len(retrieved[1]), 1)
+            self.assertEqual(len(retrieved[2]), 1)
+            self.assertEqual(len(retrieved[3]), 1)
+
+            context = result["context_text"]
+            self.assertIn("[Doc 1 · Page 1]: Doc 1 content", context)
+            self.assertIn("[Doc 2 · Page 2]: Doc 2 content", context)
+            self.assertIn("[Doc 3 · Page 3]: Doc 3 content", context)
+
+    async def test_fallback_on_bad_json_or_exception(self):
+        """Verify rewrite_and_route falls back to direct route on malformed JSON or error."""
+        from documents.utils.agentic_retrieval import run_agentic_retrieval
+
+        mock_resp = MagicMock()
+        mock_resp.text = "NOT JSON RESPONSE"
+        mock_resp.usage_metadata = None
+
+        mock_model = MagicMock()
+        mock_model.generate_content_async = AsyncMock(return_value=mock_resp)
+
+        with patch("google.generativeai.GenerativeModel", return_value=mock_model), \
+             patch("documents.utils.agentic_retrieval._hybrid_retrieve", return_value={"hybrid_chunks": [self.chunk1]}), \
+             patch("documents.utils.agentic_retrieval._multi_doc_retrieve", return_value={"final_items": [{"doc_id": 1, "chunk": self.chunk1}]}):
+
+            result = await run_agentic_retrieval(
+                "Compare things",
+                [self.doc1, self.doc2],
+                chat_history=[{"role": "user", "content": "Previous topic"}]
+            )
+
+            # Falls back to direct with original message
+            self.assertEqual(result["route"], "direct")
+            self.assertEqual(result["standalone_query"], "Compare things")
+
+    async def test_skip_rule_no_history_single_document(self):
+        """Verify LLM call is skipped when no chat history and only one document is selected."""
+        from documents.utils.agentic_retrieval import run_agentic_retrieval
+
+        mock_model = MagicMock()
+        mock_model.generate_content_async = AsyncMock()
+
+        with patch("google.generativeai.GenerativeModel", return_value=mock_model), \
+             patch("documents.utils.agentic_retrieval._hybrid_retrieve", return_value={"hybrid_chunks": [self.chunk1]}):
+
+            result = await run_agentic_retrieval("Explain section 2", [self.doc1], chat_history=[])
+
+            # LLM must not be called
+            mock_model.generate_content_async.assert_not_called()
+            self.assertEqual(result["route"], "direct")
+            self.assertEqual(result["standalone_query"], "Explain section 2")
+            self.assertEqual(result["tokens_used"], 0)
+
+    async def test_skip_rule_summary_queries(self):
+        """Verify LLM call is skipped for summarize / list all bypass queries."""
+        from documents.utils.agentic_retrieval import run_agentic_retrieval
+
+        mock_model = MagicMock()
+        mock_model.generate_content_async = AsyncMock()
+
+        with patch("google.generativeai.GenerativeModel", return_value=mock_model), \
+             patch("documents.utils.agentic_retrieval._hybrid_retrieve", return_value={"hybrid_chunks": [self.chunk1]}), \
+             patch("documents.utils.agentic_retrieval._multi_doc_retrieve", return_value={"final_items": [{"doc_id": 1, "chunk": self.chunk1}]}):
+
+            result = await run_agentic_retrieval(
+                "Please summarize the full document",
+                [self.doc1, self.doc2],
+                chat_history=[{"role": "user", "content": "Hello"}]
+            )
+
+            mock_model.generate_content_async.assert_not_called()
+            self.assertEqual(result["route"], "direct")
+            self.assertEqual(result["standalone_query"], "Please summarize the full document")
+            self.assertEqual(result["tokens_used"], 0)
+
+
+
 
 
