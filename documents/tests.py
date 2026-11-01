@@ -491,9 +491,48 @@ class MultiDocRetrievalMergeTests(SimpleTestCase):
                 res_mock.order_by.return_value.__getitem__.side_effect = lambda s: sorted_c[s]
                 return res_mock
             mock_qs.annotate.side_effect = fake_annotate
-            mock_qs.filter.return_value.__getitem__.side_effect = lambda s: []
+
+            # Lexical branch mocks (both legacy icontains and new SearchVector)
+            lexical_mock = MagicMock()
+            lexical_mock.__getitem__.side_effect = lambda s: doc_chunks[s]
+            lexical_annotate = MagicMock()
+            lexical_annotate.order_by.return_value.__getitem__.side_effect = lambda s: doc_chunks[s]
+            lexical_mock.annotate.return_value = lexical_annotate
+            mock_qs.filter.return_value = lexical_mock
             return mock_qs
         return fake_filter
+
+    @override_settings(ENABLE_RRF_HYBRID_SEARCH=False)
+    def test_hybrid_retrieve_flag_off_preserves_legacy_behavior(self):
+        """With ENABLE_RRF_HYBRID_SEARCH=False, verify legacy retrieval return shape and ordering."""
+        with patch("documents.utils.gemini_chat.DocumentChunk.objects.filter", side_effect=self._get_fake_filter()):
+            result = _hybrid_retrieve(self.docs[0], "test message", top_k=5, query_embedding=self.fake_query_embedding)
+            self.assertIn("vector_chunks", result)
+            self.assertIn("keyword_chunks", result)
+            self.assertIn("hybrid_chunks", result)
+            self.assertIn("scored", result)
+            self.assertEqual(len(result["hybrid_chunks"]), 5)
+            self.assertEqual(result["hybrid_chunks"], [r["chunk"] for r in result["scored"]])
+            scores = [row["hybrid_score"] for row in result["scored"]]
+            self.assertEqual(scores, sorted(scores, reverse=True))
+
+    @override_settings(ENABLE_RRF_HYBRID_SEARCH=True)
+    def test_hybrid_retrieve_flag_on_returns_rrf_shape_and_ordering(self):
+        """With ENABLE_RRF_HYBRID_SEARCH=True, verify RRF retrieval return shape and ordering."""
+        with patch("documents.utils.gemini_chat.DocumentChunk.objects.filter", side_effect=self._get_fake_filter()):
+            result = _hybrid_retrieve(self.docs[0], "test message", top_k=5, query_embedding=self.fake_query_embedding)
+            self.assertIn("vector_chunks", result)
+            self.assertIn("keyword_chunks", result)
+            self.assertIn("hybrid_chunks", result)
+            self.assertIn("scored", result)
+            self.assertEqual(len(result["hybrid_chunks"]), 5)
+            self.assertEqual(result["hybrid_chunks"], [r["chunk"] for r in result["scored"]])
+            scores = [row["hybrid_score"] for row in result["scored"]]
+            self.assertEqual(scores, sorted(scores, reverse=True))
+            # Each scored item in RRF path also exposes ranks
+            for row in result["scored"]:
+                self.assertIn("dense_rank", row)
+                self.assertIn("lexical_rank", row)
 
     def test_hybrid_retrieve_preserves_original_keys_and_adds_scored(self):
         """
@@ -524,6 +563,7 @@ class MultiDocRetrievalMergeTests(SimpleTestCase):
             scores = [row["hybrid_score"] for row in result["scored"]]
             self.assertEqual(scores, sorted(scores, reverse=True))
 
+    @override_settings(ENABLE_RRF_HYBRID_SEARCH=False, ENABLE_FLASHRANK_RERANK=False)
     def test_multi_doc_retrieve_merge_sort_and_limit(self):
         """
         Assert:
@@ -563,6 +603,28 @@ class MultiDocRetrievalMergeTests(SimpleTestCase):
             self.assertNotIn("D3 chunk 4", context)
             self.assertNotIn("D4 chunk 1", context)
 
+    def test_rerank_chunks_flashrank_ordering_and_score(self):
+        """Verify _rerank_chunks_flashrank orders chunks and assigns rerank_score."""
+        from documents.utils.gemini_chat import _rerank_chunks_flashrank
+        c1 = MagicMock(id=1, content="Bananas and apples are fruits.")
+        c2 = MagicMock(id=2, content="Python is a popular programming language for AI.")
+        reranked = _rerank_chunks_flashrank("What programming language is used for artificial intelligence?", [c1, c2], top_n=2)
+        self.assertEqual(len(reranked), 2)
+        self.assertEqual(reranked[0].id, 2)
+        self.assertTrue(hasattr(reranked[0], "rerank_score"))
+        self.assertGreater(reranked[0].rerank_score, reranked[1].rerank_score)
+
+    def test_rerank_chunks_flashrank_fallback_on_error(self):
+        """Verify fallback to original order if FlashRank raises an exception."""
+        from documents.utils.gemini_chat import _rerank_chunks_flashrank
+        c1 = MagicMock(id=1, content="Chunk 1")
+        c2 = MagicMock(id=2, content="Chunk 2")
+        with patch("documents.utils.gemini_chat._get_flashrank_ranker", return_value=None):
+            fallback = _rerank_chunks_flashrank("query", [c1, c2], top_n=1)
+            self.assertEqual(len(fallback), 1)
+            self.assertEqual(fallback[0].id, 1)
+
+    @override_settings(ENABLE_RRF_HYBRID_SEARCH=False, ENABLE_FLASHRANK_RERANK=False)
     async def test_get_workspace_response_integration_includes_top_scored_chunk(self):
         """
         Assert get_workspace_response passes the globally ranked top-15 context to the model prompt.
@@ -597,4 +659,279 @@ class MultiDocRetrievalMergeTests(SimpleTestCase):
 
             # Assert Doc 4's best chunk is included in the prompt context
             self.assertIn("[Doc 4 · Page 1]: Doc 4 best chunk content", system_instruction)
+
+
+class WorkspaceCreateViewTests(SimpleTestCase):
+    databases = []
+
+    def setUp(self):
+        from django.test import RequestFactory
+        self.factory = RequestFactory()
+        self.user = MagicMock(id=1, is_authenticated=True, is_premium=False)
+
+    def test_workspace_create_view_get_renders_modal(self):
+        """
+        Verify GET /workspaces/create/ returns 200 OK and renders workspaces.html with open_create_modal=True.
+        """
+        from documents.views_workspace import workspace_create_view
+        request = self.factory.get("/workspaces/create/")
+        request.user = self.user
+
+        with patch("documents.views_workspace.Workspace.objects.filter") as mock_filter, \
+             patch("documents.views_workspace.render") as mock_render:
+            mock_filter.return_value.prefetch_related.return_value = []
+            mock_render.return_value = MagicMock(status_code=200)
+
+            response = workspace_create_view(request)
+
+            mock_render.assert_called_once()
+            _, template_name, context = mock_render.call_args[0]
+            self.assertEqual(template_name, "workspaces.html")
+            self.assertTrue(context.get("open_create_modal"))
+            self.assertEqual(response.status_code, 200)
+
+    def test_workspace_create_view_post_creates_workspace(self):
+        """
+        Verify POST /workspaces/create/ creates workspace and redirects to workspace_detail.
+        """
+        from documents.views_workspace import workspace_create_view
+        request = self.factory.post("/workspaces/create/", {"name": "New Project", "description": "Notes"})
+        request.user = self.user
+        request._messages = MagicMock()
+
+        mock_workspace = MagicMock(id=42, name="New Project")
+        with patch("documents.views_workspace.Workspace.objects.filter") as mock_filter, \
+             patch("documents.views_workspace.Workspace.objects.get_or_create", return_value=(mock_workspace, True)):
+            mock_filter.return_value.count.return_value = 0
+
+            response = workspace_create_view(request)
+
+            self.assertEqual(response.status_code, 302)
+            self.assertIn("/workspaces/42/", response.url)
+
+
+class ParentChildRetrievalTests(SimpleTestCase):
+    databases = []
+
+    def setUp(self):
+        from types import SimpleNamespace
+        self.doc = MagicMock(id=1, title="Test Doc", is_processed=True)
+        self.parent1 = SimpleNamespace(id=10, page_number=1, content="Parent 1 content spanning multiple sentences.")
+        self.parent2 = SimpleNamespace(id=20, page_number=2, content="Parent 2 content discussing other topics.")
+
+        self.child1 = SimpleNamespace(id=101, parent=self.parent1, parent_id=10, page_number=1, content="Child 1 of P1")
+        self.child2 = SimpleNamespace(id=102, parent=self.parent1, parent_id=10, page_number=1, content="Child 2 of P1")
+        self.child3 = SimpleNamespace(id=103, parent=self.parent2, parent_id=20, page_number=2, content="Child 1 of P2")
+
+    @override_settings(ENABLE_PARENT_CHILD=True, ENABLE_FLASHRANK_RERANK=False, RRF_K=60)
+    def test_parent_child_retrieve_deduplication_and_shape(self):
+        """Verify _parent_child_retrieve dedupes children by parent and preserves return shape."""
+        from documents.utils.gemini_chat import _parent_child_retrieve
+
+        mock_qs = MagicMock()
+        # Mock vector search returning child1, child2, child3
+        mock_qs.select_related.return_value.annotate.return_value.order_by.return_value = [
+            self.child1, self.child2, self.child3
+        ]
+
+        with patch("documents.utils.gemini_chat.ChildChunk.objects.filter", return_value=mock_qs), \
+             patch("documents.utils.gemini_chat._get_query_embedding", return_value=[0.1] * 768):
+
+            result = _parent_child_retrieve(self.doc, "test query", top_k=5)
+
+            self.assertIn("vector_chunks", result)
+            self.assertIn("keyword_chunks", result)
+            self.assertIn("hybrid_chunks", result)
+            self.assertIn("scored", result)
+
+            # Both child1 and child2 belong to parent1 (id=10), child3 belongs to parent2 (id=20)
+            # Resulting parents must be deduplicated to exactly 2 parents
+            parents = result["hybrid_chunks"]
+            self.assertEqual(len(parents), 2)
+            parent_ids = [p.id for p in parents]
+            self.assertIn(10, parent_ids)
+            self.assertIn(20, parent_ids)
+
+    @override_settings(ENABLE_PARENT_CHILD=True)
+    def test_hybrid_retrieve_delegates_to_parent_child_when_children_exist(self):
+        """Verify _hybrid_retrieve calls _parent_child_retrieve when flag is on and children exist."""
+        from documents.utils.gemini_chat import _hybrid_retrieve
+
+        with patch("documents.utils.gemini_chat.ChildChunk.objects.filter") as mock_filter, \
+             patch("documents.utils.gemini_chat._parent_child_retrieve") as mock_pc:
+            mock_filter.return_value.exists.return_value = True
+            mock_pc.return_value = {"hybrid_chunks": [self.parent1], "scored": []}
+
+            res = _hybrid_retrieve(self.doc, "query")
+
+            mock_pc.assert_called_once()
+            self.assertEqual(res["hybrid_chunks"], [self.parent1])
+
+    @override_settings(ENABLE_PARENT_CHILD=False, ENABLE_RRF_HYBRID_SEARCH=True)
+    def test_hybrid_retrieve_uses_legacy_rrf_when_flag_off_and_no_children(self):
+        """Verify _hybrid_retrieve uses standard RRF when no children exist."""
+        from documents.utils.gemini_chat import _hybrid_retrieve
+
+        with patch("documents.utils.gemini_chat.ChildChunk.objects.filter") as mock_filter, \
+             patch("documents.utils.gemini_chat._parent_child_retrieve") as mock_pc, \
+             patch("documents.utils.gemini_chat._hybrid_retrieve_rrf") as mock_rrf:
+            mock_filter.return_value.exists.return_value = False
+            mock_pc.return_value = {"hybrid_chunks": [self.parent1], "scored": []}
+            mock_rrf.return_value = {"hybrid_chunks": [self.parent1], "scored": []}
+
+            res = _hybrid_retrieve(self.doc, "query")
+
+            mock_pc.assert_not_called()
+            mock_rrf.assert_called_once()
+            self.assertEqual(res["hybrid_chunks"], [self.parent1])
+
+    @override_settings(ENABLE_PARENT_CHILD=False)
+    def test_flag_off_safety_document_with_children_and_null_parent_embeddings(self):
+        """
+        Verify documents that have ChildChunks and null parent embeddings
+        still retrieve correctly even when ENABLE_PARENT_CHILD is False.
+        """
+        from types import SimpleNamespace
+        from documents.utils.gemini_chat import _hybrid_retrieve
+
+        parent_null_emb = SimpleNamespace(id=99, embedding=None, page_number=3, content="Parent text with null embedding")
+        child_item = SimpleNamespace(id=901, parent=parent_null_emb, parent_id=99, page_number=3, content="Child text")
+
+        mock_qs = MagicMock()
+        mock_qs.select_related.return_value.annotate.return_value.order_by.return_value = [child_item]
+
+        with patch("documents.utils.gemini_chat.ChildChunk.objects.filter") as mock_filter, \
+             patch("documents.utils.gemini_chat._get_query_embedding", return_value=[0.1] * 768):
+            # exists() is True because this document has children
+            mock_filter.return_value.exists.return_value = True
+            mock_filter.return_value.select_related = mock_qs.select_related
+
+            res = _hybrid_retrieve(self.doc, "query")
+
+            self.assertEqual(len(res["hybrid_chunks"]), 1)
+            self.assertEqual(res["hybrid_chunks"][0].id, 99)
+            self.assertIsNone(res["hybrid_chunks"][0].embedding)
+
+    def test_relative_score_cutoff_logic(self):
+        """
+        Verify _apply_relative_score_cutoff drops items below cutoff (min_relative * top),
+        always keeps at least 2, and is disabled when set to 0.
+        """
+        from documents.utils.gemini_chat import _apply_relative_score_cutoff
+
+        items = [
+            {"id": 1, "hybrid_score": 1.0},
+            {"id": 2, "hybrid_score": 0.5},
+            {"id": 3, "hybrid_score": 0.005},  # below 0.01
+            {"id": 4, "hybrid_score": 0.001},  # below 0.01
+        ]
+
+        # Standard 0.01 cutoff: top_score = 1.0, cutoff = 0.01
+        kept, all_items = _apply_relative_score_cutoff(items, score_key="hybrid_score", min_relative_score=0.01)
+        self.assertEqual(len(kept), 2)
+        self.assertEqual([x["id"] for x in kept], [1, 2])
+        self.assertFalse(all_items[0]["dropped"])
+        self.assertFalse(all_items[1]["dropped"])
+        self.assertTrue(all_items[2]["dropped"])
+        self.assertTrue(all_items[3]["dropped"])
+
+        # Always keep at least 2 even if index 1 is below cutoff
+        items_steep = [
+            {"id": 1, "hybrid_score": 1.0},
+            {"id": 2, "hybrid_score": 0.0001},
+            {"id": 3, "hybrid_score": 0.00005},
+        ]
+        kept_steep, _ = _apply_relative_score_cutoff(items_steep, score_key="hybrid_score", min_relative_score=0.01)
+        self.assertEqual(len(kept_steep), 2)
+        self.assertEqual([x["id"] for x in kept_steep], [1, 2])
+
+        # Disabled when 0
+        kept_disabled, _ = _apply_relative_score_cutoff(items, score_key="hybrid_score", min_relative_score=0.0)
+        self.assertEqual(len(kept_disabled), 4)
+
+    def test_parent_child_walks_down_to_unique_parents(self):
+        """
+        Verify parent selection walks down child candidates to collect RERANK_TOP_N UNIQUE parents.
+        """
+        from types import SimpleNamespace
+        from documents.utils.gemini_chat import _parent_child_retrieve
+
+        p1 = SimpleNamespace(id=1, page_number=1, content="P1 content")
+        p2 = SimpleNamespace(id=2, page_number=2, content="P2 content")
+        p3 = SimpleNamespace(id=3, page_number=3, content="P3 content")
+
+        # 5 children: C1(P1), C2(P1), C3(P2), C4(P1), C5(P3)
+        c1 = SimpleNamespace(id=101, parent=p1, parent_id=1, page_number=1, content="C1 of P1")
+        c2 = SimpleNamespace(id=102, parent=p1, parent_id=1, page_number=1, content="C2 of P1")
+        c3 = SimpleNamespace(id=103, parent=p2, parent_id=2, page_number=2, content="C3 of P2")
+        c4 = SimpleNamespace(id=104, parent=p1, parent_id=1, page_number=1, content="C4 of P1")
+        c5 = SimpleNamespace(id=105, parent=p3, parent_id=3, page_number=3, content="C5 of P3")
+
+        mock_qs = MagicMock()
+        mock_qs.select_related.return_value.annotate.return_value.order_by.return_value = [c1, c2, c3, c4, c5]
+
+        with patch("documents.utils.gemini_chat.ChildChunk.objects.filter", return_value=mock_qs), \
+             patch("documents.utils.gemini_chat._get_query_embedding", return_value=[0.1] * 768), \
+             patch("documents.utils.gemini_chat._rerank_chunks_flashrank", side_effect=lambda q, ch, top_n: ch):
+
+            # Request 2 unique parents: should walk down and pick P1 and P2 (skipping C2 which is P1)
+            res = _parent_child_retrieve(self.doc, "query", top_k=2)
+            self.assertEqual(len(res["hybrid_chunks"]), 2)
+            self.assertEqual([p.id for p in res["hybrid_chunks"]], [1, 2])
+
+    def test_workspace_retrieval_mixed_reindexed_and_legacy_documents(self):
+        """
+        Verify _multi_doc_retrieve handles a mix of reindexed (has children) and legacy (no children) docs,
+        applies unique parent selection and cutoff to the merged pool.
+        """
+        from types import SimpleNamespace
+        from documents.utils.gemini_chat import _multi_doc_retrieve
+
+        doc_reindexed = MagicMock(id=10, title="ReindexedDoc", is_processed=True)
+        doc_legacy = MagicMock(id=20, title="LegacyDoc", is_processed=True)
+
+        p_reindexed = SimpleNamespace(id=100, page_number=1, content="Reindexed doc parent text")
+        c_legacy = SimpleNamespace(id=200, page_number=2, content="Legacy doc chunk text")
+
+        def fake_hybrid_retrieve(doc, query, top_k=5, query_embedding=None):
+            if doc.id == 10:
+                # Returns parent DocumentChunk
+                return {
+                    "hybrid_chunks": [p_reindexed],
+                    "scored": [{"chunk": p_reindexed, "hybrid_score": 0.85}],
+                }
+            else:
+                # Returns legacy DocumentChunk
+                return {
+                    "hybrid_chunks": [c_legacy],
+                    "scored": [{"chunk": c_legacy, "hybrid_score": 0.001}],  # very low score to test cutoff
+                }
+
+        with patch("documents.utils.gemini_chat._hybrid_retrieve", side_effect=fake_hybrid_retrieve), \
+             patch("documents.utils.gemini_chat._rerank_chunks_flashrank", side_effect=lambda q, ch, top_n: ch), \
+             override_settings(ENABLE_FLASHRANK_RERANK=True, RERANK_MIN_RELATIVE_SCORE=0.01):
+
+            details = _multi_doc_retrieve(
+                [doc_reindexed, doc_legacy],
+                "query",
+                query_embedding=[0.1] * 768,
+                return_details=True,
+            )
+
+            # Both documents contributed to candidate pool
+            all_scored = details["all_scored"]
+            self.assertEqual(len(all_scored), 2)
+            doc_ids = {item["doc_id"] for item in all_scored}
+            self.assertEqual(doc_ids, {10, 20})
+
+            # Both kept because minimum 2 are always kept
+            final_items = details["final_items"]
+            self.assertEqual(len(final_items), 2)
+
+            context_text = details["context_text"]
+            self.assertIn("[ReindexedDoc · Page 1]: Reindexed doc parent text", context_text)
+            self.assertIn("[LegacyDoc · Page 2]: Legacy doc chunk text", context_text)
+
+
+
 

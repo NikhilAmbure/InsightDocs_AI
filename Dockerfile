@@ -16,6 +16,9 @@ COPY requirements.txt /app/requirements.txt
 
 RUN pip install --upgrade pip && pip install -r /app/requirements.txt
 
+ENV FLASHRANK_CACHE_DIR=/app/.flashrank_cache
+RUN python -c "from flashrank import Ranker; Ranker(model_name='ms-marco-MiniLM-L-12-v2', cache_dir='/app/.flashrank_cache')"
+
 COPY . /app
 
 COPY docker/entrypoint.sh /entrypoint.sh
