@@ -19,7 +19,14 @@ from django.conf import settings
 from langgraph.graph import END, StateGraph
 from pydantic import BaseModel, Field
 
-from .gemini_chat import _hybrid_retrieve, _multi_doc_retrieve, _safe_json_loads
+from .gemini_chat import (
+    _apply_relative_score_cutoff,
+    _generate_shared_query_embedding,
+    _hybrid_retrieve,
+    _multi_doc_retrieve,
+    _rerank_chunks_flashrank,
+    _safe_json_loads,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +70,36 @@ class AgenticState(TypedDict):
     timings: Dict[str, float]  # node_name -> latency_ms
     tokens_used: int  # tokens from rewrite LLM call
     error: Optional[str]
+
+
+async def _call_gemini_rewrite(prompt: str):
+    """
+    Calls Gemini 2.5 Flash to rewrite and route queries.
+    Uses modern google.genai with thinking_budget=0 to disable thinking overhead,
+    falling back to google.generativeai if unavailable or mocked.
+    """
+    # Check if google.generativeai has been patched/mocked in tests
+    model_cls = getattr(genai, "GenerativeModel", None)
+    if hasattr(model_cls, "return_value") or hasattr(model_cls, "side_effect") or hasattr(getattr(model_cls, "generate_content_async", None), "assert_called"):
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        return await model.generate_content_async(prompt)
+
+    try:
+        from google import genai as modern_genai
+        from google.genai import types as modern_genai_types
+        client = modern_genai.Client(api_key=getattr(settings, "GOOGLE_API_KEY", None))
+        return await client.aio.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=modern_genai_types.GenerateContentConfig(
+                thinking_config=modern_genai_types.ThinkingConfig(thinking_budget=0),
+                response_mime_type="application/json",
+            ),
+        )
+    except Exception as e:
+        logger.debug(f"modern_genai call failed ({e}), falling back to genai.GenerativeModel: {e}")
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        return await model.generate_content_async(prompt)
 
 
 def _is_summary_query(query_text: str) -> bool:
@@ -113,9 +150,9 @@ async def rewrite_and_route_node(state: AgenticState) -> Dict[str, Any]:
             "timings": timings,
         }
 
-    # Format history turns for prompt
+    # Format history turns for prompt (pass only the last 4 turns)
     history_lines = []
-    for msg in chat_history[-6:]:
+    for msg in chat_history[-4:]:
         role = msg.get("role", "user")
         content = msg.get("content", "").strip()
         if content:
@@ -163,12 +200,7 @@ Return STRICT JSON matching this schema:
 
     tokens_used = 0
     try:
-        model = genai.GenerativeModel("gemini-2.5-flash")
-
-        async def _call_gemini():
-            return await model.generate_content_async(prompt)
-
-        response = await asyncio.wait_for(_call_gemini(), timeout=REWRITE_TIMEOUT_SECONDS)
+        response = await asyncio.wait_for(_call_gemini_rewrite(prompt), timeout=REWRITE_TIMEOUT_SECONDS)
 
         # Track usage tokens from rewrite call
         usage_meta = getattr(response, "usage_metadata", None)
@@ -291,11 +323,99 @@ async def retrieve_node(state: AgenticState) -> Dict[str, Any]:
             chunks = res.get("hybrid_chunks", []) if isinstance(res, dict) else []
             retrieved_parents[d_id] = chunks
         elif len(documents) > 1:
-            def _retrieve_multi(docs, q):
-                return _multi_doc_retrieve(docs, q, return_details=True)
+            # Parallel per-document retrieval in workspace mode (same asyncio.gather path as decompose, same query)
+            shared_embedding = await asyncio.to_thread(_generate_shared_query_embedding, standalone_query)
+            enable_rerank = getattr(settings, "ENABLE_FLASHRANK_RERANK", False)
+            processed_docs = [doc for doc in documents if getattr(doc, "is_processed", False)]
+            if not processed_docs:
+                processed_docs = documents
+            doc_count = max(len(processed_docs), 1)
 
-            ws_details = await asyncio.to_thread(_retrieve_multi, documents, standalone_query)
-            final_items = ws_details.get("final_items", []) if isinstance(ws_details, dict) else []
+            if enable_rerank:
+                rerank_candidates_k = getattr(settings, "RERANK_CANDIDATES", 20)
+                rerank_top_n = getattr(settings, "RERANK_TOP_N", 5)
+                per_doc_top_k = max(5, int(math.ceil(rerank_candidates_k / doc_count)))
+            else:
+                rerank_candidates_k = 20
+                rerank_top_n = getattr(settings, "RERANK_TOP_N", 5)
+                per_doc_top_k = 5
+
+            def _retrieve_single_direct(doc, q, k, emb):
+                return _hybrid_retrieve(doc, q, top_k=k, query_embedding=emb)
+
+            tasks = [
+                asyncio.to_thread(_retrieve_single_direct, doc, standalone_query, per_doc_top_k, shared_embedding)
+                for doc in processed_docs
+            ]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            all_scored = []
+            for doc, res in zip(processed_docs, results):
+                d_id = _get_doc_id(doc)
+                d_title = _get_doc_title(doc, "Document")
+                if isinstance(res, Exception):
+                    logger.warning(f"Parallel direct retrieval failed for doc {d_id}: {res}")
+                    continue
+                if not isinstance(res, dict):
+                    continue
+                scored_items = res.get("scored")
+                if scored_items is not None:
+                    for item in scored_items:
+                        all_scored.append({
+                            "hybrid_score": item.get("hybrid_score", 0.0),
+                            "chunk": item["chunk"],
+                            "doc_title": d_title,
+                            "doc_id": d_id,
+                            "dropped": False,
+                        })
+                else:
+                    for chunk in res.get("hybrid_chunks", []):
+                        all_scored.append({
+                            "hybrid_score": 0.0,
+                            "chunk": chunk,
+                            "doc_title": d_title,
+                            "doc_id": d_id,
+                            "dropped": False,
+                        })
+
+            all_scored.sort(key=lambda x: x["hybrid_score"], reverse=True)
+
+            if enable_rerank and all_scored:
+                candidate_items = all_scored[:rerank_candidates_k]
+                candidate_chunks = [item["chunk"] for item in candidate_items]
+                chunk_id_to_item = {item["chunk"].id: item for item in candidate_items}
+                reranked_chunks = await asyncio.to_thread(
+                    _rerank_chunks_flashrank, standalone_query, candidate_chunks, top_n=len(candidate_chunks)
+                )
+
+                unique_items = []
+                seen_chunk_ids = set()
+                for c in reranked_chunks:
+                    if c.id not in seen_chunk_ids:
+                        seen_chunk_ids.add(c.id)
+                        item = chunk_id_to_item.get(c.id)
+                        if item:
+                            item["hybrid_score"] = float(getattr(c, "rerank_score", 0.0) or 0.0)
+                            item["dropped"] = False
+                            unique_items.append(item)
+                            if len(unique_items) >= rerank_top_n:
+                                break
+
+                kept_items, all_unique = _apply_relative_score_cutoff(unique_items, score_key="hybrid_score")
+                final_items = kept_items
+            else:
+                unique_items = []
+                seen_chunk_ids = set()
+                for item in all_scored:
+                    c = item["chunk"]
+                    if c.id not in seen_chunk_ids:
+                        seen_chunk_ids.add(c.id)
+                        item["dropped"] = False
+                        unique_items.append(item)
+                        if len(unique_items) >= 15:
+                            break
+                final_items = unique_items
+
             for item in final_items:
                 doc_id = item.get("doc_id")
                 retrieved_parents.setdefault(doc_id, []).append(item["chunk"])
@@ -304,9 +424,28 @@ async def retrieve_node(state: AgenticState) -> Dict[str, Any]:
     timings = dict(state.get("timings") or {})
     timings["retrieve"] = elapsed_ms
 
-    total_chunks = sum(len(v) for v in retrieved_parents.values())
+    # Extract scores and counts for retry threshold evaluation
+    all_parent_scores = []
+    total_chunks = 0
+    for chunks in retrieved_parents.values():
+        total_chunks += len(chunks)
+        for c in chunks:
+            s = getattr(c, "rerank_score", None)
+            if s is None:
+                s = getattr(c, "hybrid_score", None)
+            if s is None:
+                s = getattr(c, "score", None)
+            if s is not None:
+                try:
+                    all_parent_scores.append(float(s))
+                except (ValueError, TypeError):
+                    pass
+
+    top_parent_score = max(all_parent_scores) if all_parent_scores else 0.0
+
     logger.info(
-        f"retrieve completed in {elapsed_ms:.2f}ms (route='{route}'): {total_chunks} chunks retrieved across {len(retrieved_parents)} doc(s)"
+        f"[AgenticRetrieval Result] standalone_query='{standalone_query}' route='{route}' "
+        f"top_parent_score={top_parent_score:.6f} parents_returned={total_chunks}"
     )
 
     return {

@@ -1096,20 +1096,26 @@ async def get_gemini_response(user_message, document, chat_history, progress_cal
             yield USER_FRIENDLY_ERROR_MSG
 
 
+def _generate_shared_query_embedding(query: str):
+    """Generate embedding for workspace query to share across all documents."""
+    try:
+        res = genai.embed_content(
+            model="models/gemini-embedding-001",
+            content=query,
+            task_type="retrieval_query",
+            output_dimensionality=768,
+        )
+        return res.get("embedding")
+    except Exception as emb_err:
+        logger.warning(f"Failed to generate shared embedding for workspace query: {emb_err}")
+        return None
+
+
 def _multi_doc_retrieve(documents, user_message, query_embedding=None, return_details=False):
     """Retrieve relevant chunks across all workspace documents with a single shared query embedding."""
     shared_embedding = query_embedding
     if shared_embedding is None:
-        try:
-            res = genai.embed_content(
-                model="models/gemini-embedding-001",
-                content=user_message,
-                task_type="retrieval_query",
-                output_dimensionality=768,
-            )
-            shared_embedding = res.get("embedding")
-        except Exception as emb_err:
-            logger.warning(f"Failed to generate shared embedding for workspace query: {emb_err}")
+        shared_embedding = _generate_shared_query_embedding(user_message)
 
     enable_rerank = getattr(settings, "ENABLE_FLASHRANK_RERANK", False)
     processed_docs = [doc for doc in documents if getattr(doc, "is_processed", False)]

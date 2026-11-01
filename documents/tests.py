@@ -13,6 +13,7 @@ from documents.utils.gemini_chat import (
 )
 
 
+@override_settings(ENABLE_AGENTIC_RETRIEVAL=False)
 class ChatMessageDuplicateTests(SimpleTestCase):
     databases = []
 
@@ -624,7 +625,7 @@ class MultiDocRetrievalMergeTests(SimpleTestCase):
             self.assertEqual(len(fallback), 1)
             self.assertEqual(fallback[0].id, 1)
 
-    @override_settings(ENABLE_RRF_HYBRID_SEARCH=False, ENABLE_FLASHRANK_RERANK=False)
+    @override_settings(ENABLE_RRF_HYBRID_SEARCH=False, ENABLE_FLASHRANK_RERANK=False, ENABLE_AGENTIC_RETRIEVAL=False)
     async def test_get_workspace_response_integration_includes_top_scored_chunk(self):
         """
         Assert get_workspace_response passes the globally ranked top-15 context to the model prompt.
@@ -1040,6 +1041,7 @@ class AgenticRetrievalTests(SimpleTestCase):
 
         with patch("google.generativeai.GenerativeModel", return_value=mock_model), \
              patch("documents.utils.agentic_retrieval._hybrid_retrieve", return_value={"hybrid_chunks": [self.chunk1]}), \
+             patch("documents.utils.agentic_retrieval._generate_shared_query_embedding", return_value=[0.1] * 768), \
              patch("documents.utils.agentic_retrieval._multi_doc_retrieve", return_value={"final_items": [{"doc_id": 1, "chunk": self.chunk1}]}):
 
             result = await run_agentic_retrieval(
@@ -1079,6 +1081,7 @@ class AgenticRetrievalTests(SimpleTestCase):
 
         with patch("google.generativeai.GenerativeModel", return_value=mock_model), \
              patch("documents.utils.agentic_retrieval._hybrid_retrieve", return_value={"hybrid_chunks": [self.chunk1]}), \
+             patch("documents.utils.agentic_retrieval._generate_shared_query_embedding", return_value=[0.1] * 768), \
              patch("documents.utils.agentic_retrieval._multi_doc_retrieve", return_value={"final_items": [{"doc_id": 1, "chunk": self.chunk1}]}):
 
             result = await run_agentic_retrieval(
