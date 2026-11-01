@@ -111,7 +111,7 @@ class Command(BaseCommand):
         chat_history = _parse_history(history_str)
 
         self.stdout.write(f"\n========================================================")
-        self.stdout.write(f"DEBUG AGENTIC RETRIEVAL (Phase 2a LangGraph)")
+        self.stdout.write(f"DEBUG AGENTIC RETRIEVAL (Agentic retrieval)")
         self.stdout.write(f"Workspace: {workspace_name}")
         self.stdout.write(f"Documents ({len(documents)}):")
         for d in documents:
@@ -174,8 +174,25 @@ class Command(BaseCommand):
                     page_str = str(c.page_number) if c.page_number is not None else "-"
                     self.stdout.write(f"  {rank:<5} {c.id:<10} {page_str:<6} {score_str:<14} {clean_content}")
 
-        # 3. Context & Citations
-        self.stdout.write(self.style.SUCCESS(f"\n--- [3. NODE 3: BUILD CONTEXT] (Latency: {timings.get('build_context', 0.0):.2f}ms) ---"))
+        # 3. Corrective Retry Summary (Phase 2b)
+        retry_fired = res.get("retry_fired", False)
+        first_pass_score = res.get("first_pass_score", 0.0)
+        retry_pass_score = res.get("retry_pass_score", 0.0)
+        alternative_query = res.get("alternative_query")
+        retry_winner = res.get("retry_winner")
+        retry_latency = timings.get("retry_retrieve", 0.0)
+
+        self.stdout.write(self.style.SUCCESS(f"\n--- [3. CORRECTIVE RETRY (Phase 2b)] ---"))
+        self.stdout.write(f"First Pass Top Score:  {first_pass_score:.6f}")
+        self.stdout.write(f"Retry Fired:          {'YES' if retry_fired else 'NO'}")
+        if retry_fired:
+            self.stdout.write(f"Alternative Query:    \"{alternative_query}\"")
+            self.stdout.write(f"Retry Pass Top Score: {retry_pass_score:.6f}")
+            self.stdout.write(f"Winner:               {('RETRY PASS' if retry_winner == 'retry' else 'FIRST PASS')}")
+            self.stdout.write(f"Added Retry Latency:  {retry_latency:.2f}ms")
+
+        # 4. Context & Citations
+        self.stdout.write(self.style.SUCCESS(f"\n--- [4. BUILD CONTEXT] (Latency: {timings.get('build_context', 0.0):.2f}ms) ---"))
         sources = res.get("sources", [])
         self.stdout.write(f"Total Sources Formatted: {len(sources)}")
         self.stdout.write(self.style.SUCCESS("\nAssembled Context Preview:"))
@@ -189,10 +206,12 @@ class Command(BaseCommand):
         else:
             self.stdout.write("(Empty context)")
 
-        # 4. Latency Summary
-        self.stdout.write(self.style.SUCCESS(f"\n--- [4. EXECUTION TIMINGS] ---"))
+        # 5. Latency Summary
+        self.stdout.write(self.style.SUCCESS(f"\n--- [5. EXECUTION TIMINGS] ---"))
         self.stdout.write(f"Node 1 (rewrite_and_route): {timings.get('rewrite_and_route', 0.0):.2f}ms")
         self.stdout.write(f"Node 2 (retrieve):          {timings.get('retrieve', 0.0):.2f}ms")
+        if "retry_retrieve" in timings:
+            self.stdout.write(f"Node (retry_retrieve):      {timings.get('retry_retrieve', 0.0):.2f}ms")
         self.stdout.write(f"Node 3 (build_context):     {timings.get('build_context', 0.0):.2f}ms")
         self.stdout.write(f"Total Graph Wall Time:      {total_time_ms:.2f}ms\n")
 

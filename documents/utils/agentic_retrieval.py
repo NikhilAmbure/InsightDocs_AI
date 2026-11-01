@@ -57,6 +57,10 @@ class RewriteAndRouteOutput(BaseModel):
     sub_queries: List[SubQuery] = Field(default_factory=list)
 
 
+class AlternativeQueryOutput(BaseModel):
+    alternative_query: str
+
+
 class AgenticState(TypedDict):
     user_message: str
     chat_history: List[Dict[str, str]]
@@ -70,6 +74,12 @@ class AgenticState(TypedDict):
     timings: Dict[str, float]  # node_name -> latency_ms
     tokens_used: int  # tokens from rewrite LLM call
     error: Optional[str]
+    top_parent_score: float
+    retry_fired: bool
+    alternative_query: Optional[str]
+    first_pass_score: float
+    retry_pass_score: float
+    retry_winner: Optional[str]
 
 
 async def _call_gemini_rewrite(prompt: str):
@@ -255,25 +265,21 @@ Return STRICT JSON matching this schema:
         }
 
 
-async def retrieve_node(state: AgenticState) -> Dict[str, Any]:
+async def _execute_retrieval(
+    query: str,
+    documents: List[Any],
+    route: str = "direct",
+    sub_queries: Optional[List[Dict[str, Any]]] = None,
+) -> Tuple[Dict[int, List[Any]], float]:
     """
-    Node 2: retrieve
-    Executes retrieval based on state['route']:
-    - 'direct': runs standard retrieval pipeline with standalone_query.
-    - 'decompose': runs concurrent per-document retrieval via asyncio.gather and guarantees
-      each selected document receives at least its own top-k slots so no document starves.
+    Executes hybrid retrieval + reranking across documents for a given query.
+    Used by both retrieve_node (first pass) and retry_retrieve_node (second pass).
+    Returns (retrieved_parents, top_parent_score).
     """
-    t0 = time.time()
-    route = state.get("route", "direct")
-    standalone_query = state.get("standalone_query") or state.get("user_message")
-    documents = state.get("documents") or []
-    sub_queries = state.get("sub_queries") or []
-
     rerank_top_n = getattr(settings, "RERANK_TOP_N", 5)
     retrieved_parents: Dict[int, List[Any]] = {}
 
-    if route == "decompose" and len(documents) >= 2:
-        # Build document-to-query map
+    if route == "decompose" and len(documents) >= 2 and sub_queries:
         doc_query_map: Dict[int, str] = {}
         for sq in sub_queries:
             doc_id = sq.get("document_id")
@@ -281,19 +287,16 @@ async def retrieve_node(state: AgenticState) -> Dict[str, Any]:
             if doc_id is not None and q:
                 doc_query_map[int(doc_id)] = q
 
-        # Ensure every selected document has a query (use standalone_query as fallback)
         for d in documents:
             d_id = _get_doc_id(d)
             if d_id not in doc_query_map:
-                doc_query_map[d_id] = standalone_query
+                doc_query_map[d_id] = query
 
-        # Guarantee every selected document gets at least its own slots (min 2 slots)
         per_doc_slots = max(2, int(math.ceil(rerank_top_n / max(len(documents), 1))))
 
-        def _retrieve_single(doc, query, top_k):
-            return _hybrid_retrieve(doc, query, top_k=top_k)
+        def _retrieve_single(doc, q_text, top_k):
+            return _hybrid_retrieve(doc, q_text, top_k=top_k)
 
-        # Run concurrent single-document retrieval with asyncio.gather across thread workers
         tasks = [
             asyncio.to_thread(_retrieve_single, doc, doc_query_map[_get_doc_id(doc)], per_doc_slots)
             for doc in documents
@@ -319,12 +322,11 @@ async def retrieve_node(state: AgenticState) -> Dict[str, Any]:
             def _retrieve_one(d, q, k):
                 return _hybrid_retrieve(d, q, top_k=k)
 
-            res = await asyncio.to_thread(_retrieve_one, doc, standalone_query, rerank_top_n)
+            res = await asyncio.to_thread(_retrieve_one, doc, query, rerank_top_n)
             chunks = res.get("hybrid_chunks", []) if isinstance(res, dict) else []
             retrieved_parents[d_id] = chunks
         elif len(documents) > 1:
-            # Parallel per-document retrieval in workspace mode (same asyncio.gather path as decompose, same query)
-            shared_embedding = await asyncio.to_thread(_generate_shared_query_embedding, standalone_query)
+            shared_embedding = await asyncio.to_thread(_generate_shared_query_embedding, query)
             enable_rerank = getattr(settings, "ENABLE_FLASHRANK_RERANK", False)
             processed_docs = [doc for doc in documents if getattr(doc, "is_processed", False)]
             if not processed_docs:
@@ -333,18 +335,16 @@ async def retrieve_node(state: AgenticState) -> Dict[str, Any]:
 
             if enable_rerank:
                 rerank_candidates_k = getattr(settings, "RERANK_CANDIDATES", 20)
-                rerank_top_n = getattr(settings, "RERANK_TOP_N", 5)
                 per_doc_top_k = max(5, int(math.ceil(rerank_candidates_k / doc_count)))
             else:
                 rerank_candidates_k = 20
-                rerank_top_n = getattr(settings, "RERANK_TOP_N", 5)
                 per_doc_top_k = 5
 
             def _retrieve_single_direct(doc, q, k, emb):
                 return _hybrid_retrieve(doc, q, top_k=k, query_embedding=emb)
 
             tasks = [
-                asyncio.to_thread(_retrieve_single_direct, doc, standalone_query, per_doc_top_k, shared_embedding)
+                asyncio.to_thread(_retrieve_single_direct, doc, query, per_doc_top_k, shared_embedding)
                 for doc in processed_docs
             ]
             results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -385,7 +385,7 @@ async def retrieve_node(state: AgenticState) -> Dict[str, Any]:
                 candidate_chunks = [item["chunk"] for item in candidate_items]
                 chunk_id_to_item = {item["chunk"].id: item for item in candidate_items}
                 reranked_chunks = await asyncio.to_thread(
-                    _rerank_chunks_flashrank, standalone_query, candidate_chunks, top_n=len(candidate_chunks)
+                    _rerank_chunks_flashrank, query, candidate_chunks, top_n=len(candidate_chunks)
                 )
 
                 unique_items = []
@@ -420,15 +420,8 @@ async def retrieve_node(state: AgenticState) -> Dict[str, Any]:
                 doc_id = item.get("doc_id")
                 retrieved_parents.setdefault(doc_id, []).append(item["chunk"])
 
-    elapsed_ms = (time.time() - t0) * 1000
-    timings = dict(state.get("timings") or {})
-    timings["retrieve"] = elapsed_ms
-
-    # Extract scores and counts for retry threshold evaluation
-    all_parent_scores = []
-    total_chunks = 0
+    all_scores = []
     for chunks in retrieved_parents.values():
-        total_chunks += len(chunks)
         for c in chunks:
             s = getattr(c, "rerank_score", None)
             if s is None:
@@ -437,12 +430,34 @@ async def retrieve_node(state: AgenticState) -> Dict[str, Any]:
                 s = getattr(c, "score", None)
             if s is not None:
                 try:
-                    all_parent_scores.append(float(s))
+                    all_scores.append(float(s))
                 except (ValueError, TypeError):
                     pass
 
-    top_parent_score = max(all_parent_scores) if all_parent_scores else 0.0
+    top_score = max(all_scores) if all_scores else 0.0
+    return retrieved_parents, top_score
 
+
+async def retrieve_node(state: AgenticState) -> Dict[str, Any]:
+    """
+    Node 2: retrieve
+    Executes initial retrieval with standalone_query.
+    """
+    t0 = time.time()
+    route = state.get("route", "direct")
+    standalone_query = state.get("standalone_query") or state.get("user_message")
+    documents = state.get("documents") or []
+    sub_queries = state.get("sub_queries") or []
+
+    retrieved_parents, top_parent_score = await _execute_retrieval(
+        standalone_query, documents, route=route, sub_queries=sub_queries
+    )
+
+    elapsed_ms = (time.time() - t0) * 1000
+    timings = dict(state.get("timings") or {})
+    timings["retrieve"] = elapsed_ms
+
+    total_chunks = sum(len(v) for v in retrieved_parents.values())
     logger.info(
         f"[AgenticRetrieval Result] standalone_query='{standalone_query}' route='{route}' "
         f"top_parent_score={top_parent_score:.6f} parents_returned={total_chunks}"
@@ -450,6 +465,255 @@ async def retrieve_node(state: AgenticState) -> Dict[str, Any]:
 
     return {
         "retrieved_parents": retrieved_parents,
+        "top_parent_score": top_parent_score,
+        "first_pass_score": top_parent_score,
+        "retry_fired": False,
+        "timings": timings,
+    }
+
+
+def should_retry(state: AgenticState) -> str:
+    """
+    Conditional edge after retrieve.
+    Returns 'retry_retrieve' if:
+    1. ENABLE_CORRECTIVE_RETRY is True
+    2. FlashRank reranking is enabled (so cross-encoder scores exist)
+    3. Query is NOT a summarize/list all bypass query
+    4. Top parent score is below RETRY_MIN_TOP_SCORE
+    5. Retry hasn't already fired (never loop)
+    Otherwise returns 'build_context'.
+    """
+    enable_retry = getattr(settings, "ENABLE_CORRECTIVE_RETRY", False)
+    if not enable_retry:
+        return "build_context"
+
+    enable_rerank = getattr(settings, "ENABLE_FLASHRANK_RERANK", False)
+    if not enable_rerank:
+        return "build_context"
+
+    user_message = state.get("user_message", "")
+    standalone_query = state.get("standalone_query", "")
+    if _is_summary_query(user_message) or _is_summary_query(standalone_query):
+        return "build_context"
+
+    if state.get("retry_fired", False):
+        return "build_context"
+
+    top_score = state.get("top_parent_score", 0.0)
+    retry_min_top_score = getattr(settings, "RETRY_MIN_TOP_SCORE", 0.001)
+
+    if top_score < retry_min_top_score:
+        return "retry_retrieve"
+
+    return "build_context"
+
+
+def _clean_alternative_query(alt_query: str, documents: List[Any]) -> str:
+    """
+    Sanitizes alternative query:
+    1. Removes quotation marks (single, double, backticks, unicode quotes).
+    2. Strips any occurrence of selected document titles, filenames, and file extensions.
+    3. Normalizes whitespace and returns clean plain text.
+    """
+    cleaned = alt_query
+    # Strip quotation marks
+    cleaned = re.sub(r'["\'`“”‘’]', ' ', cleaned)
+
+    for doc in documents:
+        title = _get_doc_title(doc, "")
+        terms_to_strip = []
+        if title:
+            terms_to_strip.append(title)
+            name_no_ext = re.sub(r'\.[a-zA-Z0-9]{2,5}$', '', title)
+            if name_no_ext:
+                terms_to_strip.append(name_no_ext)
+            base_name = title.split("/")[-1].split("\\")[-1]
+            if base_name:
+                terms_to_strip.append(base_name)
+                base_no_ext = re.sub(r'\.[a-zA-Z0-9]{2,5}$', '', base_name)
+                if base_no_ext:
+                    terms_to_strip.append(base_no_ext)
+
+        file_obj = getattr(doc, "file", None)
+        if file_obj and hasattr(file_obj, "name"):
+            f_name = file_obj.name.split("/")[-1].split("\\")[-1]
+            if f_name:
+                terms_to_strip.append(f_name)
+                f_no_ext = re.sub(r'\.[a-zA-Z0-9]{2,5}$', '', f_name)
+                if f_no_ext:
+                    terms_to_strip.append(f_no_ext)
+
+        terms_to_strip = sorted(set(terms_to_strip), key=len, reverse=True)
+        for term in terms_to_strip:
+            if len(term.strip()) >= 3:
+                pattern = re.compile(re.escape(term.strip()), re.IGNORECASE)
+                cleaned = pattern.sub(' ', cleaned)
+
+    # Remove lingering standalone extension keywords and file labels
+    cleaned = re.sub(r'\b(pdf|docx|txt|document|file)\b', ' ', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    return cleaned
+
+
+async def retry_retrieve_node(state: AgenticState) -> Dict[str, Any]:
+    """
+    Node: retry_retrieve (Phase 2b)
+    Performs one corrective retrieval retry when initial top score falls below RETRY_MIN_TOP_SCORE.
+    Calls Gemini Flash to generate an alternative query with domain keywords and synonyms in plain words.
+    The alternative query must NOT include document titles, filenames, or quotation marks.
+    If the alternative query contains a document title/filename, it is stripped.
+    If the alternative query is empty or equals the original standalone query, re-retrieval is skipped.
+    Keeps whichever pass has the higher top score; never merges the two passes.
+    """
+    t0 = time.time()
+    user_message = state.get("user_message", "")
+    standalone_query = state.get("standalone_query") or user_message
+    chat_history = state.get("chat_history") or []
+    documents = state.get("documents") or []
+    route = state.get("route", "direct")
+    old_top_score = state.get("top_parent_score", 0.0)
+    old_parents = state.get("retrieved_parents", {})
+
+    timings = dict(state.get("timings") or {})
+    retry_tokens = 0
+    alt_query = None
+
+    doc_lines = []
+    for d in documents:
+        doc_id = _get_doc_id(d)
+        doc_title = _get_doc_title(d, default=f"Doc {doc_id}")
+        doc_lines.append(f"- ID {doc_id}: \"{doc_title}\"")
+    docs_str = "\n".join(doc_lines) if doc_lines else "None"
+
+    history_lines = []
+    for msg in chat_history[-4:]:
+        role = msg.get("role", "user")
+        content = msg.get("content", "").strip()
+        if content:
+            history_lines.append(f"{role.capitalize()}: {content}")
+    history_str = "\n".join(history_lines) if history_lines else "None"
+
+    prompt = f"""You are an expert search query reformulation engine for an enterprise document retrieval system.
+The initial search query yielded poor or low-confidence results.
+Your task is to produce a plain-text alternative search query that rephrases what the user wants using synonyms and likely domain terms.
+
+CRITICAL RULES:
+1. Do NOT include document titles, filenames, or file extensions (e.g., .pdf, .docx).
+2. Do NOT use quotation marks (single or double quotes).
+3. Use plain natural words and specific domain terminology that describe the underlying topic, concept, or information sought.
+4. If the user's message is too ambiguous, vague, or refers to an undefined reference (such as "section 2", "part 1", "this clause", etc.) without enough context to rewrite meaningfully, return the original standalone query unchanged.
+
+AVAILABLE CONTEXT (FOR DOMAIN INFERENCE ONLY - DO NOT COPY TITLES/FILENAMES INTO QUERY):
+{docs_str}
+
+CONVERSATION HISTORY:
+{history_str}
+
+ORIGINAL USER MESSAGE:
+{user_message}
+
+PREVIOUS RETRIEVAL QUERY:
+{standalone_query}
+
+Return STRICT JSON matching this schema:
+{{
+  "alternative_query": "<plain-text search query without titles, filenames, or quotes>"
+}}
+"""
+
+    try:
+        response = await asyncio.wait_for(_call_gemini_rewrite(prompt), timeout=REWRITE_TIMEOUT_SECONDS)
+        usage_meta = getattr(response, "usage_metadata", None)
+        if usage_meta is not None:
+            retry_tokens = int(getattr(usage_meta, "total_token_count", 0) or 0)
+
+        raw_text = response.text or ""
+        json_payload = _safe_json_loads(raw_text)
+        if not json_payload or not isinstance(json_payload, dict):
+            raise ValueError(f"Invalid JSON returned: {raw_text[:100]}")
+
+        parsed = AlternativeQueryOutput.model_validate(json_payload)
+        raw_alt_query = parsed.alternative_query.strip()
+        if not raw_alt_query:
+            raise ValueError("Empty alternative query returned")
+
+        # Safety net: remove document titles, filenames, and quotation marks
+        alt_query = _clean_alternative_query(raw_alt_query, documents)
+
+    except Exception as e:
+        logger.warning(f"Alternative query generation failed or timed out: {e}. Skipping retry silently.")
+        elapsed_ms = (time.time() - t0) * 1000
+        timings["retry_retrieve"] = elapsed_ms
+        logger.info(
+            f"[CorrectiveRetry Result] retry_fired=True alt_query=None "
+            f"first_score={old_top_score:.6f} retry_score=0.000000 winner='first'"
+        )
+        return {
+            "retry_fired": True,
+            "alternative_query": None,
+            "first_pass_score": old_top_score,
+            "retry_pass_score": 0.0,
+            "retry_winner": "first",
+            "tokens_used": state.get("tokens_used", 0) + retry_tokens,
+            "timings": timings,
+        }
+
+    # Safety net: if alternative query is empty or identical to the original standalone query, skip re-retrieval
+    is_empty = not alt_query
+    is_identical = (alt_query.lower() == standalone_query.strip().lower())
+
+    if is_empty or is_identical:
+        elapsed_ms = (time.time() - t0) * 1000
+        timings["retry_retrieve"] = elapsed_ms
+        final_alt_display = alt_query if alt_query else standalone_query
+        logger.info(
+            f"[CorrectiveRetry Result] retry_fired=True alt_query='{final_alt_display}' "
+            f"skipped_re_retrieval=True reason={'empty_after_strip' if is_empty else 'identical_to_original'} "
+            f"first_score={old_top_score:.6f} retry_score={old_top_score:.6f} winner='first'"
+        )
+        return {
+            "retrieved_parents": old_parents,
+            "top_parent_score": old_top_score,
+            "retry_fired": True,
+            "alternative_query": final_alt_display,
+            "first_pass_score": old_top_score,
+            "retry_pass_score": old_top_score,
+            "retry_winner": "first",
+            "tokens_used": state.get("tokens_used", 0) + retry_tokens,
+            "timings": timings,
+        }
+
+    # Re-run retrieval with alternative_query
+    new_retrieved_parents, new_top_score = await _execute_retrieval(
+        alt_query, documents, route=route, sub_queries=None
+    )
+
+    if new_top_score > old_top_score:
+        winner = "retry"
+        winning_parents = new_retrieved_parents
+        winning_score = new_top_score
+    else:
+        winner = "first"
+        winning_parents = old_parents
+        winning_score = old_top_score
+
+    elapsed_ms = (time.time() - t0) * 1000
+    timings["retry_retrieve"] = elapsed_ms
+
+    logger.info(
+        f"[CorrectiveRetry Result] retry_fired=True alt_query='{alt_query}' "
+        f"first_score={old_top_score:.6f} retry_score={new_top_score:.6f} winner='{winner}'"
+    )
+
+    return {
+        "retrieved_parents": winning_parents,
+        "top_parent_score": winning_score,
+        "retry_fired": True,
+        "alternative_query": alt_query,
+        "first_pass_score": old_top_score,
+        "retry_pass_score": new_top_score,
+        "retry_winner": winner,
+        "tokens_used": state.get("tokens_used", 0) + retry_tokens,
         "timings": timings,
     }
 
@@ -514,15 +778,24 @@ async def build_context_node(state: AgenticState) -> Dict[str, Any]:
 
 
 def build_agentic_retrieval_graph():
-    """Build and compile the LangGraph StateGraph for agentic retrieval."""
+    """Build and compile the LangGraph StateGraph for agentic retrieval with corrective retry (Phase 2b)."""
     builder = StateGraph(AgenticState)
     builder.add_node("rewrite_and_route", rewrite_and_route_node)
     builder.add_node("retrieve", retrieve_node)
+    builder.add_node("retry_retrieve", retry_retrieve_node)
     builder.add_node("build_context", build_context_node)
 
     builder.set_entry_point("rewrite_and_route")
     builder.add_edge("rewrite_and_route", "retrieve")
-    builder.add_edge("retrieve", "build_context")
+    builder.add_conditional_edges(
+        "retrieve",
+        should_retry,
+        {
+            "retry_retrieve": "retry_retrieve",
+            "build_context": "build_context",
+        },
+    )
+    builder.add_edge("retry_retrieve", "build_context")
     builder.add_edge("build_context", END)
 
     return builder.compile()
@@ -547,7 +820,7 @@ async def run_agentic_retrieval(
     """
     Run agentic retrieval graph end-to-end.
     Returns dict containing context_text, sources, standalone_query, route, sub_queries,
-    retrieved_parents, timings, and tokens_used.
+    retrieved_parents, timings, tokens_used, retry_fired, alternative_query, etc.
     """
     graph = get_agentic_retrieval_graph()
     initial_state: AgenticState = {
@@ -563,6 +836,12 @@ async def run_agentic_retrieval(
         "timings": {},
         "tokens_used": 0,
         "error": None,
+        "top_parent_score": 0.0,
+        "retry_fired": False,
+        "alternative_query": None,
+        "first_pass_score": 0.0,
+        "retry_pass_score": 0.0,
+        "retry_winner": None,
     }
 
     result = await graph.ainvoke(initial_state)
